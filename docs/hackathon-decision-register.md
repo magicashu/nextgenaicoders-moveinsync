@@ -402,6 +402,16 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** The organizer files change checksum; re-profile and version expected results instead of silently updating assertions.
 - **Supersedes:** Any implication that the tiny scaffold fixture alone verifies official-data compatibility.
 
+## D-043: Runtime capability reporting is fail-visible and release-aware
+
+- **Status:** Accepted; first C3 slice implemented
+- **Decision:** Report the presence and concrete implementation of authorization, governed metrics, workflow engine, checkpoint, approval, revalidation, execution and business-audit ports through an Actuator health contributor. Process liveness remains healthy while `releaseReady`, `investigationReady`, `governedActionsReady` and `operatingMode` expose missing capabilities. Missing optional/delivered-later adapters must never be silently represented as active.
+- **Reason:** Parallel work can produce an application that starts while critical security or action components are absent. A visible capability matrix lets integration tests and operators distinguish process health from feature/release readiness without making the deterministic read path depend on LangGraph4j, PostgreSQL or telemetry.
+- **Evidence or rubric link:** Architecture/code quality, functionality and the failure fallbacks in the delivery plan.
+- **Consequences:** The current scaffold honestly reports `SCAFFOLD`: metric and deterministic engine beans exist, while authorization and governed-action ports are unavailable. C3 will update to `READ_ONLY` or `FULL` automatically as implementations are composed; integration tests must assert this progression.
+- **Reconsider if:** A secured dedicated capability endpoint replaces Actuator details; retain the same semantics and test coverage.
+- **Supersedes:** None.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -437,6 +447,7 @@ When the hackathon begins:
 | 2026-09-05 | D-040 | Moved new Codex and Claude integration work to `Java-branch-2` while preserving `Java-branch` | Maintain a clean implementation line from the accepted scaffold/plan baseline |
 | 2026-09-05 | D-041 | Froze shared authorization, checkpoint, approval, revalidation, execution and audit ports plus bounded workflow configuration | Give parallel component workers safe, framework-neutral contracts and deterministic control gates |
 | 2026-09-05 | D-042 | Added mandatory official-data G1 M01 reconciliation and fixed date/type normalization defects found by it | Ensure release correctness is proven on organizer data rather than only on the tiny fixture |
+| 2026-09-05 | D-043 | Added fail-visible runtime capability and release-readiness reporting | Distinguish a live process from a fully governed, releasable application during parallel integration |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

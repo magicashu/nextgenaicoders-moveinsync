@@ -9,6 +9,7 @@ This board is maintained by the Codex Foundation & Integration owner on `Java-br
 | Codex C0 metric/contracts | `Java-branch-2` | Green | `d4aa14d`; contract and serialization tests pass |
 | Codex C1 build foundation | `Java-branch-2` | Green | `90c1683`; Java 21 configuration and one-command verification pass |
 | Codex C2 application ports | `Java-branch-2` | Green | `90c1683`; control-plane consumer contracts pass |
+| Codex C3 Spring composition | `Java-branch-2` | In progress | Application-start capability report is green; final adapter selection awaits worker handoffs |
 | Codex official-data gate | `Java-branch-2` | Green | Current release-gate commit; seven checksums plus G1 M01 unit/API reconciliation pass |
 | Claude WS1 governed analytics | `feat/governed-analytics` | Pending | Commit, tests, seven-file ingest and G1 evidence |
 | Claude WS2 agent workflow | `feat/agent-workflow` | Pending | Commit, bounded trajectory tests and fallback proof |
@@ -22,7 +23,7 @@ This board is maintained by the Codex Foundation & Integration owner on `Java-br
 | Gate | State | Current evidence / exit condition |
 |---|---|---|
 | Organizer data integrity | Green | All seven files match `contracts/data/official-checksums.sha256` |
-| Build and baseline suite | Green | 11 Java tests, React production build, 1 React test and fixture validation pass |
+| Build and baseline suite | Green | 12 Java tests, React production build, 1 React test and fixture validation pass |
 | Official G1 M01 | Green | 4,357 / 19,913 = 21.88%; baseline 12.28%; delta 9.60 pp |
 | Official HTTP slice | Green | M01 reaches `AWAITING_APPROVAL` through the running Spring API |
 | Complete G1 investigation | Red | Await WS1/WS2/WS4: M03/M04/M09/M11, concentration, vendor rebuttal and dual brief |

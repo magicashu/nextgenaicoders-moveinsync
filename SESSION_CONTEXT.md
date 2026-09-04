@@ -21,7 +21,7 @@ codex
 
 Read `AGENTS.md` first. The authoritative records are:
 
-- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-042).
+- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-043).
 - `docs/live-problem-statement-analysis.md` — exact live requirements, rubric mapping, architecture, golden demo, and scope cuts.
 - `docs/detailed-solution-architecture-plan.md` — frozen agent count, node map, state/tools, worker tasks bound to the dataset, controls, tests, and build order.
 - `docs/project-structure.md` — implementation-ready Java/React monorepo tree, ownership boundaries, test placement and scaffolding order.
@@ -54,6 +54,7 @@ Do not reproduce those documents here; use them as the source of truth.
 - Metric contracts (D-039): v1.1 fixes M06 to use all valid employee legs, M09 to use median per-trip positive billed cost, M11 to driver-only low ratings, M15 to Sev-1/2 acknowledgement P90, M18 to descriptive escort-present rate, and qualifies universal vendor comparisons at 500 trips in both windows.
 - Shared control contracts (D-041): typed authorization, optimistic checkpoint, approval, revalidation, idempotent execution and audit ports plus configured workflow bounds are frozen for Claude consumers.
 - Official-data gate (D-042): `scripts/release/verify-release.sh` pins organizer checksums and runs the complete suite plus fixture/official API checks; G1 M01 must reproduce 4,357/19,913 = 21.88%, baseline 12.28%, delta 9.60 pp, with explicit normalization of free-text dates and comma numerics.
+- Capability reporting (D-043): Actuator distinguishes process health from `releaseReady`, investigation readiness, governed-action readiness and individual adapter availability; missing worker adapters remain visible rather than silently mocked.
 - Action scope: mocked vendor escalation, investigation ticket, watchlist, or communication draft. No real external communication.
 - Observability: one end-to-end trace with nested orchestration, tool, metric, and approval spans.
 - Evaluation (D-033): ten deterministic fixtures, corrupted variants V1-V5, and trajectory/narrative cases for G1-G3; LLM judges only for explanation quality.
@@ -61,7 +62,7 @@ Do not reproduce those documents here; use them as the source of truth.
 ## Current state
 
 - Active implementation/integration branch: `Java-branch-2`; `Java-branch` is the preserved scaffold/parallel-plan baseline.
-- Live problem statement analyzed; decisions D-015 through D-042 recorded.
+- Live problem statement analyzed; decisions D-015 through D-043 recorded.
 - Official dataset received, checksummed (`tmp/profile/checksums.sha256`), and profiled; raw profile outputs in `tmp/profile/*.txt` and parquet caches in `tmp/profile/*.parquet` (regenerable, not authoritative).
 - The synthetic rehearsal package under `outputs/01a0584b-8bd8-7370-bc91-86525608d54d/` is retired (D-022/D-023 superseded).
 - A verified application scaffold now exists. `scripts/verify.sh` passes the Java unit test, React build/test and fixture check; `scripts/demo/verify-api.sh` passes the live Spring/DuckDB JSON check.
