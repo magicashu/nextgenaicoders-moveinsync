@@ -39,8 +39,8 @@ public class ApiExceptionHandler {
         return respond(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "The request is invalid", List.of(detail));
     }
 
-    @ExceptionHandler({RunNotFoundException.class, ApprovalNotFoundException.class})
-    public ResponseEntity<ApiError> notFound(RuntimeException e) {
+    @ExceptionHandler({RunNotFoundException.class, ApprovalNotFoundException.class, org.springframework.web.servlet.resource.NoResourceFoundException.class})
+    public ResponseEntity<ApiError> notFound(Exception e) {
         return respond(HttpStatus.NOT_FOUND, "NOT_FOUND", sanitize(e.getMessage()), List.of());
     }
 
