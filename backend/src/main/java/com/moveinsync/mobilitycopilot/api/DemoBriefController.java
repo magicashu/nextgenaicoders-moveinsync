@@ -1,4 +1,4 @@
-package com.moveinsync.mobilitycopilot.reporting.api;
+package com.moveinsync.mobilitycopilot.api;
 
 import com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief;
 import com.moveinsync.mobilitycopilot.workflow.application.WorkflowCoordinator;
@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
+/** Scaffold endpoint kept for the frozen OpenAPI 0.1.0 contract and the verify-api script. */
 @Validated
 @RestController
 @RequestMapping("/api/v1/demo")
@@ -27,8 +28,7 @@ public class DemoBriefController {
     @GetMapping("/brief")
     public DecisionBrief brief(
             @RequestHeader(name = "X-Business-Unit", defaultValue = "pinnacle-Slc") @NotBlank String businessUnit,
-            @RequestParam(name = "asOf", defaultValue = "2026-06-08")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
+            @RequestParam(name = "asOf", defaultValue = "2026-06-08") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
         return workflowCoordinator.createDemoBrief(businessUnit, asOfDate);
     }
 }
