@@ -1,0 +1,150 @@
+file_name,grain,column_name,logical_type,description,source_status
+tenants.csv,One synthetic enterprise tenant,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+tenants.csv,One synthetic enterprise tenant,tenant_name,string,Synthetic tenant name field.,Column-level assumption; content domain is based on the problem statement.
+tenants.csv,One synthetic enterprise tenant,primary_region,string,Synthetic primary region field.,Column-level assumption; content domain is based on the problem statement.
+tenants.csv,One synthetic enterprise tenant,timezone,string,Synthetic timezone field.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,site_id,string,Enterprise campus/site identifier.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,site_name,string,Synthetic site name field.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,city,string,Operating city.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,latitude,number,Synthetic latitude field.,Column-level assumption; content domain is based on the problem statement.
+sites.csv,One enterprise campus/site,longitude,number,Synthetic longitude field.,Column-level assumption; content domain is based on the problem statement.
+shifts.csv,One configured employee shift,shift_id,string,Scheduled employee shift identifier.,Column-level assumption; content domain is based on the problem statement.
+shifts.csv,One configured employee shift,shift_name,string,Synthetic shift name field.,Column-level assumption; content domain is based on the problem statement.
+shifts.csv,One configured employee shift,local_start_time,string,Synthetic local start time field.,Column-level assumption; content domain is based on the problem statement.
+shifts.csv,One configured employee shift,local_end_time,string,Synthetic local end time field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,vendor_id,string,Transport vendor identifier.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,vendor_name,string,Synthetic vendor name field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,contract_tier,string,Synthetic contract tier field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,active_from,date,Synthetic active from field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,active_to,date,Synthetic active to field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,ota_sla_pct,number,Synthetic ota sla pct field.,Column-level assumption; content domain is based on the problem statement.
+vendors.csv,One transport vendor per tenant,safety_sla_pct,number,Synthetic safety sla pct field.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,route_id,string,Configured mobility route identifier.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,route_name,string,Synthetic route name field.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,site_id,string,Enterprise campus/site identifier.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,service_mode,string,"CAB, NODAL, or SHUTTLE.",Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,planned_distance_km,number,Configured trip distance in kilometres.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,active_flag,boolean,Synthetic active flag field.,Column-level assumption; content domain is based on the problem statement.
+routes.csv,One configured route,synthetic_hotspot_flag,boolean,Synthetic synthetic hotspot flag field.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,vehicle_id,string,Tokenized vehicle identifier.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,vendor_id,string,Transport vendor identifier.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,service_mode,string,"CAB, NODAL, or SHUTTLE.",Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,vehicle_type,string,Synthetic vehicle type field.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,capacity,number,Synthetic capacity field.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,fuel_type,string,Synthetic vehicle fuel category.,Column-level assumption; content domain is based on the problem statement.
+vehicles.csv,One anonymized vehicle,compliance_status,string,Combined vehicle/driver compliance state.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,driver_id,string,Tokenized driver identifier.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,vendor_id,string,Transport vendor identifier.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,driver_token,string,Synthetic driver token field.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,training_status,string,Synthetic training status field.,Column-level assumption; content domain is based on the problem statement.
+drivers.csv,One anonymized driver,background_check_status,number,Synthetic background check status field.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,employee_token,string,Synthetic employee token field.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,site_id,string,Enterprise campus/site identifier.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,shift_id,string,Scheduled employee shift identifier.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,business_unit,string,Synthetic business unit field.,Column-level assumption; content domain is based on the problem statement.
+employees.csv,One anonymized employee,active_flag,boolean,Synthetic active flag field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,service_mode,string,"CAB, NODAL, or SHUTTLE.",Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,metric_id,string,Synthetic metric id field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,target_value,number,Synthetic target value field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,comparison_operator,string,Synthetic comparison operator field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,effective_from,date,Synthetic effective from field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,effective_to,date,Synthetic effective to field.,Column-level assumption; content domain is based on the problem statement.
+sla_targets.csv,One tenant/mode/metric SLA version,metric_version,string,Synthetic metric version field.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,service_date,date,UTC calendar date of scheduled service.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,city,string,Operating city.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,site_id,string,Enterprise campus/site identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,shift_id,string,Scheduled employee shift identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,service_mode,string,"CAB, NODAL, or SHUTTLE.",Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,route_id,string,Configured mobility route identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,vendor_id,string,Transport vendor identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,driver_id,string,Tokenized driver identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,vehicle_id,string,Tokenized vehicle identifier.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,scheduled_start_at_utc,timestamp,Scheduled trip start timestamp in UTC.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,scheduled_drop_at_utc,timestamp,Scheduled arrival timestamp in UTC.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,actual_start_at_utc,timestamp,Actual trip start timestamp when available.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,actual_drop_at_utc,timestamp,Actual arrival timestamp when available.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,trip_status,string,"COMPLETED, CANCELLED, or ABORTED.",Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,pickup_delay_minutes,number,Actual minus scheduled pickup in minutes.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,arrival_delay_minutes,number,Actual minus scheduled arrival in minutes.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,delay_reason,string,Recorded operational reason for material delay.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,planned_distance_km,number,Configured trip distance in kilometres.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,actual_distance_km,number,Observed trip distance in kilometres.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,vehicle_capacity,number,Maximum passenger capacity.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,booked_employees,number,Booked employees recorded on the trip summary.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,boarded_employees,number,Employees recorded as boarded.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,no_show_count,number,Booked employees not boarded.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,quoted_cost,number,Planned vendor charge in INR.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,actual_cost,number,Observed vendor charge in INR; controlled nulls included.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,currency,string,ISO currency code.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,sla_tolerance_minutes,number,Maximum arrival delay counted as on time.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,on_time_arrival_flag,boolean,True when completed arrival delay is within tolerance.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,gps_expected_points,number,Expected sample GPS points for this synthetic trip.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,gps_recorded_points,number,Observed GPS point count.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,gps_coverage_pct,number,Recorded divided by expected GPS points.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,feedback_response_count,number,Feedback responses linked to the trip.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,avg_feedback_rating,number,Trip feedback rating on a 1-5 scale when supplied.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,safety_incident_flag,boolean,Whether a safety event is linked to the trip.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,compliance_status,string,Combined vehicle/driver compliance state.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,fuel_type,string,Synthetic vehicle fuel category.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,estimated_co2_kg,number,Synthetic estimated trip emissions.,Column-level assumption; content domain is based on the problem statement.
+trip_logs.csv,One row per trip-log record; controlled duplicate IDs included,data_quality_flags,boolean,Pipe-delimited controlled data-quality conditions.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,booking_id,string,Synthetic booking id field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,employee_token,string,Synthetic employee token field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,site_id,string,Enterprise campus/site identifier.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,shift_id,string,Scheduled employee shift identifier.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,boarding_status,string,Synthetic boarding status field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,scheduled_boarding_at_utc,timestamp,Synthetic scheduled boarding at utc field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,actual_boarding_at_utc,timestamp,Synthetic actual boarding at utc field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,boarding_delay_minutes,number,Synthetic boarding delay minutes field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,feedback_id,string,Synthetic feedback id field.,Column-level assumption; content domain is based on the problem statement.
+employee_trip_roster.csv,One employee booking per trip,data_quality_flag,boolean,Synthetic data quality flag field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,gps_event_id,string,Synthetic gps event id field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,recorded_at_utc,timestamp,Synthetic recorded at utc field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,sequence_no,number,Synthetic sequence no field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,latitude,number,Synthetic latitude field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,longitude,number,Synthetic longitude field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,speed_kph,number,Synthetic speed kph field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,accuracy_m,number,Synthetic accuracy m field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,ignition_on,boolean,Synthetic ignition on field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,source,string,Synthetic source field.,Column-level assumption; content domain is based on the problem statement.
+gps_traces.csv,One recorded GPS point per trip,quality_flag,boolean,Synthetic quality flag field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,delay_id,string,Synthetic delay id field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,recorded_at_utc,timestamp,Synthetic recorded at utc field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,delay_stage,string,Synthetic delay stage field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,delay_minutes,number,Synthetic delay minutes field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,delay_reason,string,Recorded operational reason for material delay.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,source,string,Synthetic source field.,Column-level assumption; content domain is based on the problem statement.
+delay_records.csv,One material arrival delay event,disputed_flag,boolean,Synthetic disputed flag field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,feedback_id,string,Synthetic feedback id field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,employee_token,string,Synthetic employee token field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,submitted_at_utc,timestamp,Synthetic submitted at utc field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,rating,number,Synthetic rating field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,sentiment,string,Synthetic sentiment field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,category,string,Synthetic category field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,comment_anonymized,string,Synthetic comment anonymized field.,Column-level assumption; content domain is based on the problem statement.
+employee_feedback.csv,One employee feedback response,moderation_flag,boolean,Synthetic moderation flag field.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,tenant_id,string,Synthetic tenant boundary used for isolation tests.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,incident_id,string,Synthetic incident id field.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,trip_id,string,Anonymized trip identifier.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,reported_at_utc,timestamp,Synthetic reported at utc field.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,severity,string,Synthetic severity field.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,incident_type,string,Synthetic incident type field.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,compliance_status,string,Combined vehicle/driver compliance state.,Column-level assumption; content domain is based on the problem statement.
+safety_incidents.csv,One safety/compliance event,resolved_flag,boolean,Synthetic resolved flag field.,Column-level assumption; content domain is based on the problem statement.

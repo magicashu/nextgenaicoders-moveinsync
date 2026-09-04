@@ -1,0 +1,5 @@
+shift_id,shift_name,local_start_time,local_end_time
+SHIFT_MORNING,Morning,06:00,15:00
+SHIFT_DAY,Day,09:00,18:00
+SHIFT_EVENING,Evening,14:00,23:00
+SHIFT_NIGHT,Night,22:00,07:00
