@@ -21,7 +21,7 @@ codex
 
 Read `AGENTS.md` first. The authoritative records are:
 
-- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-040).
+- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-041).
 - `docs/live-problem-statement-analysis.md` — exact live requirements, rubric mapping, architecture, golden demo, and scope cuts.
 - `docs/detailed-solution-architecture-plan.md` — frozen agent count, node map, state/tools, worker tasks bound to the dataset, controls, tests, and build order.
 - `docs/project-structure.md` — implementation-ready Java/React monorepo tree, ownership boundaries, test placement and scaffolding order.
@@ -51,6 +51,7 @@ Do not reproduce those documents here; use them as the source of truth.
 - Parallel delivery (D-037/D-040): six exclusive component workstreams plus one Integration Owner; `Java-branch-2` is the implementation/integration branch, while `Java-branch` remains the preserved scaffold/plan baseline; workers do not merge or push directly into `Java-branch-2`.
 - Codex coding ownership (D-038): Codex owns C0-C7—shared contracts/ports, build/configuration, Spring composition, vertical/action/UI integration and release engineering—while Claude owns component packets 01–06.
 - Metric contracts (D-039): v1.1 fixes M06 to use all valid employee legs, M09 to use median per-trip positive billed cost, M11 to driver-only low ratings, M15 to Sev-1/2 acknowledgement P90, M18 to descriptive escort-present rate, and qualifies universal vendor comparisons at 500 trips in both windows.
+- Shared control contracts (D-041): typed authorization, optimistic checkpoint, approval, revalidation, idempotent execution and audit ports plus configured workflow bounds are frozen for Claude consumers.
 - Action scope: mocked vendor escalation, investigation ticket, watchlist, or communication draft. No real external communication.
 - Observability: one end-to-end trace with nested orchestration, tool, metric, and approval spans.
 - Evaluation (D-033): ten deterministic fixtures, corrupted variants V1-V5, and trajectory/narrative cases for G1-G3; LLM judges only for explanation quality.
@@ -58,12 +59,12 @@ Do not reproduce those documents here; use them as the source of truth.
 ## Current state
 
 - Active implementation/integration branch: `Java-branch-2`; `Java-branch` is the preserved scaffold/parallel-plan baseline.
-- Live problem statement analyzed; decisions D-015 through D-040 recorded.
+- Live problem statement analyzed; decisions D-015 through D-041 recorded.
 - Official dataset received, checksummed (`tmp/profile/checksums.sha256`), and profiled; raw profile outputs in `tmp/profile/*.txt` and parquet caches in `tmp/profile/*.parquet` (regenerable, not authoritative).
 - The synthetic rehearsal package under `outputs/01a0584b-8bd8-7370-bc91-86525608d54d/` is retired (D-022/D-023 superseded).
 - A verified application scaffold now exists. `scripts/verify.sh` passes the Java unit test, React build/test and fixture check; `scripts/demo/verify-api.sh` passes the live Spring/DuckDB JSON check.
 - The next step is replacing the tiny fixture seam with full seven-file ingestion and reconciling official-data M01/M04/M09.
-- Codex completed C0 metric semantics and the generic multi-unit metric contract in `d4aa14d`. Next Codex work is C1/C2 build foundation and application-port freeze; Claude packets remain under `docs/claude-workstreams/` for the user to launch independently.
+- Codex completed C0 metric semantics in `d4aa14d` and has implemented the C1/C2 bounded configuration and shared control-plane ports. Claude packets remain under `docs/claude-workstreams/` for the user to launch independently.
 
 ## Immediate build sequence
 

@@ -50,10 +50,15 @@ export type DecisionBrief = {
   findings: string[]
   recommendedAction: {
     actionId: string
-    type: string
+    runId: string
+    type: 'CREATE_SITE_SHIFT_WATCHLIST' | 'CREATE_INVESTIGATION_TICKET' | 'DRAFT_VENDOR_ESCALATION' | 'DRAFT_COMMUNICATION'
     title: string
     rationale: string
-    status: string
+    scope: Record<string, string>
+    evidenceVersion: string
+    createdAt: string
+    expiresAt: string
+    status: 'DRAFT_REQUIRES_APPROVAL'
   }
   evidence: EvidenceBundle
   status: string

@@ -8,6 +8,12 @@ server:
 mobility:
   data:
     directory: ${MOBILITY_DATA_DIR:data/fixtures}
+  workflow:
+    max-investigation-steps: ${MAX_INVESTIGATION_STEPS:4}
+    max-correction-cycles: ${MAX_CORRECTION_CYCLES:1}
+    max-tool-calls: ${MAX_TOOL_CALLS:12}
+    tool-timeout: ${TOOL_TIMEOUT:10s}
+    approval-ttl: ${APPROVAL_TTL:30m}
 
 management:
   endpoints:

@@ -31,9 +31,14 @@ export const fixtureBrief: DecisionBrief = {
   ],
   recommendedAction: {
     actionId: '00000000-0000-0000-0000-000000000002',
-    type: 'CREATE_WATCHLIST',
+    runId: '00000000-0000-0000-0000-000000000001',
+    type: 'CREATE_SITE_SHIFT_WATCHLIST',
     title: 'Create a site-shift watchlist',
     rationale: 'Investigate the deterioration before assigning vendor blame.',
+    scope: { businessUnit: 'pinnacle-Slc' },
+    evidenceVersion: 'fixture-v1',
+    createdAt: '2026-06-08T08:00:00Z',
+    expiresAt: '2026-06-08T08:30:00Z',
     status: 'DRAFT_REQUIRES_APPROVAL',
   },
   evidence: {

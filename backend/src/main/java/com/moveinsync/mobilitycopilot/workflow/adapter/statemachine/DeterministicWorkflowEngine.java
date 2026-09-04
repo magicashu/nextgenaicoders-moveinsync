@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -55,6 +56,12 @@ public final class DeterministicWorkflowEngine implements WorkflowEngine {
 
     private AuditEvent event(WorkflowState state, String eventType) {
         return new AuditEvent(
-                UUID.randomUUID(), state.runId(), state.tenant().businessUnit(), eventType, Instant.now());
+                UUID.randomUUID(),
+                state.runId(),
+                state.tenant().businessUnit(),
+                eventType,
+                Map.of("workflowStep", state.step().name()),
+                Instant.now(),
+                state.runId().toString());
     }
 }

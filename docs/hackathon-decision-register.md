@@ -382,6 +382,16 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** The user asks to merge the finished release back into `Java-branch` or selects another release branch.
 - **Supersedes:** The `Java-branch` integration-target portions of D-037/D-038; workstream ownership is unchanged.
 
+## D-041: Shared control-plane ports and bounded workflow configuration are frozen
+
+- **Status:** Accepted and implemented
+- **Decision:** Freeze project-owned Java ports for tenant authorization, optimistic-version workflow checkpoints, approval persistence, action revalidation, idempotent execution and append-only audit. Action proposals carry run ID, allowlisted type, bounded scope, evidence version, creation/expiry times and typed status. Approval decisions carry approval/action/run IDs and typed approve/reject/edit semantics. Execution requires a trusted actor/tenant match and an evidence-version match before revalidation; executors receive the revalidation result and return a terminal receipt. Workflow limits are typed configuration with defaults of four investigation steps, one correction cycle, twelve tool calls, ten-second tool timeout and thirty-minute approval TTL.
+- **Reason:** Claude component implementations need stable interfaces that prevent database/framework coupling and make the safety boundary enforceable in tests. Configured bounds and explicit evidence/expiry/idempotency data prevent unbounded or stale action execution.
+- **Evidence or rubric link:** Governed action, auditability, agentic cost/scale and architecture/code-quality criteria; D-024, D-037 and D-038.
+- **Consequences:** WS2/WS3/WS4 implement against these ports and may not change them without an Integration Owner contract update. PostgreSQL and mock adapters remain replaceable. Control contract tests reject cross-tenant commands, invalid edit decisions, unqualified revalidation failures and incomplete execution receipts.
+- **Reconsider if:** Integration reveals a missing field; update Java records, schemas, consumer/provider tests and the decision register atomically.
+- **Supersedes:** The underspecified scaffold-only action/approval/audit records in D-036.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -415,6 +425,7 @@ When the hackathon begins:
 | 2026-09-05 | D-038 | Assigned Codex the C0-C7 foundation and integration coding series alongside six Claude component workstreams | Ensure both Codex and Claude write production/test code while preserving exclusive ownership |
 | 2026-09-05 | D-039 | Reconciled M04/M05/M06/M09/M11/M15/M18 and vendor qualification into metric-contract v1.1 | Prevent parallel workers from encoding contradictory denominators, aggregations or claims |
 | 2026-09-05 | D-040 | Moved new Codex and Claude integration work to `Java-branch-2` while preserving `Java-branch` | Maintain a clean implementation line from the accepted scaffold/plan baseline |
+| 2026-09-05 | D-041 | Froze shared authorization, checkpoint, approval, revalidation, execution and audit ports plus bounded workflow configuration | Give parallel component workers safe, framework-neutral contracts and deterministic control gates |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |
