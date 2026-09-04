@@ -352,6 +352,16 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** Team size, hackathon duration or a mandatory starter requires consolidation; combine workstreams without changing the frozen component boundaries or P0 gates.
 - **Supersedes:** None.
 
+## D-038: Codex owns a hands-on foundation and integration coding series
+
+- **Status:** Accepted
+- **Decision:** The Integration Owner is an active Codex coding lane rather than a review-only role. Codex owns series C0-C7: metric/contract freeze, shared Java records and schemas, build foundation, application ports, Spring composition, G1 vertical integration, governed-action integration, UI/API integration repair, and release engineering. Six Claude workers continue to own the bounded component paths in D-037. Codex may modify a Claude-owned path only after handoff during an announced integration/fix window, never concurrently.
+- **Reason:** Shared seams and cross-component behavior require substantial implementation, and leaving the Integration Owner as a passive coordinator would underuse capacity and make integration work ownerless. Explicit coding ownership keeps both Codex and Claude productive without introducing file conflicts.
+- **Evidence or rubric link:** Architecture/code quality requires stable typed contracts and composition; functionality requires end-to-end integration; agentic design requires the workflow, controls and telemetry to function together.
+- **Consequences:** Packet `00-integration-owner.md` is the Codex coding series; packets `01`–`06` are assigned to Claude. Cross-component contract and integration tests, build/configuration, release automation and integration repair are first-class Codex deliverables.
+- **Reconsider if:** Only one coding agent is available; in that case execute the same series sequentially before absorbing component work.
+- **Supersedes:** Any interpretation of D-037 in which the Integration Owner performs coordination only.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -382,6 +392,7 @@ When the hackathon begins:
 | 2026-09-05 | D-035 | Replaced the non-mandatory Angular frontend choice with React and TypeScript while retaining the Java backend | Match team delivery preference without changing the governed agent architecture or API contracts |
 | 2026-09-05 | D-036 | Created and verified a runnable Java/React monorepo scaffold around one deterministic evidence-to-approval slice | Establish working boundaries and a regression baseline before expanding the full graph |
 | 2026-09-05 | D-037 | Adopted six exclusive parallel workstreams plus one Integration Owner, contract freeze, integration waves and release gates | Let multiple Claude sessions work concurrently without diverging on metrics, contracts, controls or demo outcomes |
+| 2026-09-05 | D-038 | Assigned Codex the C0-C7 foundation and integration coding series alongside six Claude component workstreams | Ensure both Codex and Claude write production/test code while preserving exclusive ownership |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

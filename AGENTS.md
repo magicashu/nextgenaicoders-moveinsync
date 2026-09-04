@@ -24,6 +24,7 @@ Operating rules:
 - Always join, cache and audit on `(business_unit, trip_id)`; `trip_id` alone collides across tenants.
 - Build the vertical golden path before optional sophistication.
 - For parallel implementation, follow D-037 and `docs/parallel-delivery-plan.md`: one Integration Owner freezes shared contracts and dependencies; each worker uses one worktree and writes only its assigned paths; workers do not merge or push directly into `Java-branch`.
+- D-038 makes Codex an active coding owner for foundation and integration series C0-C7; Claude workers own packets 01–06. Do not perform concurrent edits in a worker-owned path—wait for handoff and use an announced integration/fix window.
 - Use the smallest relevant project-local skill under `.agents/skills/` and read its `SKILL.md` before applying it.
 - Keep tenant authorization, metrics, calculations, approvals, and action state transitions deterministic; use the LLM for bounded routing, synthesis, and explanation.
 - Never execute an external side effect without explicit approval, idempotency, and an audit event.

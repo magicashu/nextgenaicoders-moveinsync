@@ -2,7 +2,7 @@
 
 ## 1. Outcome
 
-This is the execution plan for building the Java/React hackathon solution with multiple Claude sessions working in parallel. It converts the accepted architecture into six non-overlapping implementation workstreams coordinated by one Integration Owner.
+This is the execution plan for building the Java/React hackathon solution with Codex and multiple Claude sessions working in parallel. It converts the accepted architecture into six non-overlapping Claude component workstreams plus one hands-on Codex Foundation & Integration coding series.
 
 The runtime product still has four logical AI roles. The number of coding workstreams does not change the agent architecture.
 
@@ -42,11 +42,11 @@ scheduled or user request
 
 ## 3. Team topology
 
-Use one Integration Owner and six component workstreams.
+Use Codex as the hands-on Foundation & Integration Owner and six Claude component workstreams. Codex has its own code deliverables; it is not only a reviewer or project manager.
 
 | Owner | Branch | Exclusive responsibility |
 |---|---|---|
-| Integration Owner | `Java-branch` | Contracts, dependencies, shared configuration, docs, merge order, release gates and final demo |
+| Codex — Foundation & Integration | `Java-branch` | Shared contracts, ports, build/configuration, Spring composition, integration tests, merge repairs, release automation and final demo |
 | WS1 Governed Analytics | `feat/governed-analytics` | Seven-file ingestion, normalized DuckDB views, M01-M18, snapshots, anomaly and contribution analysis |
 | WS2 Agent Workflow | `feat/agent-workflow` | Typed workflow, four AI roles, seven investigation workers, deterministic engine and LangGraph4j spike |
 | WS3 Governance & Actions | `feat/governance-actions` | Tenant access, checkpoints, approval, revalidation, idempotency, mock execution and audit |
@@ -55,6 +55,23 @@ Use one Integration Owner and six component workstreams.
 | WS6 Quality & Telemetry | `feat/quality-telemetry` | Evaluation, security, recovery tests, traces, CI gates and demo verification |
 
 Do not assign a separate coding worker to each runtime AI role. The four roles share a typed workflow state and belong together in WS2.
+
+### 3.1 Codex coding series
+
+Codex completes this series on `Java-branch`, stopping component workers during any shared-contract change:
+
+| Series | Coding outcome | Starts | Done when |
+|---|---|---|---|
+| C0 Metric and contract freeze | Resolve metric ambiguities; implement/finalize shared Java records, JSON schemas, OpenAPI examples and compatibility tests | Immediately | Backend records serialize against schemas and React fixtures validate |
+| C1 Build foundation | Pin centrally approved dependencies, configuration properties, profiles and verification commands | After C0 | Clean Java/React baseline passes from one command |
+| C2 Application ports | Freeze typed metric, investigation, checkpoint, approval, execution and audit interfaces used by Claude components | With C0 | Mock producer/consumer contract tests compile |
+| C3 Spring composition | Wire Claude implementations through interfaces in `config/**`; add health/capability reporting and safe fallback selection | As component APIs arrive | Application starts with deterministic adapters and reports missing optional dependencies safely |
+| C4 Vertical integration | Build cross-component integration tests for authorize → metric → anomaly → workflow → brief → approval wait | After WS1/WS2/WS4 first handoffs | G1 reaches `AWAITING_APPROVAL` with verified evidence |
+| C5 Governed action integration | Connect checkpoint, revalidation, idempotent executor and audit through the composition root | After WS3 handoff | Approval/resume produces exactly one audited mock effect |
+| C6 UI/API integration and repair | Resolve contract mismatches, generated types, CORS/runtime configuration and end-to-end defects without duplicating domain logic | After WS4/WS5 handoffs | Browser G1 flow passes against the real API |
+| C7 Release engineering | Maintain `scripts/verify.sh`, Compose/AWS configuration, seed/reset, release tags, fallback output and demo bundle | Continuous; final after all gates | Clean-start release and backup demo pass repeatedly |
+
+Codex may edit a Claude-owned path only during an announced integration/fix window after that worker has handed off and stopped. The change must preserve the owning component's tests and be reported in the decision or integration log.
 
 If fewer people or Claude sessions are available:
 
@@ -186,13 +203,15 @@ Workers commit only to their feature branches. They do not merge or push into `J
 
 ## 7. Exclusive path ownership
 
-### Integration Owner
+### Codex — Foundation & Integration
 
 ```text
 pom.xml
 backend/pom.xml
 backend/src/main/java/.../MobilityCopilotApplication.java
 backend/src/main/java/.../config/**
+backend/src/test/java/.../contract/**
+backend/src/test/java/.../integration/**
 backend/src/main/resources/application.yml
 contracts/**
 docs/**
@@ -202,6 +221,7 @@ README.md
 AGENTS.md
 SESSION_CONTEXT.md
 scripts/verify.sh
+scripts/integration/**
 ```
 
 ### WS1 — Governed Analytics
@@ -431,10 +451,10 @@ The time boxes below assume a 24-hour build window. Scale them proportionally wi
 
 | Phase | Suggested time | Parallel work | Exit gate |
 |---|---:|---|---|
-| 0. Contract and risk freeze | 0–1 h | Integration Owner freezes types, metric semantics, API, dependencies and worktrees; WS2 runs isolated LangGraph4j spike only after contracts exist | All consumers compile against one contract; baseline green; orchestration choice recorded |
-| 1. Deterministic foundations | 1–5 h | WS1 ingestion/G1 metrics; WS2 mocked workflow; WS3 persistence/approval state; WS4 API adapters; WS5 fixture UI; WS6 fast gates/OTel | Ten metric fixtures, composite-key test, backend/frontend builds and one mocked pause/resume pass |
-| 2. G1 vertical integration | 5–10 h | Connect real metrics, contribution workers, critic, dual brief, API/UI, pending approval | One-command G1 reproduces every shown number, rejects vendor blame and stops before action |
-| 3. Governed action and recovery | 10–14 h | WS3 real checkpoint/approval/audit; WS2 resume; WS6 stale/duplicate/crash tests; WS5 action states | Approve/reject/edit/expire pass; post-approval revalidation; exactly one effect; restart-safe audit trail |
+| 0. Contract and risk freeze | 0–1 h | Codex implements C0-C2, freezes API/dependencies and creates worktrees; WS2 runs the isolated LangGraph4j spike only after contracts exist | All consumers compile against one contract; baseline green; orchestration choice recorded |
+| 1. Deterministic foundations | 1–5 h | Codex implements C1/C3; WS1 ingestion/G1 metrics; WS2 mocked workflow; WS3 persistence/approval state; WS4 API adapters; WS5 fixture UI; WS6 fast gates/OTel | Ten metric fixtures, composite-key test, backend/frontend builds and one mocked pause/resume pass |
+| 2. G1 vertical integration | 5–10 h | Codex implements C4/C6 while Claude workers connect real metrics, contribution workers, critic, dual brief, API/UI and pending approval | One-command G1 reproduces every shown number, rejects vendor blame and stops before action |
+| 3. Governed action and recovery | 10–14 h | Codex implements C5; WS3 supplies checkpoint/approval/audit; WS2 resume; WS6 stale/duplicate/crash tests; WS5 action states | Approve/reject/edit/expire pass; post-approval revalidation; exactly one effect; restart-safe audit trail |
 | 4. Degraded data and breadth | 14–17 h | G2, G3, V1-V5, remaining workers/metrics, partial failures and safe conversation | G2 caveats visible, G3 never escalates, corruptions degrade explicitly, tenant/security gates green |
 | 5. Observability and product polish | 17–20 h | Trace/cost/latency proof, trust panel, leadership brief, README/HLD/deployment story | One judge-readable trace and audit record, measured latency/model use, complete rubric-to-proof map |
 | 6. Feature freeze and rehearsal | final 4 h | Release fixes, seed/reset, screenshots, backup video, pitch rehearsals | Two clean-start runs and three timed demo rehearsals pass |
@@ -666,4 +686,4 @@ Never cut G1 correctness, G2 caveats, G3 suppression, tenant isolation, evidence
 
 ## 18. Claude work packets
 
-Ready-to-paste work packets are stored in `docs/claude-workstreams/`. Give each Claude exactly one packet and one worktree. The Integration Owner uses `00-integration-owner.md`; component workers use packets `01` through `06`.
+Ready-to-paste work packets are stored in `docs/claude-workstreams/`. Codex follows `00-integration-owner.md`; give each Claude exactly one packet and one worktree from packets `01` through `06`.
