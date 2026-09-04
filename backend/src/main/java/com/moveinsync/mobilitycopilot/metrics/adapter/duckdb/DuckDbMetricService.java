@@ -34,9 +34,20 @@ public class DuckDbMetricService implements MetricService {
     private final AnalyticsStore store;
     private final CapabilityMatrixService capabilities;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public DuckDbMetricService(AnalyticsStore store, CapabilityMatrixService capabilities) {
         this.store = store;
         this.capabilities = capabilities;
+    }
+
+    /**
+     * Convenience constructor kept for the Integration Owner's official reconciliation gate (D-042):
+     * builds a private analytics store over the configured directory with a data-derived capability matrix.
+     */
+    public DuckDbMetricService(com.moveinsync.mobilitycopilot.config.MobilityDataProperties properties) {
+        this.store = new com.moveinsync.mobilitycopilot.ingestion.adapter.duckdb.DuckDbAnalyticsStore(properties,
+                new com.moveinsync.mobilitycopilot.ingestion.application.DatasetFileCatalog());
+        this.capabilities = new DuckDbCapabilityMatrixService(this.store);
     }
 
     @Override
