@@ -1,7 +1,7 @@
 # Mobility Decision Copilot: Detailed Solution Architecture
 
 Date: 2026-09-04  
-Status: Frozen pending dataset profiling
+Status: Frozen; bound to the official dataset on 2026-09-04 (see `dataset-profile-and-capability-matrix.md` and D-029 through D-033)
 
 ## 1. Architecture decision
 
@@ -9,13 +9,14 @@ Build a **controlled multi-agent analytical workflow**, not an autonomous swarm 
 
 - Four LLM specialists with separate prompts, inputs, outputs, and permissions.
 - Two components make dynamic agentic decisions: Supervisor and Investigator. Only the Investigator runs a bounded tool-selection loop.
-- Eighteen top-level LangGraph nodes plus one reusable four-node investigation subgraph.
+- Eighteen top-level workflow nodes plus one reusable four-node investigation subgraph, executed through a LangGraph4j adapter or the deterministic Java state-machine fallback.
 - DuckDB and governed metric contracts calculate operational facts.
 - Langfuse observes and evaluates the workflow; it is not the audit ledger.
 - No document RAG or neural reranker in the mandatory path while the only resource is structured trip logs.
 - A conditional fifth Knowledge Agent and seven-node retrieval subgraph only if policies, SLAs, contracts, SOPs, or historical reports arrive.
+- Dataset bindings: tenant is `business_unit`, the trip key is `(business_unit, trip_id)`, and the supported analyses per tenant come from the capability matrix in `dataset-profile-and-capability-matrix.md`. There are no GPS, driver, route, SLA or budget fields; see Section 4a.
 
-LangGraph distinguishes predetermined workflows from agents that dynamically choose tools. This system deliberately combines them instead of making every step agentic. See [LangGraph workflows and agents](https://docs.langchain.com/oss/python/langgraph/workflows-agents).
+The design distinguishes predetermined workflows from agents that dynamically choose tools. This system deliberately combines them instead of making every step agentic. The orchestration pattern is framework-neutral; the live implementation uses Java interfaces with either the validated LangGraph4j adapter or a deterministic state-machine fallback. See the conceptual [LangGraph workflows and agents](https://docs.langchain.com/oss/python/langgraph/workflows-agents) reference.
 
 ## 2. Vocabulary
 
@@ -68,9 +69,23 @@ Add only if documents contain decision-relevant knowledge absent from structured
 
 ## 4. Why data domains are workers, not agents
 
-Vendor, route/shift, GPS, cost, feedback, and safety analyses use the same tenant, governed engine, policy boundary, and result schema. They are parallel worker tasks executed through the same Investigation Agent subgraph.
+Vendor, site-shift-direction, delay-reason, cost and billing, feedback, tracking and safety alerts, and no-show and roster analyses use the same tenant, governed engine, policy boundary, and result schema. They are parallel worker tasks executed through the same Investigation Agent subgraph.
 
-Separate permanent agents would add prompts, state, model calls, latency, and merging failures without creating a real boundary. LangGraph's orchestrator-worker pattern and `Send` support isolated dynamic workers when the validated plan calls for them. See [orchestrator-worker guidance](https://docs.langchain.com/oss/python/langgraph/workflows-agents#orchestrator-worker).
+Separate permanent agents would add prompts, state, model calls, latency, and merging failures without creating a real boundary. The Java orchestrator dispatches isolated, typed investigation tasks when the validated plan calls for them and merges them with explicit provenance. See the conceptual [orchestrator-worker guidance](https://docs.langchain.com/oss/python/langgraph/workflows-agents#orchestrator-worker).
+
+### 4a. Worker tasks bound to the official dataset
+
+| Worker task | Source tables | Governed metrics | Availability |
+|---|---|---|---|
+| `vendor` | rides, bills, feedback, alerts | M01-M03, M09-M14 by `vendor_id` | all tenants; peer ranking needs 500 trips |
+| `site_shift_direction` | rides, legs | M01, M04, M05 by `office × shift_type × trip_direction` | all tenants; single-office tenants get a caveat |
+| `delay_reason` | rides | M03 | all tenants |
+| `cost_billing` | bills | M09, M10 | M10 unsupported for `vanta-Aus` and `vanta-Sea` |
+| `feedback` | feedback | M11, M12 | low coverage for `vanta-Aus`, `vanta-Sea`, `catalyst-Sac` |
+| `tracking_safety_alerts` | alerts | M13-M16, M18 | event types vary by tenant; sign-off violations excluded |
+| `noshow_roster` | legs | M06, M07 | all tenants |
+
+There is no GPS worker. Location, speed and geofence analysis beyond the alert counts is marked unsupported in the capability matrix.
 
 ## 5. Main graph: 18 nodes
 
@@ -80,9 +95,9 @@ Separate permanent agents would add prompts, state, model calls, latency, and me
 |---:|---|---|---|---|
 | 1 | `initialize_run` | Deterministic | Create run, trace, data version, request mode, budget, and tenant-safe IDs | Reject malformed request |
 | 2 | `authorize_scope` | Deterministic | Enforce tenant, persona, metrics, dimensions, and tools | Fail closed |
-| 3 | `profile_dataset` | Deterministic | Read/calculate schema and data-quality facts | Continue with supported capabilities |
-| 4 | `build_capability_matrix` | Deterministic | Mark analyses supported, derivable, or unavailable | Disable unsupported branches |
-| 5 | `compute_metric_snapshot` | Deterministic | Compute versioned metrics, baselines, population, and freshness | Quality-qualified snapshot |
+| 3 | `profile_dataset` | Deterministic | Load the versioned schema/data-quality profile; calculate it only when the data version changes | Continue with supported capabilities |
+| 4 | `build_capability_matrix` | Deterministic | Load/build the per-data-version matrix of supported, derivable, and unavailable analyses | Disable unsupported branches |
+| 5 | `compute_metric_snapshot` | Deterministic | Load/compute cached versioned metrics, baselines, population, and freshness for the requested window | Quality-qualified snapshot |
 | 6 | `detect_anomalies` | Deterministic | Compare against available SLA, history, or peers | Healthy-brief route |
 | 7 | `prioritize_issue` | Deterministic | Select the highest-value issue with configurable materiality/confidence rules | Low-confidence investigation only |
 | 8 | `supervisor_plan` | LLM A1 | Create bounded typed plan | Parse retry once, then fallback |
@@ -94,7 +109,7 @@ Separate permanent agents would add prompts, state, model calls, latency, and me
 | 14 | `compose_decision_brief` | LLM A4 | Produce dual brief and action draft | Deterministic template fallback |
 | 15 | `action_policy_gate` | Deterministic | Validate action, parameters, evidence, expiry, and authorization | Report-only/reject route |
 | 16 | `approval_interrupt` | Human | Pause for approve, reject, or edit with serializable payload | Rejection/expiry to audit |
-| 17 | `execute_mock_action` | Deterministic | Idempotently create mock escalation/ticket/watchlist/draft | Bounded retry, never duplicate |
+| 17 | `revalidate_and_execute_mock_action` | Deterministic | After approval, recheck authorization, evidence version, expiry, parameters, and preconditions; then idempotently create the mock escalation/ticket/watchlist/draft | Bounded retry, never duplicate |
 | 18 | `append_audit_event` | Deterministic | Persist run, evidence, decision, approval, and receipt refs | Surface ledger failure |
 
 ```mermaid
@@ -119,7 +134,7 @@ flowchart TD
     N15 -->|report only / reject| N18[18 append_audit_event]
     N15 -->|eligible| N16{{16 approval_interrupt}}
     N16 -->|reject / expire| N18
-    N16 -->|approve| N17[17 execute_mock_action]
+    N16 -->|approve| N17[17 revalidate and execute mock action]
     N17 --> N18
     H --> N18
     N18 --> E([END])
@@ -148,7 +163,7 @@ flowchart LR
     G -->|complete / partial / exhausted| O([InvestigationResult])
 ```
 
-Use default per-invocation subgraph persistence so parallel calls remain isolated while inheriting the parent checkpointer. This is the current recommended mode for independent multi-agent calls. See [LangGraph subgraph persistence](https://docs.langchain.com/oss/python/langgraph/use-subgraphs#subgraph-persistence).
+Give every parallel investigation task an isolated run-scoped state object and merge only typed evidence envelopes into the parent state. The checkpoint repository persists the parent workflow and completed task results by run ID; this contract must behave identically under LangGraph4j and the fallback state machine.
 
 ## 7. Governed analytical tools
 
@@ -167,7 +182,7 @@ simulate_action(action_type, target_ids, parameters)
 
 Every tool result includes evidence/query ID, metric contract/version, data version, window, filters, grain, numerator, denominator, value/unit, comparison, population, coverage, warnings, and tenant-safe provenance.
 
-The metric registry owns definition, formula implementation, owner, allowed dimensions, exclusions, unit, grain, freshness, authorization, and edge-case behavior. Incompatible groupings are rejected, not approximated.
+The metric registry owns definition, formula implementation, owner, allowed dimensions, exclusions, unit, grain, freshness, authorization, and edge-case behavior. Incompatible groupings are rejected, not approximated. The v1 registry is M01-M18 in `dataset-profile-and-capability-matrix.md` Section 8, with allowed dimensions `vendor_id`, `site_id`, `shift_id`, `direction`, `mode`, `fuel_type`, `vehicle_id` and comparison modes historical (prior four complete weeks), in-tenant peer, cross-tenant peer (facilities-head persona only) and configured target.
 
 ## 8. RAG decision
 
@@ -222,7 +237,7 @@ Do not initially add HyDE, multi-query expansion, knowledge graphs, OpenKB/PageI
 
 ### Operational prioritization
 
-Rank anomalies using deterministic configurable features: safety override, SLA/trend gap, affected trips/employees, cost impact, persistence, coverage/confidence, and minimum volume. Do not freeze weights or thresholds before profiling the dataset. Expose score components in the UI.
+Rank anomalies using deterministic configurable features: safety override, configured-target/trend gap, affected trips/rider legs, cost impact, persistence, coverage/confidence, and minimum volume. Initial thresholds from profiling: a material issue needs at least 300 trips in the window, an absolute gap of 3 percentage points and a relative rise of 25% against the prior four complete weeks for rate metrics, or any Sev-1/2 alert-rate doubling. A step change confined to one alert type that falls to near zero (the sign-off-violation case, G3) is classified as a data-regime change and routed to a data-quality note, not an issue. Expose score components in the UI.
 
 ### Document reranking
 
@@ -258,7 +273,7 @@ All models are JSON-serializable and versioned. Use explicit reducers for parall
 
 ## 12. Approval, recovery, and audit
 
-Compile the parent graph with a checkpointer and tenant-safe `thread_id`. SQLite is acceptable locally; PostgreSQL is the production story. LangGraph distinguishes thread checkpoints from cross-thread stores and requires thread IDs for persistence. See [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence).
+Run the workflow with a checkpoint repository and tenant-safe run/conversation ID. A local relational adapter is acceptable for the demo; PostgreSQL is the production story. Persist workflow checkpoints separately from cross-run memory and business audit events.
 
 Approval payload:
 
@@ -279,12 +294,12 @@ Approval payload:
 Rules:
 
 - Put `interrupt()` in a dedicated approval node.
-- Never perform a non-idempotent write before it; LangGraph restarts the node on resume.
+- Never perform a non-idempotent write before it; either orchestration adapter may re-enter the approval node during resume or retry.
 - Recheck authorization, parameters, evidence version, expiry, and preconditions after approval.
 - Enforce idempotency at the action repository boundary.
-- Audit proposal, approval/rejection/edit, attempts, receipt, and final status.
+- Append an immutable audit event at proposal, approval/rejection/edit, execution attempt, receipt, and final status; node 18 also writes the terminal run summary.
 
-See current [LangGraph interrupt rules](https://docs.langchain.com/oss/python/langgraph/interrupts#rules-of-interrupts).
+The original [LangGraph interrupt rules](https://docs.langchain.com/oss/python/langgraph/interrupts#rules-of-interrupts) remain useful design guidance, but the Java spike must prove the actual LangGraph4j resume semantics before relying on them.
 
 ## 13. Verification and confidence
 
@@ -294,7 +309,7 @@ The deterministic verifier ensures:
 - Units, filters, populations, and periods are compatible.
 - Current/reference windows are valid.
 - Claim evidence is present and authorized.
-- Missing GPS/roster/join coverage appears in caveats.
+- Missing feedback coverage, unsupported cost-per-km, single-office tenants, capped delays and excluded billing adjustments appear in caveats.
 - “Caused” is rejected without causal evidence; use “contributed,” “associated,” or “coincided.”
 - Sparse groups are suppressed or qualified.
 - Action type and parameters are allowlisted.
@@ -315,7 +330,7 @@ mobility_run
   investigation.vendor
     choose_analysis
     tool.rank_contributors
-  investigation.gps
+  investigation.tracking_safety_alerts
     choose_analysis
     tool.get_quality_report
   merge_evidence
@@ -323,20 +338,20 @@ mobility_run
   verify_evidence
   compose_decision_brief
   approval_interrupt
-  execute_mock_action
+  revalidate_and_execute_mock_action
   append_audit_event
 ```
 
 Record safe tenant, run/thread ID, workflow/prompt/model/metric/data versions, task/tool, evidence count, latency, usage/cost, retries, outcome, approval, and audit ID. Redact PII and secrets.
 
-Langfuse supports LangChain callbacks and manual Python/OpenTelemetry instrumentation, so it observes the graph without dictating orchestration. See [Langfuse tracing](https://langfuse.com/docs/observability/get-started).
+Langfuse accepts language-neutral OpenTelemetry spans, so the Java runtime can instrument Spring AI, graph nodes, tools, approval transitions and DuckDB queries without allowing observability to dictate orchestration. See [Langfuse tracing](https://langfuse.com/docs/observability/get-started).
 
 ## 15. Evaluation
 
 ### Deterministic tests
 
-- Hand-calculated metric fixtures for nulls, duplicates, cancellations, zero denominators, time zones, and late data.
-- Capability behavior without GPS, cost, roster, feedback, or SLA.
+- Hand-calculated metric fixtures for nulls, duplicates, cancellations, zero denominators, capped delays, negative bills and cross-tenant `trip_id` collisions (the ten fixtures in `dataset-profile-and-capability-matrix.md` Section 11).
+- Capability behavior without legs, bills, severity, feedback coverage or billed km (variants V1-V5).
 - Plan validator blocks arbitrary SQL, unsupported dimensions, excess tasks, and cross-tenant scope.
 - Verifier catches changed numbers, missing evidence, incompatible periods, and unsupported causal claims.
 - Approval reject/edit/expiry, crash/resume, and duplicate execution.
@@ -356,7 +371,7 @@ Langfuse supports LangChain callbacks and manual Python/OpenTelemetry instrument
 - Missing-data caveats are visible.
 - LLM judges assess only clarity, relevance, and explanation groundedness—not arithmetic, security, or authorization.
 
-Once the real schema is known, create 20-30 golden cases and five corrupted-data variants. No cross-tenant leak, wrong governed metric, unsupported citation, or unauthorized action may pass.
+Golden cases G1, G2 and G3, the ten fixtures and the five corrupted variants are defined in `dataset-profile-and-capability-matrix.md` Section 11; extend to 20-30 cases during the build. No cross-tenant leak, wrong governed metric, unsupported citation, or unauthorized action may pass, and G3 must never escalate.
 
 ## 16. Security boundaries
 
@@ -375,7 +390,7 @@ One screen should expose:
 
 1. Proactive morning brief and top issue.
 2. Metric, SLA/history/peer comparison, population, and freshness.
-3. Vendor/route/GPS/cost/feedback evidence drawer.
+3. Vendor, site-shift, delay-reason, cost, feedback and safety-alert evidence drawer, with unsupported analyses shown greyed with the reason.
 4. Direct versus inferred claims, confidence components, and caveats.
 5. Action, expected effect, risk, and approve/reject/edit.
 6. Forwardable leadership narrative from the same evidence.
@@ -385,44 +400,29 @@ The dashboard is not the product; the proactive decision and controlled interven
 
 ## 18. Implementation order
 
-### Before data arrives
+### Dataset intake (completed 2026-09-04)
 
-1. Pydantic state/output contracts.
-2. Metric registry interface and synthetic fixtures.
-3. Dataset adapter and profiler.
-4. Graph skeleton with mocked deterministic tools.
-5. One synthetic golden path and one degraded path.
-6. Checkpoint, approval, idempotency, audit, and trace skeleton.
-7. Minimal UI on stable sample responses.
-
-### On receipt
-
-1. Preserve and checksum source.
-2. Profile schema, types, nulls, duplicates, categories, timestamps, units, keys, and join coverage.
-3. Map fields and build capability matrix.
-4. Hand-reconcile initial metrics.
-5. Select the strongest real issue and supported comparison.
-6. Enable only supported workers.
-7. Record actual formulas, thresholds, values, and golden cases in the decision register.
+Preserved and checksummed the seven files, profiled every table, mapped fields, built the per-tenant capability matrix, hand-reconciled M01-M18, selected G1/G2/G3 and recorded D-029 through D-033. Evidence: `dataset-profile-and-capability-matrix.md`.
 
 ### Build sequence
 
-1. One metric end to end.
-2. Proactive trigger/prioritization.
-3. Two strong investigation dimensions.
-4. Verified dual brief.
-5. Approval/audit.
-6. Traces/evaluations.
-7. Messy-data variants.
-8. Additional supported dimensions.
-9. Optional RAG only if its gate passes.
+1. Java record/sealed-type state and output contracts with Jackson schemas.
+2. DuckDB adapter: load seven CSVs, normalise keys and formats, build tenant-keyed views, reproduce the ten fixtures.
+3. Metric registry with M01, M04 and M09 end to end for `pinnacle-Slc`; then the rest of M01-M18.
+4. Daily snapshot cache, anomaly detection with the profiled thresholds, and G3 regime-change classification.
+5. Graph skeleton with the seven workers on real tools; G1 as-of 2026-06-08 through investigation and verified dual brief.
+6. Approval, revalidation, idempotency, audit and trace skeleton.
+7. React/TypeScript brief, evidence drawer with capability greying, approval inbox and trust panel.
+8. G2 as-of 2026-08-01 with caveats; corrupted variants V1-V5; regression gate.
+9. Conversational drawer (D-027) and peer-comparison questions.
+10. Optional RAG only if its gate passes.
 
 ## 19. Team split
 
 | Owner | Responsibility | Contract |
 |---|---|---|
 | Data/metrics | Adapter, DuckDB, registry, anomaly/contribution tools | Typed evidence objects |
-| Agent/backend | LangGraph, API, checkpoint/recovery | Pydantic state/contracts |
+| Agent/backend | Spring Boot/Spring AI, LangGraph4j adapter or Java state machine, checkpoint/recovery | Java records, sealed types and Jackson schemas |
 | Product/frontend | Brief, investigation, approval, leadership/trust views | Stable API fixtures from hour one |
 | Quality/demo | Langfuse, tests, audit proof, deck, demo script | Requirement-to-proof matrix |
 
@@ -432,8 +432,8 @@ With three people, combine quality/demo with agent/backend. Split by engineering
 
 Cut in order: document RAG/A5, extra investigation dimensions, general chat, rich export, PostgreSQL/deployment polish.
 
-Never cut: one correct governed metric, contextual benchmark, proactive trigger, evidence-backed investigation, verified dual output, approval/audit, and deterministic fallback.
+Never cut: one correct governed metric, contextual benchmark, proactive trigger, evidence-backed investigation, verified dual output, approval/audit, deterministic fallback, and the composite tenant key.
 
 Judge-facing wording:
 
-> We use four specialized LLM roles, but only where semantic judgment helps. LangGraph controls an 18-node workflow; a bounded investigator subgraph runs supported domain analyses in parallel. All metrics, thresholds, authorization, evidence checks, approvals, and actions remain deterministic. Because the supplied resource is structured trip data, SQL is operational truth. Hybrid RAG and reranking are a conditional policy-evidence lane, activated only if decision-relevant documents arrive. Every conclusion is versioned, traceable, approval-gated, and auditable.
+> We use four specialized LLM roles, but only where semantic judgment helps. A typed Java orchestrator controls an 18-node workflow; a bounded investigator subgraph runs supported domain analyses in parallel. LangGraph4j is an adapter, not a business-logic dependency, and a deterministic Java state machine is the fallback. All metrics, thresholds, authorization, evidence checks, approvals, and actions remain deterministic. Because the supplied resource is structured trip data, SQL is operational truth. Hybrid RAG and reranking are activated only if decision-relevant documents arrive. Every conclusion is versioned, traceable, approval-gated, and auditable.

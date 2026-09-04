@@ -1,0 +1,16 @@
+{
+  "caseId": "G1-SCAFFOLD",
+  "description": "Tiny deterministic delayed-trip-rate fixture",
+  "input": {
+    "businessUnit": "pinnacle-Slc",
+    "asOfDate": "2026-06-08"
+  },
+  "expected": {
+    "metricId": "M01_DELAYED_TRIP_RATE",
+    "currentPercent": 30.0,
+    "baselinePercent": 10.0,
+    "deltaPercentagePoints": 20.0,
+    "finalStep": "AWAITING_APPROVAL",
+    "actionExecuted": false
+  }
+}
