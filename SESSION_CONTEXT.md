@@ -8,6 +8,10 @@ Continue the MoveInSync AI hackathon project and produce a judge-ready working p
 
 `/Users/miniorange/Desktop/miniOrange-IAM/try/hackathon`
 
+## GitHub identity
+
+Use the configured GitHub account `magicashu` for this project. Do not switch accounts unless the user explicitly asks.
+
 Start a fresh CLI session with:
 
 ```bash
