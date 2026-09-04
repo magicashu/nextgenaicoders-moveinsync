@@ -9,5 +9,12 @@ public enum WorkflowStep {
     BRIEFED,
     AWAITING_APPROVAL,
     COMPLETED,
-    FAILED
+    FAILED,
+    // terminal refinements added by the workflow workstream (additive, D-041 shapes unchanged)
+    HEALTHY,
+    REPORT_ONLY,
+    EXECUTED,
+    APPROVED_NOT_EXECUTED,
+    REJECTED,
+    EXPIRED
 }
