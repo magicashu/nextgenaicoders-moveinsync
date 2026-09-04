@@ -2,13 +2,42 @@ name: deterministic-evaluation
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "evals/**"
+      - "backend/src/test/java/com/moveinsync/mobilitycopilot/quality/**"
+      - "backend/src/test/java/com/moveinsync/mobilitycopilot/security/**"
+      - "scripts/demo/**"
 
 jobs:
-  fixture:
+  gates:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-      - run: python scripts/data/validate-fixture.py
+          python-version: "3.12"
+      - name: Fixture reconciliation
+        run: python scripts/data/validate-fixture.py
+      - name: Deterministic quality, security, recovery and architecture gates (budget 10 min)
+        run: timeout 600 ./mvnw -q -pl backend test -Dtest='*QualityGateTest,*MetricFixtureGateTest,*ScorecardTest,*AdversarialCorpusTest,*RecoveryCorpusTest,*RedactionTest,*PackageBoundaryTest,*TelemetryTest' -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Live scorecard against the fixture-backed API (budget 3 min)
+        run: |
+          export JAVA_HOME="$JAVA_HOME_21_X64"
+          SERVER_PORT=8080 ./mvnw -q -pl backend spring-boot:run > backend.log 2>&1 &
+          for i in $(seq 1 90); do curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 && break; sleep 1; done
+          timeout 180 sh scripts/demo/scorecard.sh || (tail -50 backend.log; exit 1)
+          timeout 60 sh scripts/demo/smoke.sh
+      - name: Re-run gated tests against the produced artifacts
+        run: timeout 300 ./mvnw -q -pl backend test -Dtest='*ScorecardTest,*AdversarialCorpusTest,*MetricFixtureGateTest' -Dsurefire.failIfNoSpecifiedTests=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-results
+          path: evals/results/

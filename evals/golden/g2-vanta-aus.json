@@ -1,0 +1,14 @@
+{
+  "caseId": "G2",
+  "description": "vanta-Aus cross-domain deterioration with caveats, as-of 2026-08-01 (D-032)",
+  "input": {"businessUnit": "vanta-Aus", "asOfDate": "2026-08-01", "persona": "TRANSPORT_MANAGER"},
+  "expected": {
+    "status": "AWAITING_APPROVAL",
+    "headlineMetric": {"metricId": "M01_DELAYED_TRIP_RATE", "valueAtLeast": 7.0, "baselineAtMost": 3.5},
+    "requiredCaveats": ["Low feedback coverage", "zero km", "Single office"],
+    "unsupportedMetrics": ["M10_COST_PER_BILLED_KM"],
+    "confidenceBetween": [0.3, 0.8],
+    "forbiddenClaims": ["cost per km rose", "caused", "because of"],
+    "recommendedActionTypeIn": ["CREATE_INVESTIGATION_TICKET", "CREATE_SITE_SHIFT_WATCHLIST"]
+  }
+}
