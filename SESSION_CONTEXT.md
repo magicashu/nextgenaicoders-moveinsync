@@ -63,7 +63,7 @@ Do not reproduce those documents here; use them as the source of truth.
 - The synthetic rehearsal package under `outputs/01a0584b-8bd8-7370-bc91-86525608d54d/` is retired (D-022/D-023 superseded).
 - A verified application scaffold now exists. `scripts/verify.sh` passes the Java unit test, React build/test and fixture check; `scripts/demo/verify-api.sh` passes the live Spring/DuckDB JSON check.
 - The next step is replacing the tiny fixture seam with full seven-file ingestion and reconciling official-data M01/M04/M09.
-- The execution order, parallel branches, worktree ownership, merge gates and Claude prompts are frozen in `docs/parallel-delivery-plan.md`; Phase 0 metric/contract clarification is the next coordination gate.
+- Codex completed C0 metric semantics and the generic multi-unit metric contract in `d4aa14d`. Next Codex work is C1/C2 build foundation and application-port freeze; Claude packets remain under `docs/claude-workstreams/` for the user to launch independently.
 
 ## Immediate build sequence
 
