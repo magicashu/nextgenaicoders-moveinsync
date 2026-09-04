@@ -412,6 +412,18 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** A secured dedicated capability endpoint replaces Actuator details; retain the same semantics and test coverage.
 - **Supersedes:** None.
 
+## D-044: Integrated runtime uses governed adapters with deterministic orchestration
+
+- **Status:** Accepted and implemented
+- **Decision:** Compose the six completed workstreams on `Java-branch-2` through project-owned ports. DuckDB-backed governed analytics is the default `AnalyticsGateway`; the 18-node deterministic Java workflow is the default engine; the registry identity resolver and role authorizer guard every tenant boundary; the in-memory control plane is the local-demo fallback while PostgreSQL remains the production profile; the product API delegates to the resumable workflow; and `TransitionListener` emits nested, redacted `TraceRecorder` spans with optional Langfuse export. Scaffold adapters are not active in the default runtime.
+- **Approval transaction:** The approval lifecycle validates identity, tenant, role, state, expiry and edits without changing state; the workflow resume node then owns the atomic persisted decision, fresh-evidence revalidation, idempotent effect and audit events. Cross-tenant approval IDs are hidden as not found.
+- **Verification:** The composed official-data integration test must reproduce G1 M01, reach `AWAITING_APPROVAL`, approve, revalidate and finish `EXECUTED` with one receipt and a matching trace. The official HTTP gate must also run tenant-isolation, prompt/SQL-injection, role-bypass, G2/G3, audit and zero-tolerance scorecard checks.
+- **Reason:** Each worker packet was correct in isolation but shipped temporary seams. A single explicit composition decision prevents demo scaffolds, duplicate beans and double approval transitions from surviving integration.
+- **Evidence or rubric link:** Functionality, architecture/code quality, auditability, action approval, observability and multi-tenant security.
+- **Consequences:** LangGraph4j remains unnecessary for the submitted deterministic path; Langfuse remains optional and failure-safe. The local demo is complete without external secrets, while production can select PostgreSQL and Langfuse through configuration.
+- **Reconsider if:** The organizer mandates a graph library, a real side-effect system replaces the mock executor, or production deployment requires a distributed control plane.
+- **Supersedes:** D-043's temporary `SCAFFOLD` runtime state and any worker-local scaffold binding.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -448,6 +460,7 @@ When the hackathon begins:
 | 2026-09-05 | D-041 | Froze shared authorization, checkpoint, approval, revalidation, execution and audit ports plus bounded workflow configuration | Give parallel component workers safe, framework-neutral contracts and deterministic control gates |
 | 2026-09-05 | D-042 | Added mandatory official-data G1 M01 reconciliation and fixed date/type normalization defects found by it | Ensure release correctness is proven on organizer data rather than only on the tiny fixture |
 | 2026-09-05 | D-043 | Added fail-visible runtime capability and release-readiness reporting | Distinguish a live process from a fully governed, releasable application during parallel integration |
+| 2026-09-05 | D-044 | Composed all six workstreams behind governed adapters and verified the approval transaction, official-data workflow, scorecard and trace | Replace every active scaffold seam with the tested, tenant-safe release path |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

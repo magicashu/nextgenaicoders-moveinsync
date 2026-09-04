@@ -1,20 +1,11 @@
 package com.moveinsync.mobilitycopilot.api.security;
 
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Registry-backed resolver mirroring the governance workstream's identity rules (five official
- * business units, named roles). The composition root replaces it with the governance
- * IdentityResolver adapter by setting {@code mobility.api.actor-resolver=governance}.
- */
-@Component
-@ConditionalOnProperty(name = "mobility.api.actor-resolver", havingValue = "allowlist", matchIfMissing = true)
+/** Lightweight allowlist resolver retained for isolated API tests and scaffold-mode demos. */
 public class AllowlistActorResolver implements ActorResolver {
 
     static final Set<String> TENANTS = Set.of("pinnacle-Slc", "vanta-Sea", "vanta-Aus", "catalyst-Sac", "orbit-Slc");

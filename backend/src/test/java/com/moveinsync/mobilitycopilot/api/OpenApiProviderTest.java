@@ -11,9 +11,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Provider-side check against the frozen OpenAPI 0.1.0 and JSON schemas: the scaffold path is still
- * served with its required header, and the DecisionBrief the API emits has every required property.
- * The six product endpoints are proposed to the Integration Owner in the handoff for OpenAPI 0.2.0.
+ * Provider-side check against OpenAPI 0.2.0 and the frozen JSON schemas.
  */
 class OpenApiProviderTest {
 
@@ -30,11 +28,18 @@ class OpenApiProviderTest {
     @SuppressWarnings("unchecked")
     void frozenContractStillDescribesTheDemoEndpoint() throws Exception {
         Map<String, Object> openapi = new Yaml().load(Files.readString(contracts().resolve("openapi/mobility-copilot.yaml")));
+        assertThat(((Map<String, Object>) openapi.get("info")).get("version")).isEqualTo("0.2.0");
         Map<String, Object> paths = (Map<String, Object>) openapi.get("paths");
-        assertThat(paths).containsKey("/api/v1/demo/brief");
+        assertThat(paths).containsKeys("/api/v1/demo/brief", "/api/v1/briefs/morning", "/api/v1/workflows",
+                "/api/v1/workflows/{workflowId}", "/api/v1/questions", "/api/v1/approvals/{approvalId}",
+                "/api/v1/approvals/{approvalId}/decision", "/api/v1/audit/{workflowId}");
         Map<String, Object> get = (Map<String, Object>) ((Map<String, Object>) paths.get("/api/v1/demo/brief")).get("get");
         List<Map<String, Object>> parameters = (List<Map<String, Object>>) get.get("parameters");
-        assertThat(parameters).anyMatch(p -> "X-Business-Unit".equals(p.get("name")) && Boolean.TRUE.equals(p.get("required")));
+        assertThat(parameters).anyMatch(p -> "#/components/parameters/BusinessUnit".equals(p.get("$ref")));
+        Map<String, Object> components = (Map<String, Object>) openapi.get("components");
+        Map<String, Object> componentParameters = (Map<String, Object>) components.get("parameters");
+        Map<String, Object> businessUnit = (Map<String, Object>) componentParameters.get("BusinessUnit");
+        assertThat(businessUnit).containsEntry("name", "X-Business-Unit").containsEntry("required", true);
     }
 
     @Test
@@ -45,6 +50,6 @@ class OpenApiProviderTest {
         var components = java.util.Arrays.stream(com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief.class.getRecordComponents()).map(c -> c.getName()).toList();
         assertThat(components).containsAll(required);
         Map<String, Object> status = (Map<String, Object>) ((Map<String, Object>) schema.get("properties")).get("status");
-        assertThat((List<String>) status.get("enum")).contains("AWAITING_APPROVAL", "HEALTHY");
+        assertThat((List<String>) status.get("enum")).contains("AWAITING_APPROVAL", "REPORT_ONLY", "HEALTHY");
     }
 }

@@ -60,6 +60,19 @@ public class ApprovalLifecycle {
 
     /** Applies approve, reject or edit. Expiry is applied lazily whenever a decision arrives late. */
     public ApprovalRecord decide(ActorContext actor, UUID approvalId, ApprovalDecisionType type, String comment, ActionProposal editedProposal, String traceId) {
+        ApprovalDecision decision = prepareDecision(actor, approvalId, type, comment, editedProposal, traceId);
+        repository.decide(decision);
+        ApprovalRecord updated = repository.findRecord(approvalId).orElseThrow();
+        auditDecision(updated.request(), decision, traceId);
+        return updated;
+    }
+
+    /**
+     * Validates and constructs a decision without persisting it. The resumable workflow uses this
+     * path because its revalidation node owns the atomic approval transition and action execution.
+     */
+    public ApprovalDecision prepareDecision(ActorContext actor, UUID approvalId, ApprovalDecisionType type,
+                                            String comment, ActionProposal editedProposal, String traceId) {
         ApprovalRecord record = repository.findRecord(approvalId)
                 .orElseThrow(() -> new ApprovalTransitionException("UNKNOWN_APPROVAL", "Approval request does not exist"));
         ApprovalRequest request = record.request();
@@ -79,21 +92,21 @@ public class ApprovalLifecycle {
         if (type == ApprovalDecisionType.EDIT) {
             proposal = validateEdit(request, editedProposal);
         }
-        ApprovalDecision decision = new ApprovalDecision(approvalId, request.proposal().actionId(), request.runId(), type, actor.actorId(), now, comment, proposal);
-        repository.decide(decision);
-        ApprovalRecord updated = repository.findRecord(approvalId).orElseThrow();
+        return new ApprovalDecision(approvalId, request.proposal().actionId(), request.runId(), type, actor.actorId(), now, comment, proposal);
+    }
+
+    private void auditDecision(ApprovalRequest request, ApprovalDecision decision, String traceId) {
         Map<String, String> payload = new LinkedHashMap<>();
-        payload.put("approvalId", approvalId.toString());
+        payload.put("approvalId", decision.approvalId().toString());
         payload.put("actionId", request.proposal().actionId().toString());
-        payload.put("decision", type.name());
-        payload.put("decidedBy", actor.actorId());
+        payload.put("decision", decision.decision().name());
+        payload.put("decidedBy", decision.decidedBy());
         payload.put("evidenceVersion", request.evidenceVersion());
-        payload.put("comment", comment == null ? "" : comment);
-        if (proposal != null) {
-            payload.put("editedScope", proposal.scope().toString());
+        payload.put("comment", decision.comment() == null ? "" : decision.comment());
+        if (decision.editedProposal() != null) {
+            payload.put("editedScope", decision.editedProposal().scope().toString());
         }
-        audit.append(event(request.runId(), request.businessUnit(), "APPROVAL_" + type.name(), traceId, payload));
-        return updated;
+        audit.append(event(request.runId(), request.businessUnit(), "APPROVAL_" + decision.decision().name(), traceId, payload));
     }
 
     /** Sweeps pending requests past their expiry; safe to call repeatedly. */

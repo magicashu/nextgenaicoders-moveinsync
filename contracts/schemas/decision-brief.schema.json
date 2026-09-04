@@ -13,6 +13,6 @@
     "findings": { "type": "array", "items": { "type": "string" } },
     "recommendedAction": { "$ref": "action-proposal.schema.json" },
     "evidence": { "$ref": "evidence-bundle.schema.json" },
-    "status": { "enum": ["AWAITING_APPROVAL", "HEALTHY"] }
+    "status": { "enum": ["AWAITING_APPROVAL", "REPORT_ONLY", "HEALTHY"] }
   }
 }

@@ -9,11 +9,17 @@ mobility:
   data:
     directory: ${MOBILITY_DATA_DIR:data/fixtures}
   workflow:
+    analytics-gateway: ${ANALYTICS_GATEWAY:governed}
+    control-plane: ${CONTROL_PLANE:in-memory}
+    language-model: ${LANGUAGE_MODEL:none}
     max-investigation-steps: ${MAX_INVESTIGATION_STEPS:4}
     max-correction-cycles: ${MAX_CORRECTION_CYCLES:1}
     max-tool-calls: ${MAX_TOOL_CALLS:12}
     tool-timeout: ${TOOL_TIMEOUT:10s}
     approval-ttl: ${APPROVAL_TTL:30m}
+  api:
+    gateway: ${DECISION_RUN_GATEWAY:workflow}
+    actor-resolver: ${ACTOR_RESOLVER:governance}
 
 management:
   endpoints:

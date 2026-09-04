@@ -254,6 +254,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
 
     private Routing initialize(WorkflowRun run, Map<String, String> attributes) {
         run.step(WorkflowStep.INITIALIZED);
+        attributes.put("businessUnit", run.state().tenant().businessUnit());
         attributes.put("mode", run.context().mode().name());
         attributes.put("persona", run.context().persona().name());
         attributes.put("workflowVersion", run.context().workflowVersion());

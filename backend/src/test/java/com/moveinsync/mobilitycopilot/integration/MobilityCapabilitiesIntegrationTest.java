@@ -18,19 +18,19 @@ class MobilityCapabilitiesIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void reportsAvailableImplementationsAndMissingReleaseCapabilitiesWithoutFailingStartup() throws Exception {
+    void reportsTheGovernedLocalFallbackAsReleaseReady() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.components.mobilityCapabilities.status").value("UP"))
-                .andExpect(jsonPath("$.components.mobilityCapabilities.details.releaseReady").value(false))
-                .andExpect(jsonPath("$.components.mobilityCapabilities.details.operatingMode").value("SCAFFOLD"))
+                .andExpect(jsonPath("$.components.mobilityCapabilities.details.releaseReady").value(true))
+                .andExpect(jsonPath("$.components.mobilityCapabilities.details.operatingMode").value("FULL"))
                 .andExpect(jsonPath("$.components.mobilityCapabilities.details.capabilities.governedMetrics.status")
                         .value("AVAILABLE"))
                 .andExpect(jsonPath("$.components.mobilityCapabilities.details.capabilities.workflowEngine.status")
                         .value("AVAILABLE"))
                 .andExpect(jsonPath("$.components.mobilityCapabilities.details.capabilities.authorization.status")
-                        .value("UNAVAILABLE"))
+                        .value("AVAILABLE"))
                 .andExpect(jsonPath("$.components.mobilityCapabilities.details.capabilities.businessAudit.status")
-                        .value("UNAVAILABLE"));
+                        .value("AVAILABLE"));
     }
 }

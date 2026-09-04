@@ -9,32 +9,32 @@ This board is maintained by the Codex Foundation & Integration owner on `Java-br
 | Codex C0 metric/contracts | `Java-branch-2` | Green | `d4aa14d`; contract and serialization tests pass |
 | Codex C1 build foundation | `Java-branch-2` | Green | `90c1683`; Java 21 configuration and one-command verification pass |
 | Codex C2 application ports | `Java-branch-2` | Green | `90c1683`; control-plane consumer contracts pass |
-| Codex C3 Spring composition | `Java-branch-2` | In progress | Application-start capability report is green; final adapter selection awaits worker handoffs |
-| Codex official-data gate | `Java-branch-2` | Green | Current release-gate commit; seven checksums plus G1 M01 unit/API reconciliation pass |
-| Claude WS1 governed analytics | `feat/governed-analytics` | Pending | Commit, tests, seven-file ingest and G1 evidence |
-| Claude WS2 agent workflow | `feat/agent-workflow` | Pending | Commit, bounded trajectory tests and fallback proof |
-| Claude WS3 governance/actions | `feat/governance-actions` | Pending | Commit, approval/resume/idempotency/audit tests |
-| Claude WS4 product API | `feat/product-api` | Pending | Commit, provider/consumer and tenant tests |
-| Claude WS5 React experience | `feat/react-experience` | Pending | Commit, UI tests/build and browser proof |
-| Claude WS6 quality/telemetry | `feat/quality-telemetry` | Pending | Commit, evaluation/security/recovery/trace gates |
+| Codex C3 Spring composition | `Java-branch-2` | Green | Governed analytics, identity, product API, control plane and telemetry adapters composed; application context and capability report pass |
+| Codex official-data gate | `Java-branch-2` | Green | Seven checksums, G1 exact metric reconciliation, full workflow approval/resume and HTTP scorecard pass |
+| Claude WS1 governed analytics | `feat/governed-analytics` | Integrated | `54abda6`; seven-file ingest, M01-M18, G1/G2/G3 analytics and 49 packet tests |
+| Claude WS2 agent workflow | `feat/agent-workflow` | Integrated | `04a2ec9`; bounded 18-node trajectory, four roles, seven workers and 30 packet tests |
+| Claude WS3 governance/actions | `feat/governance-actions` | Integrated | `86d8def`; authorization, checkpoint, approval, revalidation, idempotency, audit and 22+4 packet tests |
+| Claude WS4 product API | `feat/product-api` | Integrated | `ea12891`; six product endpoints, dual-audience DTOs and 23 packet tests |
+| Claude WS5 React experience | `feat/react-experience` | Integrated | `7bed4c7`; React decision workflow, seven UI tests and production build |
+| Claude WS6 quality/telemetry | `feat/quality-telemetry` | Integrated | `401ee3e`; scorecard, adversarial/recovery corpora, redacted trace exporter and 27 packet tests |
 
 ## Release gates
 
 | Gate | State | Current evidence / exit condition |
 |---|---|---|
 | Organizer data integrity | Green | All seven files match `contracts/data/official-checksums.sha256` |
-| Build and baseline suite | Green | 12 Java tests, React production build, 1 React test and fixture validation pass |
+| Build and baseline suite | Green | 127 Java tests, React production build, 7 React tests and fixture validation pass |
 | Official G1 M01 | Green | 4,357 / 19,913 = 21.88%; baseline 12.28%; delta 9.60 pp |
-| Official HTTP slice | Green | M01 reaches `AWAITING_APPROVAL` through the running Spring API |
-| Complete G1 investigation | Red | Await WS1/WS2/WS4: M03/M04/M09/M11, concentration, vendor rebuttal and dual brief |
-| G2 honest degradation | Red | Await implemented low-coverage/unsupported-metric behavior |
-| G3 data-regime suppression | Red | Await data-quality classifier and no-action trajectory |
-| Tenant isolation | Red | Await cross-business-unit API, tool and join regressions |
-| Approval and one effect | Red | Await WS3 plus Codex C5 integration |
-| Evidence coverage | Red | Await proof that every displayed numeric claim resolves to governed evidence |
-| Root trace and telemetry fallback | Red | Await WS6 plus integrated Langfuse-degraded test |
-| Browser judge flow | Red | Await WS4/WS5 plus Codex C6 integration |
-| Clean-start release and backup | Red | Await C7 final Compose/start/reset and two repeated rehearsals |
+| Official HTTP slice | Green | Product API reproduces G1 and reaches `AWAITING_APPROVAL`; smoke approval resumes to `EXECUTED` |
+| Complete G1 investigation | Green | M03/M04/M09/M11, site/shift concentration, vendor rebuttal, dual brief and evidence are present |
+| G2 honest degradation | Green | Official scorecard passes low-coverage and zero-km caveat gate |
+| G3 data-regime suppression | Green | Official scorecard confirms sign-off change is a quality note, not an M13 escalation |
+| Tenant isolation | Green | Header, workflow read, approval, governed-tool and composite-key regressions pass |
+| Approval and one effect | Green | Approval, fresh revalidation, idempotent mock execution, duplicate rejection and audit tests pass |
+| Evidence coverage | Green | Deterministic verifier and scorecard resolve displayed numeric claims to governed evidence IDs |
+| Root trace and telemetry fallback | Green | Nested workflow spans, redaction and non-blocking degraded exporter tests pass |
+| Browser judge flow | Green | Seven React interaction tests and production build pass against the product API contract |
+| Clean-start release and backup | Green | `scripts/release/verify-release.sh` passed twice consecutively: 127 Java tests, 7 React tests/build, exact official metrics, fixture and official HTTP, approval execution, G1/G2/G3, security/audit and 7 generated-artifact evaluator tests |
 
 ## Authoritative commands
 

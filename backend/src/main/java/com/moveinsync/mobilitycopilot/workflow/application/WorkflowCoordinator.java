@@ -37,7 +37,7 @@ public final class WorkflowCoordinator {
     public WorkflowOutcome run(ActorContext actor, TenantContext tenant, LocalDate asOfDate, RunContext.Persona persona,
                                RunContext.RequestMode mode, String question) {
         WorkflowState state = WorkflowState.start(tenant, asOfDate, properties.maxInvestigationSteps(), properties.maxCorrectionCycles(), properties.maxToolCalls());
-        RunContext context = new RunContext(actor, persona, mode, state.runId().toString(), RunContext.WORKFLOW_VERSION,
+        RunContext context = new RunContext(actor, persona, mode, state.runId().toString().replace("-", ""), RunContext.WORKFLOW_VERSION,
                 RunContext.PROMPT_VERSION, "unset", "unknown", question);
         return workflowEngine.run(state, context);
     }

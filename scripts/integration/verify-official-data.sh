@@ -14,4 +14,4 @@ if [ ! -d "$dataset_dir" ]; then
   exit 1
 fi
 
-./mvnw -pl backend -Dtest=OfficialDatasetReconciliationTest test
+./mvnw -pl backend -Dtest=OfficialDatasetReconciliationTest,OfficialMetricFixtureExporter test

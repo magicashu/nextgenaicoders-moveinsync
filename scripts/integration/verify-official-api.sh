@@ -31,12 +31,12 @@ done
 
 response="$(curl --fail --silent --show-error \
   -H 'X-Business-Unit: pinnacle-Slc' \
-  'http://localhost:8080/api/v1/demo/brief?asOf=2026-06-08')"
+  'http://localhost:8080/api/v1/briefs/morning?asOf=2026-06-08')"
 
 printf '%s' "$response" | python3 -c '
 import json, sys
 brief = json.load(sys.stdin)
-metric = brief["metric"]
+metric = brief["operations"]["headlineKpi"]["metric"]
 assert metric["metricId"] == "M01_DELAYED_TRIP_RATE"
 assert metric["status"] == "SUPPORTED"
 assert float(metric["value"]) == 21.88
@@ -47,5 +47,11 @@ assert float(metric["denominator"]) == 19913.0
 assert metric["unit"] == "PERCENT"
 assert metric["contractVersion"] == "metrics-v1.1"
 assert brief["status"] == "AWAITING_APPROVAL"
-print("Official API valid: M01=21.88%, baseline=12.28%, delta=9.60pp, status=AWAITING_APPROVAL")
+assert brief["trust"]["finalStep"] == "AWAITING_APPROVAL"
+assert brief["operations"]["approval"]["status"] == "PENDING"
+assert len(brief["trust"]["transitions"]) >= 16
+print("Official product API valid: M01=21.88%, baseline=12.28%, delta=9.60pp, approval=PENDING")
 '
+
+MOBILITY_API='http://localhost:8080' MOBILITY_SMOKE_APPROVE=true sh scripts/demo/smoke.sh
+MOBILITY_API='http://localhost:8080' sh scripts/demo/scorecard.sh

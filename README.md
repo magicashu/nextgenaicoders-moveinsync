@@ -2,9 +2,9 @@
 
 Java 21/Spring Boot and React/TypeScript starter for the MoveInSync agentic intelligence and reporting challenge.
 
-The checked-in sample is a deterministic vertical slice:
+The checked-in product is a deterministic, evidence-governed vertical slice:
 
-`request -> tenant context -> M01 in DuckDB -> anomaly rule -> evidence check -> brief -> draft action`
+`request -> tenant/RBAC -> DuckDB metrics -> anomaly detection -> four agent roles -> evidence critic -> dual brief -> approval -> revalidation -> idempotent mock effect -> audit/trace`
 
 It intentionally does not include RAG, a vector database, unrestricted text-to-SQL, or independent agent microservices.
 
@@ -32,18 +32,33 @@ export MOBILITY_DATA_DIR="$PWD/outputs/official dataset/MoveInSync - Anonymised 
 ./mvnw -pl backend spring-boot:run
 ```
 
-The demo endpoint is:
+The product endpoint is:
 
 ```bash
 curl -H 'X-Business-Unit: pinnacle-Slc' \
-  'http://localhost:8080/api/v1/demo/brief?asOf=2026-06-08'
+  'http://localhost:8080/api/v1/briefs/morning?asOf=2026-06-08'
 ```
+
+The default runtime uses governed DuckDB analytics, the deterministic 18-node Java workflow,
+registry-backed tenant/RBAC checks, the in-memory local control plane and an in-memory trace
+exporter. No external secret is required for the local demo.
 
 ## Optional profiles
 
 - `-Pai-openai`: adds the Spring AI OpenAI model starter. Set `OPENAI_API_KEY` before activating it.
 - `-Ppostgres`: adds PostgreSQL/Flyway dependencies. Run with Spring profile `postgres`.
 - LangGraph4j is not included until the D-028 spike passes; the sample uses the project-owned deterministic workflow engine.
+- Langfuse export is optional. Set `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`; without them tracing remains available locally and does not block the product.
+
+## Release verification
+
+```bash
+./scripts/release/verify-release.sh
+```
+
+This checks organizer-file integrity, all Java and React tests, official metric reconciliation,
+the running product API, approval/resume, tenant isolation, adversarial requests, G1/G2/G3 and the
+generated scorecard.
 
 ## Important paths
 

@@ -16,3 +16,5 @@ backend/target/
 logs/
 data/corrupted/generated/
 outputs/official dataset/
+evals/results/*
+!evals/results/.gitkeep
