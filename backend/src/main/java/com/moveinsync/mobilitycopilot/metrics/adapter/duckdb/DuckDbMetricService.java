@@ -81,9 +81,17 @@ public final class DuckDbMetricService implements MetricService {
                 SELECT
                     trim(business_unit) AS business_unit,
                     CAST(replace(CAST(trip_id AS VARCHAR), ',', '') AS BIGINT) AS trip_id,
-                    CAST(trip_date AS DATE) AS trip_date,
+                    coalesce(
+                        try_cast(trip_date AS DATE),
+                        CAST(try_strptime(CAST(trip_date AS VARCHAR), '%%B %%-d, %%Y') AS DATE)
+                    ) AS trip_date,
                     CAST(replace(CAST(delay_minutes AS VARCHAR), ',', '') AS DOUBLE) AS delay_minutes
-                FROM read_csv_auto('%s', union_by_name = true, header = true)
+                FROM read_csv_auto(
+                    '%s',
+                    union_by_name = true,
+                    header = true,
+                    all_varchar = true
+                )
                 """.formatted(glob);
         try (Statement statement = connection.createStatement()) {
             statement.execute(sql);

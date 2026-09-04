@@ -392,6 +392,16 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** Integration reveals a missing field; update Java records, schemas, consumer/provider tests and the decision register atomically.
 - **Supersedes:** The underspecified scaffold-only action/approval/audit records in D-036.
 
+## D-042: Official-data reconciliation is a mandatory integration gate
+
+- **Status:** Accepted and implemented for G1 M01
+- **Decision:** Add dedicated integration and HTTP tests that read the immutable organizer trip files and reproduce G1 M01 exactly: 4,357 / 19,913 = 21.88%, with a 12.28% prior-four-week baseline and 9.60 percentage-point delta. The DuckDB CSV boundary reads drift-prone trip files as strings before explicit normalization and accepts both ISO fixture dates and the organizer's free-text month format. Pin the seven organizer-file checksums and make them, the full Java/React suite, the fixture API and official-data API part of one release command. Fixture tests remain fast, but a release cannot pass on fixtures alone.
+- **Reason:** The first official-data run exposed two defects hidden by the synthetic fixture: direct date casting rejected values such as `July 14, 2026`, and CSV auto-inference treated `delay_minutes` as integer before encountering comma-formatted values such as `1,318`.
+- **Evidence or rubric link:** G1 in D-032 and official dataset dictionary; functionality and architecture/code-quality criteria.
+- **Consequences:** `scripts/release/verify-release.sh` is the authoritative aggregate gate; `scripts/integration/verify-official-data.sh` is required after data/metric merges. WS1 may replace the temporary normalized view with its full seven-file ingestion layer only if the integration and HTTP regressions remain green.
+- **Reconsider if:** The organizer files change checksum; re-profile and version expected results instead of silently updating assertions.
+- **Supersedes:** Any implication that the tiny scaffold fixture alone verifies official-data compatibility.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -426,6 +436,7 @@ When the hackathon begins:
 | 2026-09-05 | D-039 | Reconciled M04/M05/M06/M09/M11/M15/M18 and vendor qualification into metric-contract v1.1 | Prevent parallel workers from encoding contradictory denominators, aggregations or claims |
 | 2026-09-05 | D-040 | Moved new Codex and Claude integration work to `Java-branch-2` while preserving `Java-branch` | Maintain a clean implementation line from the accepted scaffold/plan baseline |
 | 2026-09-05 | D-041 | Froze shared authorization, checkpoint, approval, revalidation, execution and audit ports plus bounded workflow configuration | Give parallel component workers safe, framework-neutral contracts and deterministic control gates |
+| 2026-09-05 | D-042 | Added mandatory official-data G1 M01 reconciliation and fixed date/type normalization defects found by it | Ensure release correctness is proven on organizer data rather than only on the tiny fixture |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

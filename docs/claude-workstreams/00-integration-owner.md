@@ -35,6 +35,7 @@ AGENTS.md
 SESSION_CONTEXT.md
 scripts/verify.sh
 scripts/integration/**
+scripts/release/**
 ```
 
 ## Coding series
@@ -47,6 +48,8 @@ scripts/integration/**
 6. **C5 Action integration:** connect approval resume → revalidation → idempotent executor → audit and prove exactly one effect.
 7. **C6 UI/API integration:** repair contract, generated-type, runtime and CORS issues; run the real browser/API flow.
 8. **C7 Release engineering:** implement verification, seed/reset, Compose/AWS configuration, fallback output and release automation.
+
+The final release command is `./scripts/release/verify-release.sh`. It is intentionally stricter than a worker test: the organizer-file checksums, complete Java/React suite, governed M01 reconciliation, fixture-backed API and official-data API must all pass. Extend this command with the G2, G3, tenant, approval/idempotency, telemetry and browser gates as their owning packets arrive; never remove an existing gate to make a merge green.
 
 ## Coordination work
 
