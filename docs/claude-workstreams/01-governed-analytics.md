@@ -4,7 +4,7 @@ You own governed ingestion, metrics and anomalies for the MoveInSync Mobility De
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/governed-analytics`
 - Worktree: `<WORKTREE_PATH>`
 - Java 21/Spring Boot; DuckDB is the analytical plane.
@@ -68,4 +68,4 @@ Return tenant-safe, versioned and reproducible metric/anomaly evidence from all 
 
 ## Delivery
 
-Commit only your owned paths. Do not push or merge into `Java-branch`. Return the standard handoff from the plan, including exact test commands/results and any shared change request.
+Commit only your owned paths. Do not push or merge into `Java-branch-2`. Return the standard handoff from the plan, including exact test commands/results and any shared change request.

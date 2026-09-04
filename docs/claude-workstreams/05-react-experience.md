@@ -4,7 +4,7 @@ You own the complete React/TypeScript decision experience for the MoveInSync Mob
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/react-experience`
 - Worktree: `<WORKTREE_PATH>`
 
@@ -56,4 +56,4 @@ Build the five-minute judge flow against frozen typed fixtures first, then switc
 
 ## Delivery
 
-Commit only `frontend/**`. Do not push or merge into `Java-branch`. Return the standard handoff with screenshots or route names and exact test/build results.
+Commit only `frontend/**`. Do not push or merge into `Java-branch-2`. Return the standard handoff with screenshots or route names and exact test/build results.

@@ -136,7 +136,7 @@ Legend: S supported, D derivable with caveat, U unsupported.
 | GPS / location analysis | U | U | U | U | U | no coordinates |
 | Budget variance | U | U | U | U | U | no budget |
 
-## 8. Governed metric contracts v1
+## 8. Governed metric contracts v1.1
 
 All metrics are computed per tenant, per window, with optional dimensions restricted to: vendor_id, site_id, shift_id, direction, mode, fuel_type, vehicle_id. Minimum volume for a ranked group is 300 trips (or 500 for vendor peer rankings) unless the contract states otherwise. Each result carries numerator, denominator, population, window, filters, data version and caveats.
 
@@ -145,21 +145,23 @@ All metrics are computed per tenant, per window, with optional dimensions restri
 | M01 | Delayed-trip rate | trips with `delay_minutes > 0` / trips | trip | none | % |
 | M02 | Mean and P90 delay of delayed trips | `delay_minutes` capped at 600 | trip | delay = 0; > 1,440 quarantined | min |
 | M03 | Delay-reason mix | delayed trips by `delay_reason` / delayed trips | trip | none | % |
-| M04 | On-time pickup rate | boarded legs with `actual_pickup - planned_pickup ≤ 10 min` / boarded legs with both epochs | leg | null epochs, not boarded | % |
-| M05 | On-time drop rate | boarded legs with `actual_drop - planned_drop ≤ 10 min` / same | leg | as M04 | % |
-| M06 | No-show rate | legs with `is_no_show` / planned legs (`signintype` not null or boarded) | leg | `stwid = 0` | % |
+| M04 | On-time pickup rate | boarded legs with `actual_pickup_epoch - planned_pickup_epoch ≤ 10 min` / boarded legs with both pickup epochs | leg | either pickup epoch null, `boarding_status != Boarded`, `stwid = 0` | % |
+| M05 | On-time drop rate | boarded legs with `actual_drop_epoch - planned_drop_epoch ≤ 10 min` / boarded legs with both drop epochs | leg | either drop epoch null, `boarding_status != Boarded`, `stwid = 0` | % |
+| M06 | No-show rate | valid employee legs with `is_no_show = true` / all valid employee legs | leg | `stwid = 0`; exact duplicate legs | % |
 | M07 | Dashboard-cancellation rate | legs with `not_boarding_reason = TRIP_CANCELLED_FROM_DASHBOARD` / planned legs | leg | as M06 | % |
 | M08 | Occupancy | `min(actualemployee_cnt, capacity)` / `actual_cab_capacity` | trip | capacity null | % |
-| M09 | Cost per trip | sum `trip_cost` / billed trips | bill | `trip_cost < 0`, null trip_id, exact duplicates | currency |
+| M09 | Median billed cost per trip | median of per-trip positive billed cost after summing retained lines by `(business_unit, trip_id)` | bill/trip | `trip_cost < 0`, null trip_id, exact duplicates | currency |
 | M10 | Cost per billed km | sum `trip_cost` / sum `total_trip_km` | bill | `total_trip_km = 0`, negatives | currency/km |
-| M11 | Low-rating rate | legs rated with driver or cab or safety `≤ 2` / legs rated `> 0` | feedback | rating 0 | % |
+| M11 | Low driver-rating rate | feedback rows with `driver_rating` in {1, 2} / feedback rows with `driver_rating > 0` | feedback | driver rating 0; `stwid = 0`; exact duplicates | % |
 | M12 | Mean driver / safety rating | mean of ratings `> 0` | feedback | rating 0 | 1-5 |
 | M13 | Alert rate | alerts / trips × 1,000 | trip | `EMPLOYEE_SIGN_OFF_TIME_VIOLATION` (Q5) | per 1,000 trips |
 | M14 | Sev-1/2 alert rate | alerts with severity in {Sev-1, Sev-2} / trips × 1,000 | trip | as M13 | per 1,000 trips |
-| M15 | Alert acknowledgement P90 | `acknowledge_time - start_time` | alert | null severity, null ack | min |
+| M15 | Sev-1/2 alert acknowledgement P90 | P90 of `acknowledge_time - start_time` for severity in {Sev-1, Sev-2} | alert | other/invalid/null severity, null/negative acknowledgement duration, M13 excluded event type | min |
 | M16 | Tracking-gap rate | `DEVICE_NOT_REACHABLE` alerts / trips × 1,000 | trip | tenants with zero events → U | per 1,000 trips |
 | M17 | EV share | trips with `Electric` / trips | trip | none | % |
-| M18 | Escort compliance | trips with `actual_escort` among trips with a `WOMAN_TRAVELLING_ALONE` alert | trip | tenants without the alert type → U | % |
+| M18 | Escort-present rate | distinct trips with `actual_escort = true` among distinct trips with a `WOMAN_TRAVELLING_ALONE` alert | trip | tenants without the alert type → U; no compliance claim without an external rule | % |
+
+For G1 vendor-trend language, “every vendor rose” means every vendor with at least 500 trips in both the current and baseline windows increased. Lower-volume vendors may be shown as qualified context but are not included in the universal statement.
 
 Comparison modes for every metric: prior 4 complete weeks (historical), same tenant other vendors/sites (peer), other tenants same window (cross-tenant peer, shown only to facilities-head persona), and the configured target where one is defined.
 
@@ -247,7 +249,7 @@ Deterministic metric fixtures (hand-reconciled against the profile above):
 6. M13 excludes sign-off violation alerts and does not flag May for pinnacle-Slc.
 7. Join on `trip_id` alone for orbit-Slc versus composite key differs by exactly 6,753 IDs.
 8. Leg dedupe removes 708 rows; bill dedupe removes 72 exact duplicates.
-9. Delay cap: Pooja Mikhailov Travel mean delay of delayed trips uses capped values; 77 trips above 600 min quarantined.
+9. Delay cap: Pooja Mikhailov Travel mean delay of delayed trips caps 77 trips above 600 minutes; values above 1,440 minutes are quarantined rather than averaged.
 10. Marshal rating of 0 excluded from M12.
 
 Corrupted variants for degraded-data tests (generated from the real files, never replacing them):

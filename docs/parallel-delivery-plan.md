@@ -46,7 +46,7 @@ Use Codex as the hands-on Foundation & Integration Owner and six Claude componen
 
 | Owner | Branch | Exclusive responsibility |
 |---|---|---|
-| Codex — Foundation & Integration | `Java-branch` | Shared contracts, ports, build/configuration, Spring composition, integration tests, merge repairs, release automation and final demo |
+| Codex — Foundation & Integration | `Java-branch-2` | Shared contracts, ports, build/configuration, Spring composition, integration tests, merge repairs, release automation and final demo |
 | WS1 Governed Analytics | `feat/governed-analytics` | Seven-file ingestion, normalized DuckDB views, M01-M18, snapshots, anomaly and contribution analysis |
 | WS2 Agent Workflow | `feat/agent-workflow` | Typed workflow, four AI roles, seven investigation workers, deterministic engine and LangGraph4j spike |
 | WS3 Governance & Actions | `feat/governance-actions` | Tenant access, checkpoints, approval, revalidation, idempotency, mock execution and audit |
@@ -58,7 +58,7 @@ Do not assign a separate coding worker to each runtime AI role. The four roles s
 
 ### 3.1 Codex coding series
 
-Codex completes this series on `Java-branch`, stopping component workers during any shared-contract change:
+Codex completes this series on `Java-branch-2`, stopping component workers during any shared-contract change:
 
 | Series | Coding outcome | Starts | Done when |
 |---|---|---|---|
@@ -152,9 +152,9 @@ The Integration Owner exclusively owns and versions:
 
 Every evidence-backed number must preserve tenant, metric ID and version, data version, time window, filters, numerator, denominator or supporting count, coverage, confidence and provenance.
 
-### 5.2 Resolve metric-contract questions
+### 5.2 Metric-contract questions — resolved in D-039
 
-Before parallel implementation, reconcile the metric table, golden examples and tests for:
+The metric table, golden examples and tests were reconciled before metric implementation for:
 
 - M04/M05: exact eligible-leg denominator;
 - M06: exact planned-leg denominator;
@@ -164,12 +164,12 @@ Before parallel implementation, reconcile the metric table, golden examples and 
 - M18: rename to escort-present rate unless an actual compliance rule is supplied;
 - the minimum-volume rule used to state that “every vendor rose.”
 
-No worker may silently choose an interpretation. The resolved definitions must be updated in the dataset profile, decision register, SQL contract and deterministic fixtures together.
+No worker may silently choose a different interpretation. The frozen answers are metric-contract v1.1 in the dataset profile and D-039; any proposed change must update the decision register, SQL contract and deterministic fixtures together.
 
 ### 5.3 Baseline gate
 
 ```bash
-git switch Java-branch
+git switch Java-branch-2
 ./scripts/verify.sh
 git status --short
 git rev-parse HEAD
@@ -199,7 +199,7 @@ git worktree add ../hackathon-wt-react-experience -b feat/react-experience <BASE
 git worktree add ../hackathon-wt-quality-telemetry -b feat/quality-telemetry <BASELINE_COMMIT>
 ```
 
-Workers commit only to their feature branches. They do not merge or push into `Java-branch`. The Integration Owner reviews and merges from the canonical checkout using the `magicashu` account.
+Workers commit only to their feature branches. They do not merge or push into `Java-branch-2`. The Integration Owner reviews and merges from the canonical checkout using the `magicashu` account.
 
 ## 7. Exclusive path ownership
 
@@ -481,7 +481,7 @@ Recommended order:
 Before each integration window:
 
 - announce a 15-minute contract freeze;
-- require workers to rebase on the latest `Java-branch`;
+- require workers to rebase on the latest `Java-branch-2`;
 - merge shared contract changes first;
 - merge sequentially and run the integration gate after each merge;
 - tag green milestones: `foundation-green`, `g1-green`, `hardening-green`, `demo-rc1`.
@@ -516,7 +516,7 @@ npm --prefix frontend run build
 
 Workers may omit unrelated expensive commands, but must say why.
 
-### Every merge into `Java-branch`
+### Every merge into `Java-branch-2`
 
 - Java compile, JUnit and architecture tests;
 - TypeScript check, UI tests and production build;
@@ -664,7 +664,7 @@ Never cut G1 correctness, G2 caveats, G3 suppression, tenant isolation, evidence
 
 ## 17. Release checklist
 
-- `Java-branch` is green and tagged.
+- `Java-branch-2` is green and tagged.
 - Fresh clone/bootstrap/test/launch succeeds.
 - Official dataset checksums are unchanged.
 - G1 numbers and trajectory pass.

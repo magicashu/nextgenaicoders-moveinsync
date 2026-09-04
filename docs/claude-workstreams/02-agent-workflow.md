@@ -4,7 +4,7 @@ You own workflow orchestration and the four logical AI roles for the MoveInSync 
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/agent-workflow`
 - Worktree: `<WORKTREE_PATH>`
 
@@ -63,4 +63,4 @@ Implement the typed, bounded four-role workflow behind the project-owned `Workfl
 
 ## Delivery
 
-Commit only your owned paths. Do not push or merge into `Java-branch`. Return the standard handoff, including the explicit LangGraph4j keep/drop result.
+Commit only your owned paths. Do not push or merge into `Java-branch-2`. Return the standard handoff, including the explicit LangGraph4j keep/drop result.

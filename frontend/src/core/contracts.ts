@@ -1,25 +1,37 @@
 export type MetricResult = {
   metricId: string
   metricName: string
-  valuePercent: number
-  baselinePercent: number
-  deltaPercentagePoints: number
-  numerator: number
-  denominator: number
+  unit: 'PERCENT' | 'MINUTES' | 'CURRENCY' | 'CURRENCY_PER_KM' | 'PER_1000_TRIPS' | 'RATING' | 'COUNT'
+  status: 'SUPPORTED' | 'UNSUPPORTED'
+  value: number | null
+  baselineValue: number | null
+  delta: number | null
+  numerator: number | null
+  denominator: number | null
+  supportingCount: number
   periodStart: string
   periodEnd: string
+  filters: Record<string, string>
   contractVersion: string
   dataVersion: string
+  source: string
+  caveats: string[]
 }
 
 export type EvidenceBundle = {
   items: Array<{
     evidenceId: string
     metricId: string
-    valuePercent: number
-    baselinePercent: number
-    numerator: number
-    denominator: number
+    value: number
+    unit: string
+    baselineValue: number | null
+    delta: number | null
+    numerator: number | null
+    denominator: number | null
+    supportingCount: number
+    periodStart: string
+    periodEnd: string
+    filters: Record<string, string>
     source: string
     contractVersion: string
     dataVersion: string

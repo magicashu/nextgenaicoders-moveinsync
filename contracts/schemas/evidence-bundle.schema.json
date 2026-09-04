@@ -10,12 +10,25 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["evidenceId", "metricId", "source", "contractVersion", "dataVersion"],
+        "required": ["evidenceId", "metricId", "value", "unit", "supportingCount", "periodStart", "periodEnd", "filters", "source", "contractVersion", "dataVersion"],
         "properties": {
           "evidenceId": { "type": "string" },
           "metricId": { "type": "string" },
+          "value": { "type": "number" },
+          "unit": { "type": "string" },
+          "baselineValue": { "type": ["number", "null"] },
+          "delta": { "type": ["number", "null"] },
+          "numerator": { "type": ["number", "null"] },
+          "denominator": { "type": ["number", "null"] },
+          "supportingCount": { "type": "integer", "minimum": 0 },
+          "periodStart": { "type": "string", "format": "date" },
+          "periodEnd": { "type": "string", "format": "date" },
+          "filters": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
           "source": { "type": "string" },
-          "contractVersion": { "type": "string" },
+          "contractVersion": { "const": "metrics-v1.1" },
           "dataVersion": { "type": "string" }
         }
       }

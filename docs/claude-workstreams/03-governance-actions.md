@@ -4,7 +4,7 @@ You own trusted tenant access, workflow durability, approval, action execution a
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/governance-actions`
 - Worktree: `<WORKTREE_PATH>`
 
@@ -67,4 +67,4 @@ Guarantee that tenant scope and every side effect are deterministic, approved, f
 
 ## Delivery
 
-Commit only your owned paths. Do not push or merge into `Java-branch`. Return the standard handoff with migration order and recovery assumptions.
+Commit only your owned paths. Do not push or merge into `Java-branch-2`. Return the standard handoff with migration order and recovery assumptions.

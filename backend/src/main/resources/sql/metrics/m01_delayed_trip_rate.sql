@@ -1,4 +1,4 @@
--- M01-v1: delayed trips / all trips. Tenant and period are mandatory parameters.
+-- metrics-v1.1 / M01: delayed trips / all trips. Tenant and period are mandatory parameters.
 SELECT
     count(*) FILTER (WHERE delay_minutes > 0) AS delayed_trips,
     count(*) AS total_trips,

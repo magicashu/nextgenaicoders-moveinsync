@@ -362,6 +362,26 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** Only one coding agent is available; in that case execute the same series sequentially before absorbing component work.
 - **Supersedes:** Any interpretation of D-037 in which the Integration Owner performs coordination only.
 
+## D-039: Governed metric contracts v1.1 resolve implementation ambiguities
+
+- **Status:** Accepted
+- **Decision:** Freeze metric-contract v1.1 with these clarifications: M04/M05 use boarded, non-placeholder employee legs with both corresponding planned and actual epochs; M06 divides no-shows by all valid non-placeholder employee legs after exact deduplication; M09 is the median of per-trip positive billed cost after retained lines are summed by composite trip key; M11 is low driver-rating rate; M15 is the acknowledgement P90 for Sev-1/2 eligible alerts only; M18 is renamed escort-present rate and makes no compliance claim without an external rule. “Every vendor rose” applies only to vendors with at least 500 trips in both comparison windows.
+- **Reason:** Direct profiling showed that `signintype IS NOT NULL OR boarded` excludes all 118,032 no-show rows from the M06 denominator. The documented vanta-Aus 2.7% → 4.1% → 4.2% series exactly matches driver-only low ratings, not “any low rating.” Sev-1/2 acknowledgement P90 is 2 minutes while all-severity P90 is 19 minutes, so the configured severe-alert target requires the severe population. Existing M09 golden examples and G1 analysis consistently use medians.
+- **Evidence or rubric link:** Official file dictionaries; deterministic read-only reconciliation on 2026-09-05; D-031 and G1/G2 fixtures in the dataset profile.
+- **Consequences:** SQL, Java/JSON metric contracts, frontend fixtures and deterministic tests use generic value/unit fields rather than percent-only names. M06, M11 and M15 implementations that use the earlier ambiguous wording must be rejected. M18 is descriptive until a real policy or SLA defines compliance.
+- **Reconsider if:** The organizer supplies an authoritative formula, SLA/compliance rule or corrected fixture.
+- **Supersedes:** The conflicting portions of D-031 and metric-contract v1; all unaffected D-031 exclusions and comparison rules remain active.
+
+## D-040: Active implementation moves to Java-branch-2
+
+- **Status:** Accepted and implemented
+- **Decision:** Preserve `Java-branch` at the last pushed planning/scaffold state and perform all new implementation and integration on the Git-safe branch `Java-branch-2` (the user's “Java branch 2”). New Codex foundation work is committed and pushed only to `Java-branch-2`. Claude component branches must be based on or rebased onto the frozen `Java-branch-2` baseline and must not merge directly into it.
+- **Reason:** The user requested a clean second branch for the parallel implementation while retaining the existing Java branch as a stable reference.
+- **Evidence or rubric link:** Repository delivery safety and D-037/D-038 parallel ownership model.
+- **Consequences:** Every active plan, packet and session instruction targets `Java-branch-2`; `Java-branch` receives no further implementation changes unless the user explicitly requests it.
+- **Reconsider if:** The user asks to merge the finished release back into `Java-branch` or selects another release branch.
+- **Supersedes:** The `Java-branch` integration-target portions of D-037/D-038; workstream ownership is unchanged.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -393,6 +413,8 @@ When the hackathon begins:
 | 2026-09-05 | D-036 | Created and verified a runnable Java/React monorepo scaffold around one deterministic evidence-to-approval slice | Establish working boundaries and a regression baseline before expanding the full graph |
 | 2026-09-05 | D-037 | Adopted six exclusive parallel workstreams plus one Integration Owner, contract freeze, integration waves and release gates | Let multiple Claude sessions work concurrently without diverging on metrics, contracts, controls or demo outcomes |
 | 2026-09-05 | D-038 | Assigned Codex the C0-C7 foundation and integration coding series alongside six Claude component workstreams | Ensure both Codex and Claude write production/test code while preserving exclusive ownership |
+| 2026-09-05 | D-039 | Reconciled M04/M05/M06/M09/M11/M15/M18 and vendor qualification into metric-contract v1.1 | Prevent parallel workers from encoding contradictory denominators, aggregations or claims |
+| 2026-09-05 | D-040 | Moved new Codex and Claude integration work to `Java-branch-2` while preserving `Java-branch` | Maintain a clean implementation line from the accepted scaffold/plan baseline |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

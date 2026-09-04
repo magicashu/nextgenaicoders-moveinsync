@@ -7,9 +7,11 @@
   },
   "expected": {
     "metricId": "M01_DELAYED_TRIP_RATE",
-    "currentPercent": 30.0,
-    "baselinePercent": 10.0,
-    "deltaPercentagePoints": 20.0,
+    "value": 30.0,
+    "baselineValue": 10.0,
+    "delta": 20.0,
+    "unit": "PERCENT",
+    "contractVersion": "metrics-v1.1",
     "finalStep": "AWAITING_APPROVAL",
     "actionExecuted": false
   }

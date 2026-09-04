@@ -9,7 +9,7 @@
     "businessUnit": { "type": "string", "minLength": 1 },
     "asOfDate": { "type": "string", "format": "date" },
     "headline": { "type": "string" },
-    "metric": { "type": "object" },
+    "metric": { "$ref": "metric-result.schema.json" },
     "findings": { "type": "array", "items": { "type": "string" } },
     "recommendedAction": { "$ref": "action-proposal.schema.json" },
     "evidence": { "$ref": "evidence-bundle.schema.json" },

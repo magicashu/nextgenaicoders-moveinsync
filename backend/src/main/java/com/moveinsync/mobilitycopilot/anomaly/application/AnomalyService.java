@@ -12,9 +12,10 @@ public final class AnomalyService {
     private static final BigDecimal MATERIAL_DELTA_PP = new BigDecimal("5.00");
 
     public AnomalyFinding assess(MetricResult metric) {
-        boolean material = metric.denominator() >= 5
-                && metric.deltaPercentagePoints().compareTo(MATERIAL_DELTA_PP) >= 0;
-        String severity = material && metric.deltaPercentagePoints().compareTo(new BigDecimal("10.00")) >= 0
+        boolean material = metric.supportingCount() >= 5
+                && metric.delta() != null
+                && metric.delta().compareTo(MATERIAL_DELTA_PP) >= 0;
+        String severity = material && metric.delta().compareTo(new BigDecimal("10.00")) >= 0
                 ? "HIGH"
                 : material ? "MEDIUM" : "HEALTHY";
         String summary = material

@@ -10,4 +10,4 @@ Use these packets only after Phase 0 in `docs/parallel-delivery-plan.md` is gree
 6. `05-react-experience.md`
 7. `06-quality-telemetry.md`
 
-Codex follows packet `00` on `Java-branch`. Replace `<BASELINE_COMMIT>` and `<WORKTREE_PATH>` before sending packets `01`–`06` to Claude. Each Claude worker gets exclusive write ownership, commits only to its feature branch, and returns the required handoff. Workers never push or merge directly into `Java-branch`.
+Codex follows packet `00` on `Java-branch-2`. Replace `<BASELINE_COMMIT>` and `<WORKTREE_PATH>` before sending packets `01`–`06` to Claude. Each Claude worker gets exclusive write ownership, commits only to its feature branch, and returns the required handoff. Workers never push or merge directly into `Java-branch-2`.

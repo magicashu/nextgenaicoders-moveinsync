@@ -4,7 +4,7 @@ You own reporting, contextual questions and thin REST delivery for the MoveInSyn
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/product-api`
 - Worktree: `<WORKTREE_PATH>`
 
@@ -59,4 +59,4 @@ Expose stable, tenant-safe REST endpoints and two evidence-consistent report for
 
 ## Delivery
 
-Commit only your owned paths. Do not push or merge into `Java-branch`. Return the standard handoff and list every endpoint demonstrated.
+Commit only your owned paths. Do not push or merge into `Java-branch-2`. Return the standard handoff and list every endpoint demonstrated.

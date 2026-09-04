@@ -4,7 +4,7 @@ You own evaluation, adversarial/recovery testing, observability and demo verific
 
 ## Baseline
 
-- Base: `Java-branch` at `<BASELINE_COMMIT>`
+- Base: `Java-branch-2` at `<BASELINE_COMMIT>`
 - Branch: `feat/quality-telemetry`
 - Worktree: `<WORKTREE_PATH>`
 
@@ -64,4 +64,4 @@ Prove correctness, safety, recovery and cost/latency behavior without making tel
 
 ## Delivery
 
-Commit only your owned paths. Do not push or merge into `Java-branch`. Return the standard handoff with the scorecard path, exact commands/results and any production defect found.
+Commit only your owned paths. Do not push or merge into `Java-branch-2`. Return the standard handoff with the scorecard path, exact commands/results and any production defect found.

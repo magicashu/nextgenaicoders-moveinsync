@@ -21,7 +21,7 @@ public final class BriefingActionAgent {
         var metric = investigation.headlineMetric();
         String headline = anomaly.material()
                 ? "%s: delayed-trip rate increased to %s%%".formatted(
-                        state.tenant().businessUnit(), metric.valuePercent())
+                        state.tenant().businessUnit(), metric.value())
                 : "%s: delayed-trip rate is within the materiality rule".formatted(
                         state.tenant().businessUnit());
         ActionProposal action = new ActionProposal(
@@ -33,7 +33,7 @@ public final class BriefingActionAgent {
         List<String> findings = List.of(
                 anomaly.summary(),
                 "Current: %s%%; prior four weeks: %s%%; change: %s percentage points."
-                        .formatted(metric.valuePercent(), metric.baselinePercent(), metric.deltaPercentagePoints()),
+                        .formatted(metric.value(), metric.baselineValue(), metric.delta()),
                 "The sample demonstrates the workflow contract; worker-specific attribution is the next slice.");
         return new DecisionBrief(
                 state.runId(),

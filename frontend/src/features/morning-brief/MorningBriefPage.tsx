@@ -27,6 +27,10 @@ export function MorningBriefPage() {
     return <main className="shell loading">Preparing the governed morning brief…</main>
   }
 
+  const metricValue = brief.metric.value ?? 0
+  const baselineValue = brief.metric.baselineValue ?? 0
+  const delta = brief.metric.delta ?? 0
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -47,9 +51,9 @@ export function MorningBriefPage() {
       </section>
 
       <section className="metrics">
-        <MetricCard label="Current" value={`${brief.metric.valuePercent.toFixed(1)}%`} detail={`${brief.metric.numerator} of ${brief.metric.denominator} trips`} tone="warning" />
-        <MetricCard label="Baseline" value={`${brief.metric.baselinePercent.toFixed(1)}%`} detail="Prior four complete weeks" />
-        <MetricCard label="Change" value={`+${brief.metric.deltaPercentagePoints.toFixed(1)} pp`} detail="Deterministic materiality rule" tone="warning" />
+        <MetricCard label="Current" value={`${metricValue.toFixed(1)}%`} detail={`${brief.metric.numerator} of ${brief.metric.denominator} trips`} tone="warning" />
+        <MetricCard label="Baseline" value={`${baselineValue.toFixed(1)}%`} detail="Prior four complete weeks" />
+        <MetricCard label="Change" value={`+${delta.toFixed(1)} pp`} detail="Deterministic materiality rule" tone="warning" />
       </section>
 
       <section className="content-grid">

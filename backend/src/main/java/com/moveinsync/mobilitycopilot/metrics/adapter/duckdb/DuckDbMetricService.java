@@ -4,7 +4,10 @@ import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
 import com.moveinsync.mobilitycopilot.config.MobilityDataProperties;
 import com.moveinsync.mobilitycopilot.metrics.application.MetricService;
 import com.moveinsync.mobilitycopilot.metrics.domain.MetricId;
+import com.moveinsync.mobilitycopilot.metrics.domain.MetricQuery;
 import com.moveinsync.mobilitycopilot.metrics.domain.MetricResult;
+import com.moveinsync.mobilitycopilot.metrics.domain.MetricStatus;
+import com.moveinsync.mobilitycopilot.metrics.domain.MetricUnit;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -19,11 +22,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public final class DuckDbMetricService implements MetricService {
 
-    private static final String CONTRACT_VERSION = "M01-v1";
+    private static final String CONTRACT_VERSION = "metrics-v1.1";
     private final MobilityDataProperties properties;
 
     public DuckDbMetricService(MobilityDataProperties properties) {
@@ -31,29 +36,35 @@ public final class DuckDbMetricService implements MetricService {
     }
 
     @Override
-    public MetricResult delayedTripRate(TenantContext tenant, LocalDate asOfDate) {
-        LocalDate currentStart = asOfDate.minusDays(7);
-        LocalDate currentEnd = asOfDate.minusDays(1);
-        LocalDate baselineEnd = currentStart.minusDays(1);
-        LocalDate baselineStart = baselineEnd.minusDays(27);
+    public MetricResult query(MetricQuery query) {
+        if (query.metricId() != MetricId.M01_DELAYED_TRIP_RATE) {
+            throw new IllegalArgumentException("Metric is not implemented by the scaffold: " + query.metricId());
+        }
+        TenantContext tenant = query.tenant();
         Path dataDirectory = resolveDataDirectory();
 
         try (Connection connection = DriverManager.getConnection("jdbc:duckdb:")) {
             createNormalizedView(connection, dataDirectory);
-            WindowResult current = queryWindow(connection, tenant, currentStart, currentEnd);
-            WindowResult baseline = queryWindow(connection, tenant, baselineStart, baselineEnd);
+            WindowResult current = queryWindow(connection, tenant, query.currentStart(), query.currentEnd());
+            WindowResult baseline = queryWindow(connection, tenant, query.baselineStart(), query.baselineEnd());
             return new MetricResult(
                     MetricId.M01_DELAYED_TRIP_RATE,
                     "Delayed-trip rate",
+                    MetricUnit.PERCENT,
+                    MetricStatus.SUPPORTED,
                     current.valuePercent(),
                     baseline.valuePercent(),
                     current.valuePercent().subtract(baseline.valuePercent()),
-                    current.numerator(),
+                    BigDecimal.valueOf(current.numerator()),
+                    BigDecimal.valueOf(current.denominator()),
                     current.denominator(),
-                    currentStart,
-                    currentEnd,
+                    query.currentStart(),
+                    query.currentEnd(),
+                    Map.copyOf(query.dimensions()),
                     CONTRACT_VERSION,
-                    "csv:" + dataDirectory.toAbsolutePath().normalize());
+                    "csv:" + dataDirectory.toAbsolutePath().normalize(),
+                    "sql/metrics/m01_delayed_trip_rate.sql",
+                    List.of());
         } catch (SQLException | IOException exception) {
             throw new IllegalStateException("Unable to compute M01 from " + dataDirectory, exception);
         }

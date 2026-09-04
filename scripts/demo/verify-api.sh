@@ -30,8 +30,10 @@ response="$(curl --fail --silent --show-error \
 printf '%s' "$response" | python3 -c '
 import json, sys
 brief = json.load(sys.stdin)
-assert float(brief["metric"]["valuePercent"]) == 30.0
-assert float(brief["metric"]["baselinePercent"]) == 10.0
+assert float(brief["metric"]["value"]) == 30.0
+assert float(brief["metric"]["baselineValue"]) == 10.0
+assert brief["metric"]["unit"] == "PERCENT"
+assert brief["metric"]["contractVersion"] == "metrics-v1.1"
 assert brief["status"] == "AWAITING_APPROVAL"
 print("API valid: M01=30.0%, baseline=10.0%, status=AWAITING_APPROVAL")
 '
