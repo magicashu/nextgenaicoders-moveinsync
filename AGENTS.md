@@ -9,8 +9,9 @@ At the start of every session, read these files in order:
 3. `docs/live-problem-statement-analysis.md`
 4. `docs/detailed-solution-architecture-plan.md`
 5. `docs/project-structure.md`
-6. `docs/dataset-profile-and-capability-matrix.md`
-7. The relevant section of `docs/moveinsync-ai-hackathon-winning-playbook.md`
+6. `docs/parallel-delivery-plan.md`
+7. `docs/dataset-profile-and-capability-matrix.md`
+8. The relevant section of `docs/moveinsync-ai-hackathon-winning-playbook.md`
 
 Operating rules:
 
@@ -22,6 +23,7 @@ Operating rules:
 - Do not invent schema fields, metric formulas, thresholds, anomaly claims, or demo numbers. Use only the field map, metric contracts M01-M18, thresholds and golden values in `docs/dataset-profile-and-capability-matrix.md`, and reproduce them in DuckDB before display.
 - Always join, cache and audit on `(business_unit, trip_id)`; `trip_id` alone collides across tenants.
 - Build the vertical golden path before optional sophistication.
+- For parallel implementation, follow D-037 and `docs/parallel-delivery-plan.md`: one Integration Owner freezes shared contracts and dependencies; each worker uses one worktree and writes only its assigned paths; workers do not merge or push directly into `Java-branch`.
 - Use the smallest relevant project-local skill under `.agents/skills/` and read its `SKILL.md` before applying it.
 - Keep tenant authorization, metrics, calculations, approvals, and action state transitions deterministic; use the LLM for bounded routing, synthesis, and explanation.
 - Never execute an external side effect without explicit approval, idempotency, and an audit event.

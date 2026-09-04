@@ -342,6 +342,16 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** A supplied starter repository mandates versions or packaging, or the D-028 orchestration spike justifies adding the LangGraph4j adapter.
 - **Supersedes:** The “no application code exists” handoff state only; no architecture decision changes.
 
+## D-037: Parallel delivery uses six exclusive workstreams and one Integration Owner
+
+- **Status:** Accepted
+- **Decision:** Execute the Java/React build through six component workstreams—governed analytics, agent workflow, governance/actions, product API, React experience, and quality/telemetry—coordinated by one Integration Owner on `Java-branch`. Each worker uses a separate branch/worktree and exclusive path ownership. Shared Java records, application ports, OpenAPI, JSON schemas, metric semantics, dependencies and frontend fixtures are frozen before worktrees are created; only the Integration Owner changes them. Workers commit to their branches but do not merge or push directly into `Java-branch`. Integration occurs in fixed waves with contract, metric, tenant, evidence, action and release gates. The complete plan and ready-to-paste Claude packets live in `docs/parallel-delivery-plan.md` and `docs/claude-workstreams/`.
+- **Reason:** Parallel coding is valuable only when workers cannot independently reinterpret metric formulas, tenant identity, workflow state or API payloads. Exclusive ownership and an integration gate preserve velocity without creating incompatible implementations or unsafe conflict resolutions.
+- **Evidence or rubric link:** Business impact/functionality require a working G1 vertical slice; agentic design requires bounded four-role orchestration; architecture/code quality requires typed contracts, tests and auditable boundaries. The delivery plan maps each workstream and phase to these rubric proofs.
+- **Consequences:** Phase 0 must resolve the remaining metric wording/example inconsistencies for M04, M05, M06, M09, M10, M11, M15 and M18 before different workers encode them. The critical path is contracts → ingestion → G1 metrics → anomaly/contributions → workflow/evidence → API/UI → approval/audit → rehearsal. RAG/OpenKB remains excluded. `magicashu` remains the only project GitHub account until the user requests a change.
+- **Reconsider if:** Team size, hackathon duration or a mandatory starter requires consolidation; combine workstreams without changing the frozen component boundaries or P0 gates.
+- **Supersedes:** None.
+
 ## Live problem statement intake checklist
 
 When the hackathon begins:
@@ -371,6 +381,7 @@ When the hackathon begins:
 | 2026-09-05 | D-034 | Adopted a capability-oriented Java/Angular monorepo with one backend, explicit data/control planes and a replaceable workflow engine | Convert the generic AI-agent layout into an implementation-ready structure aligned with the live solution |
 | 2026-09-05 | D-035 | Replaced the non-mandatory Angular frontend choice with React and TypeScript while retaining the Java backend | Match team delivery preference without changing the governed agent architecture or API contracts |
 | 2026-09-05 | D-036 | Created and verified a runnable Java/React monorepo scaffold around one deterministic evidence-to-approval slice | Establish working boundaries and a regression baseline before expanding the full graph |
+| 2026-09-05 | D-037 | Adopted six exclusive parallel workstreams plus one Integration Owner, contract freeze, integration waves and release gates | Let multiple Claude sessions work concurrently without diverging on metrics, contracts, controls or demo outcomes |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |

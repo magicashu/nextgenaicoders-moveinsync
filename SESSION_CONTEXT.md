@@ -21,13 +21,14 @@ codex
 
 Read `AGENTS.md` first. The authoritative records are:
 
-- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-036).
+- `docs/hackathon-decision-register.md` — accepted, conditional, deferred, and superseded decisions (D-001 through D-037).
 - `docs/live-problem-statement-analysis.md` — exact live requirements, rubric mapping, architecture, golden demo, and scope cuts.
 - `docs/detailed-solution-architecture-plan.md` — frozen agent count, node map, state/tools, worker tasks bound to the dataset, controls, tests, and build order.
 - `docs/project-structure.md` — implementation-ready Java/React monorepo tree, ownership boundaries, test placement and scaffolding order.
 - `docs/dataset-profile-and-capability-matrix.md` — official dataset inventory, checksums, tenant/key model, join coverage, data-quality findings, field map, per-tenant capability matrix, metric contracts M01-M18, golden anomalies G1-G3, fixtures and corrupted variants.
 - `docs/high-level-design.md` plus `docs/architecture/mobility-decision-copilot-hld.svg` and `.png` — component/data-flow specification and shareable HLD.
 - `docs/moveinsync-ai-hackathon-winning-playbook.md` — broader preparation, team, evaluation, demo, and learning guidance.
+- `docs/parallel-delivery-plan.md` and `docs/claude-workstreams/` — phased dependency graph, exclusive ownership, integration gates, cut rules and ready-to-paste Claude implementation packets.
 - `references/problem_explanation_7qdzf3jxklt.pdf` — supplied live problem statement.
 - `outputs/official dataset/MoveInSync - Anonymised Trip-Log Dataset/` — the seven organizer CSVs and `Dictionary/`. Never modify these files.
 
@@ -47,17 +48,19 @@ Do not reproduce those documents here; use them as the source of truth.
 - Structured-data focus: no RAG, reranking, or OpenKB unless a document corpus is supplied.
 - Repository structure (D-034/D-035): one Spring Boot service plus one React/TypeScript app, organized by business capability; the four agents are logical roles, `WorkflowEngine` shields the application from LangGraph4j, and there are no generic RAG/vector-store/model/utils packages.
 - Scaffold (D-036): runnable Java 21/Spring Boot and React starter exists. Its deterministic sample computes fixture M01 in DuckDB, verifies evidence, drafts a brief and stops at approval. Spring AI and PostgreSQL are opt-in Maven profiles; LangGraph4j is still gated.
+- Parallel delivery (D-037): six exclusive component workstreams plus one Integration Owner; freeze contracts and metric semantics before creating worktrees; workers do not merge or push directly into `Java-branch`.
 - Action scope: mocked vendor escalation, investigation ticket, watchlist, or communication draft. No real external communication.
 - Observability: one end-to-end trace with nested orchestration, tool, metric, and approval spans.
 - Evaluation (D-033): ten deterministic fixtures, corrupted variants V1-V5, and trajectory/narrative cases for G1-G3; LLM judges only for explanation quality.
 
 ## Current state
 
-- Live problem statement analyzed; decisions D-015 through D-036 recorded.
+- Live problem statement analyzed; decisions D-015 through D-037 recorded.
 - Official dataset received, checksummed (`tmp/profile/checksums.sha256`), and profiled; raw profile outputs in `tmp/profile/*.txt` and parquet caches in `tmp/profile/*.parquet` (regenerable, not authoritative).
 - The synthetic rehearsal package under `outputs/01a0584b-8bd8-7370-bc91-86525608d54d/` is retired (D-022/D-023 superseded).
 - A verified application scaffold now exists. `scripts/verify.sh` passes the Java unit test, React build/test and fixture check; `scripts/demo/verify-api.sh` passes the live Spring/DuckDB JSON check.
 - The next step is replacing the tiny fixture seam with full seven-file ingestion and reconciling official-data M01/M04/M09.
+- The execution order, parallel branches, worktree ownership, merge gates and Claude prompts are frozen in `docs/parallel-delivery-plan.md`; Phase 0 metric/contract clarification is the next coordination gate.
 
 ## Immediate build sequence
 
