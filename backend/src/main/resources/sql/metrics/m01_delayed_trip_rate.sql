@@ -1,11 +1,10 @@
--- metrics-v1.1 / M01: delayed trips / all trips. Tenant and period are mandatory parameters.
+-- metrics-v1.1 / M01 delayed-trip rate: trips with delay_minutes > 0 / trips. Grain: trip. Exclusions: none.
 SELECT
-    count(*) FILTER (WHERE delay_minutes > 0) AS delayed_trips,
-    count(*) AS total_trips,
-    round(
-        100.0 * count(*) FILTER (WHERE delay_minutes > 0) / nullif(count(*), 0),
-        2
-    ) AS value_percent
-FROM trips_normalized
-WHERE business_unit = ?
-  AND trip_date BETWEEN ? AND ?;
+    {{dimension}} AS member,
+    count(*) FILTER (WHERE is_delayed) AS numerator,
+    count(*) AS denominator,
+    100.0 * count(*) FILTER (WHERE is_delayed) / nullif(count(*), 0) AS value,
+    count(*) AS supporting_count
+FROM trips
+WHERE business_unit = {{bu}} AND trip_date BETWEEN {{start}} AND {{end}} {{filters}}
+GROUP BY 1;
