@@ -34,7 +34,7 @@ This board is maintained by the Codex Foundation & Integration owner on `Java-br
 | Evidence coverage | Green | Deterministic verifier and scorecard resolve displayed numeric claims to governed evidence IDs |
 | Root trace and telemetry fallback | Green | Nested workflow spans, redaction and non-blocking degraded exporter tests pass |
 | Browser judge flow | Green | Seven React interaction tests and production build pass against the product API contract |
-| Clean-start release and backup | Green | `scripts/release/verify-release.sh` passed twice consecutively: 127 Java tests, 7 React tests/build, exact official metrics, fixture and official HTTP, approval execution, G1/G2/G3, security/audit and 7 generated-artifact evaluator tests |
+| Clean-start release and backup | Green | `scripts/release/verify-release.sh` passed twice consecutively; integration commit `e147ed9` pushed to `origin/Java-branch-2` via `magicashu` |
 
 ## Authoritative commands
 

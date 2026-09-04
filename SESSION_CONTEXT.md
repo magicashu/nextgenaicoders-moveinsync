@@ -69,14 +69,14 @@ Do not reproduce those documents here; use them as the source of truth.
 - All six Claude workstreams are merged into `Java-branch-2`; their formal handoffs are under `.claude/handoffs/`.
 - The composed backend has 127 tests including an official-data end-to-end test that reaches `AWAITING_APPROVAL`, resumes after approval, revalidates and executes one idempotent mock effect with a matching trace.
 - The official HTTP smoke and scorecard pass G1, G2, G3, security and audit gates with every zero-tolerance counter at zero. React has seven interaction tests and a passing production build.
-- Two consecutive clean aggregate release rehearsals pass. The remaining integration-owner step is commit and push to `origin/Java-branch-2`.
+- Two consecutive clean aggregate release rehearsals pass. Integration commit `e147ed9` is pushed to `origin/Java-branch-2`; the implementation and integration phase is complete.
 
 ## Immediate build sequence
 
-1. Run `./scripts/release/verify-release.sh` twice from a clean start.
+1. Start the official-data backend and React UI for the judge rehearsal.
 2. Review generated `evals/results/scorecard.json` and the official G1 trace/audit pair.
-3. Commit only integrated product, tests, contracts, documentation and formal `.claude` handoffs; preserve unrelated local files.
-4. Push the verified integration commit to `origin/Java-branch-2` using the `magicashu` account.
+3. Rehearse the five-minute G1 story, G2 caveat story and G3 false-anomaly suppression.
+4. Configure PostgreSQL or Langfuse only if the deployment/demo environment is ready; the local fallback remains fully functional without them.
 
 ## Project-local skills to use
 
