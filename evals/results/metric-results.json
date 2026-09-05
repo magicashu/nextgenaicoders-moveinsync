@@ -1,0 +1,47 @@
+{
+  "F01" : {
+    "value" : 21.88,
+    "numerator" : 4357.00,
+    "denominator" : 19913.00
+  },
+  "F02" : {
+    "value" : 12.28,
+    "numerator" : 9186.00,
+    "denominator" : 74814.00
+  },
+  "F03" : {
+    "value" : 88.18,
+    "denominator" : 11794.00,
+    "lateShare" : 11.82
+  },
+  "F04" : {
+    "value" : 1390.34,
+    "excludedNegativeLines" : 158
+  },
+  "F05" : {
+    "status" : "UNSUPPORTED",
+    "reasonContains" : "zero km"
+  },
+  "F06" : {
+    "excludedEventType" : "EMPLOYEE_SIGN_OFF_TIME_VIOLATION",
+    "excludedCount" : 7736,
+    "mayFlagMay" : false
+  },
+  "F07" : {
+    "tenants" : [ "orbit-Slc", "vanta-Aus" ],
+    "count" : 6753
+  },
+  "F08" : {
+    "exactDuplicateBillLinesRemoved" : 72,
+    "duplicateLegsRemoved" : 708
+  },
+  "F09" : {
+    "cappedAbove600" : 77,
+    "meanBelow" : 600,
+    "quarantinedAbove1440" : 4
+  },
+  "F10" : {
+    "excludedFromM12" : true,
+    "marshalZeroRows" : 473692
+  }
+}
