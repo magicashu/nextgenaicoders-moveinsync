@@ -383,3 +383,20 @@ export async function fetchDemoBrief(): Promise<DecisionBrief> {
   if (!response.ok) throw new Error(`Brief request failed: ${response.status}`)
   return response.json() as Promise<DecisionBrief>
 }
+
+// ── Compat stubs for main-branch files (ApiContext, AppShell, store) ──────────
+
+export type CopilotApi = {
+  getWorkflow: (identity: unknown, runId: string) => Promise<unknown>
+  [key: string]: unknown
+}
+
+export const httpApi: CopilotApi = {
+  getWorkflow: async () => { throw new Error('getWorkflow not implemented') },
+}
+
+export const api = httpApi
+
+export function useMocks(): boolean {
+  return USE_MOCKS
+}
