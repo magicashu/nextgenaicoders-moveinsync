@@ -13,21 +13,20 @@ uses backend port 8080 and frontend port 5173.
 
 ### Quick start with both providers
 
-Your supplied Langfuse US configuration is saved in `.env.backend.local`, which
-is ignored by Git and readable only by your OS user. The launcher loads it.
-For this checkout, only the Sarvam key still needs to be supplied in the backend
-terminal:
+On the configured local checkout, Sarvam and Langfuse credentials are saved in
+`.env.backend.local`, which is ignored by Git and readable only by your OS user.
+The launcher loads both providers automatically:
 
 ```bash
 cd /Users/miniorange/Desktop/miniOrange-IAM/try/hackathon
-# Skip read/export if SARVAM_API_KEY is already exported with its value here.
-read -rs "SARVAM_API_KEY?Paste Sarvam API key: "
-echo
-export SARVAM_API_KEY
 bash scripts/run-local-backend.sh
 ```
 
-The setup below also describes entering both providers on a fresh checkout.
+The setup below describes entering both providers on a fresh checkout. Secret
+values are not included in Git. The GitHub repository has `SARVAM_API_KEY`,
+`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL` configured as
+repository secrets. GitHub Actions must explicitly pass these secrets to a job;
+they are not automatically downloaded or exported on developers' machines.
 
 Create a Sarvam API key at <https://dashboard.sarvam.ai/> and a Langfuse project
 with public/secret API keys. In your backend terminal (zsh on this Mac):
