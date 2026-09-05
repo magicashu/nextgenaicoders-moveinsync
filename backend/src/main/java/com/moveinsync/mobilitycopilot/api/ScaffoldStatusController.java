@@ -9,15 +9,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
-/** Structural metadata only. This endpoint never claims that declared contracts are implemented. */
+/** Implementation metadata; tenant/window eligibility is returned with each metric result. */
 @RestController
 public final class ScaffoldStatusController {
     @GetMapping("/api/v1/capabilities")
     public ScaffoldStatus capabilities() {
         return new ScaffoldStatus("PARTIAL", false, AgentRole.values().length,
                 WorkflowNode.values().length, InvestigationNode.values().length,
-                WorkerType.values().length, MetricId.values().length, List.of("M01_DELAYED_TRIP_RATE"),
-                "Official-data M01 is implemented; the governed runtime remains incomplete until all required metrics and workflow controls pass their gates.");
+                WorkerType.values().length, MetricId.values().length,
+                java.util.Arrays.stream(MetricId.values()).map(Enum::name).toList(),
+                "Four report agents and M01-M18 are implemented. Dataset eligibility remains query-specific. Durable action execution, authenticated serving and production load gates remain incomplete.");
     }
 
     public record ScaffoldStatus(String mode, boolean governedRuntimeReady, int agentRoles,

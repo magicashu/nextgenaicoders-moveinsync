@@ -31,7 +31,7 @@ class DeterministicEvidenceVerifierTest {
 
     @Test
     void verifies_a_supported_scoped_factual_claim() {
-        VerificationResult result = verifier.verify(context(), List.of(claim("C001", "Delayed trips increased.")),
+        VerificationResult result = verifier.verify(context(), List.of(claim("C001", MetricClaimText.direct(evidence("E001",tenant(),MetricStatus.AVAILABLE,"data-v1","metrics-v1")))),
                 List.of(evidence("E001", tenant(), MetricStatus.AVAILABLE, "data-v1", "metrics-v1")));
 
         assertThat(result.status()).isEqualTo(VerificationResult.Status.VERIFIED);
@@ -64,7 +64,7 @@ class DeterministicEvidenceVerifierTest {
 
     @Test
     void qualifies_partial_evidence_instead_of_treating_it_as_complete() {
-        VerificationResult result = verifier.verify(context(), List.of(claim("C001", "Feedback worsened.")),
+        VerificationResult result = verifier.verify(context(), List.of(claim("C001", MetricClaimText.direct(evidence("E001",tenant(),MetricStatus.PARTIAL,"data-v1","metrics-v1")))),
                 List.of(evidence("E001", tenant(), MetricStatus.PARTIAL, "data-v1", "metrics-v1")));
 
         assertThat(result.status()).isEqualTo(VerificationResult.Status.QUALIFIED);
@@ -75,11 +75,33 @@ class DeterministicEvidenceVerifierTest {
         return new Claim(id, text, Set.of("E001"), VerifiedClaim.Kind.DIRECT);
     }
 
+    @Test
+    void verifies_comparison_arithmetic_but_rejects_changed_delta_and_mismatched_filters() {
+        var current=evidence("E001",tenant(),MetricStatus.AVAILABLE,"data-v1","metrics-v1");
+        var request=new MetricRequest(tenant(),current.request().metricId(),current.request().measure(),
+                new MetricWindow(LocalDate.of(2026,5,1),LocalDate.of(2026,5,28)),Map.of(),"data-v1");
+        var baseline=new MetricEvidence("E002",request,MetricStatus.AVAILABLE,new BigDecimal("10.00"),
+                MetricUnit.PERCENT,new BigDecimal("10"),new BigDecimal("100"),100,"metrics-v1","M01",List.of());
+        String text=MetricClaimText.comparison(current,baseline);
+        assertThat(text).contains("Change = 11.88 percentage points");
+        var valid=new Claim("comparison",text,Set.of("E001","E002"),VerifiedClaim.Kind.DIRECT);
+        assertThat(verifier.verify(context(),List.of(valid),List.of(current,baseline)).status())
+                .isEqualTo(VerificationResult.Status.VERIFIED);
+        var invalid=new Claim("wrong",text.replace("11.88","12.88"),valid.evidenceIds(),valid.kind());
+        assertThat(verifier.verify(context(),List.of(invalid),List.of(current,baseline)).status())
+                .isEqualTo(VerificationResult.Status.REJECTED);
+        var filtered=new MetricEvidence("E003",new MetricRequest(tenant(),request.metricId(),request.measure(),
+                request.window(),Map.of("vendor_id","different"),"data-v1"),baseline.status(),baseline.value(),
+                baseline.unit(),baseline.numerator(),baseline.denominator(),baseline.population(),baseline.metricVersion(),baseline.sourceReference(),List.of());
+        assertThat(MetricClaimText.comparable(current,filtered)).isFalse();
+        assertThat(MetricClaimText.comparable(current,current)).isFalse();
+    }
+
     private static MetricEvidence evidence(String id, TenantContext tenant, MetricStatus status,
                                            String dataVersion, String metricVersion) {
         return new MetricEvidence(id, new MetricRequest(tenant, MetricId.M01_DELAYED_TRIP_RATE,
                 MetricRequest.Measure.VALUE, new MetricWindow(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 7)),
-                Map.of(), dataVersion), status, new BigDecimal("0.219"), MetricUnit.PERCENT,
+                Map.of(), dataVersion), status, new BigDecimal("21.88"), MetricUnit.PERCENT,
                 new BigDecimal("4357"), new BigDecimal("19913"), 19913, metricVersion, "M01", List.of());
     }
 

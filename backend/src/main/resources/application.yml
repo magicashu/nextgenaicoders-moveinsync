@@ -12,8 +12,15 @@ mobility:
   data:
     directory: ${MOBILITY_DATA_DIR:outputs/MoveInSync - Anonymised Trip-Log Dataset}
   ai:
-    # No provider is required for the deterministic fallback. Set to ollama only for local semantic critique.
+    # Select exactly one provider: none, sarvam or ollama.
     provider: ${MOBILITY_AI_PROVIDER:none}
+    sarvam:
+      api-key: ${SARVAM_API_KEY:}
+      endpoint: ${SARVAM_ENDPOINT:https://api.sarvam.ai/v1/chat/completions}
+      model: ${SARVAM_MODEL:sarvam-105b}
+      timeout: ${SARVAM_TIMEOUT:30s}
+      max-prompt-chars: 24000
+      max-evidence-items: 64
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       model: ${OLLAMA_MODEL:gemma3:4b}

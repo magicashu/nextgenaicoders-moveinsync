@@ -31,7 +31,7 @@ public final class EvidenceCriticAgentImpl implements EvidenceCriticAgent {
 
     @Override
     public VerificationResult review(RunContext context, InvestigationResult investigation) {
-        return review(context, List.of(), investigation);
+        return review(context, com.moveinsync.mobilitycopilot.evidence.application.MetricClaimText.candidates(investigation.evidence()), investigation);
     }
 
     @Override
@@ -39,17 +39,26 @@ public final class EvidenceCriticAgentImpl implements EvidenceCriticAgent {
         candidates = List.copyOf(candidates == null ? List.of() : candidates);
         VerificationResult verified = verifier.verify(context, candidates, investigation.evidence());
         List<String> warnings = new ArrayList<>(verified.warnings());
+        warnings.addAll(investigation.warnings());
+        if (!investigation.pendingTasks().isEmpty()) warnings.add("Investigation is partial; some approved analyses did not complete.");
         if (model.isEmpty()) {
             warnings.add("Semantic critique unavailable: no language-model provider is configured; deterministic verification completed.");
             return withWarnings(verified, warnings);
         }
         try {
-            CritiqueResult critique = parse(model.get().complete(new LanguageModelPort.ModelRequest(
+            CritiqueResult critique = parse(com.moveinsync.mobilitycopilot.workflow.application.ports.BoundedModelCalls.complete(model.get(),new LanguageModelPort.ModelRequest(
                     context, LanguageModelPort.AgentRole.EVIDENCE_CRITIC, PROMPT_VERSION,
                     prompt(context, candidates, investigation), investigation.evidence())).structuredOutput());
-            critique.globalCaveats().forEach(caveat -> warnings.add("Critic caveat: " + caveat));
-            critique.claims().forEach(review -> review.issues().forEach(issue ->
-                    warnings.add("Critic " + review.claimId() + " " + issue.type() + ": " + issue.explanation())));
+            var rejected=new java.util.HashSet<>(verified.rejectedClaimIds());
+            var known=verified.claims().stream().map(com.moveinsync.mobilitycopilot.evidence.domain.VerifiedClaim::claimId).collect(java.util.stream.Collectors.toSet());
+            for(var review:critique.claims()) {
+                if(!known.contains(review.claimId())) continue;
+                if(review.decision()==CritiqueResult.Decision.REJECT) rejected.add(review.claimId());
+                for(var issue:review.issues()) warnings.add("Semantic review "+review.claimId()+": "+issue.type()+"; interpretation requires review.");
+                // Free-form model explanations/caveats are diagnostic input, never newly verified facts.
+            }
+            var remaining=verified.claims().stream().filter(c->!rejected.contains(c.claimId())).toList();
+            verified=new VerificationResult(remaining.isEmpty()?VerificationResult.Status.REJECTED:verified.status(),remaining,java.util.Set.copyOf(rejected),verified.warnings());
         } catch (RuntimeException | JsonProcessingException failure) {
             warnings.add("Semantic critique unavailable: " + failure.getClass().getSimpleName()
                     + "; deterministic verification completed.");

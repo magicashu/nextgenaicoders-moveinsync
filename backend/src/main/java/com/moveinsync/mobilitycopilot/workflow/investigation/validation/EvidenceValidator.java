@@ -22,7 +22,7 @@ public final class EvidenceValidator {
     public List<String> validate(MetricEvidence evidence, RunContext context) {
         List<String> reasons = new ArrayList<>();
 
-        if (evidence == null) {
+        if (evidence == null || evidence.request() == null || evidence.request().tenant() == null) {
             reasons.add("evidence is null");
             return reasons;
         }
@@ -50,6 +50,12 @@ public final class EvidenceValidator {
         } else if (window.start().isAfter(window.end())) {
             reasons.add("metric window start is after end: " + window.start() + " > " + window.end());
         }
+        if (window != null && window.end() != null && window.end().isAfter(context.asOfDate())) reasons.add("Future evidence");
+        if (evidence.request().metricId() == null || evidence.unit() != evidence.request().metricId().unit()) reasons.add("Metric unit mismatch");
+        if (evidence.status() != MetricStatus.UNAVAILABLE && evidence.value() == null) reasons.add("Available evidence has no value");
+        if (evidence.evidenceId() == null || evidence.evidenceId().isBlank()) reasons.add("Missing evidence identity");
+        if (evidence.request().metricId() != null && !((evidence.request().metricId().contractId()+"-v1.1").equals(evidence.metricVersion())
+                || context.versions().metrics().equals(evidence.metricVersion()))) reasons.add("Metric version mismatch");
 
         // UNAVAILABLE evidence must have no numeric value — a value on UNAVAILABLE is incoherent
         if (MetricStatus.UNAVAILABLE.equals(evidence.status()) && evidence.value() != null) {

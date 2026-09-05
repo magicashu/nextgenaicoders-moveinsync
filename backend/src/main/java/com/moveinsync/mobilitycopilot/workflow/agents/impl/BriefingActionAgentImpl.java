@@ -22,10 +22,25 @@ import java.util.stream.Collectors;
 @Service
 public final class BriefingActionAgentImpl implements BriefingActionAgent {
 
+    /** Explicit trusted policy input is required for drafts. This never approves or executes. */
+    public DecisionBrief draftWithAction(RunContext context, VerificationResult verification,
+            com.moveinsync.mobilitycopilot.action.domain.AllowedActionPolicy policy,
+            com.moveinsync.mobilitycopilot.action.domain.ActionTarget target, String actionType) {
+        DecisionBrief brief=draft(context,verification);
+        if(verification.status()!=VerificationResult.Status.VERIFIED||verification.claims().isEmpty())return brief;
+        if(!Set.copyOf(eligibleClaims(context,verification,new ArrayList<>())).equals(Set.copyOf(verification.claims())))
+            throw new IllegalArgumentException("Draft requires entirely eligible verified claims");
+        var factory=new com.moveinsync.mobilitycopilot.action.application.ActionProposalDraftFactory(java.time.Clock.systemUTC());
+        var proposal=factory.draft(context,policy,actionType,"Review verified mobility findings",
+                "Review the cited verified evidence before deciding any operational change.",target,Set.copyOf(verification.claims()));
+        return new DecisionBrief(context,brief.operationalSummary(),brief.leadershipSummary(),verification,List.of(proposal),brief.caveats());
+    }
+
     @Override
     public DecisionBrief draft(RunContext context, VerificationResult verifiedEvidence) {
         Objects.requireNonNull(context, "context is required");
         Objects.requireNonNull(verifiedEvidence, "verifiedEvidence is required");
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireAuthorized(context);
 
         var caveats = new ArrayList<String>();
         var claims = eligibleClaims(context, verifiedEvidence, caveats);
@@ -54,6 +69,8 @@ public final class BriefingActionAgentImpl implements BriefingActionAgent {
             List<String> caveats) {
         if (verification.status() == VerificationResult.Status.REJECTED) {
             caveats.add("Verified evidence was rejected; no action draft was created.");
+            if (verification.warnings()!=null) caveats.addAll(verification.warnings());
+            return List.of();
         }
 
         var rejected = verification.rejectedClaimIds() == null

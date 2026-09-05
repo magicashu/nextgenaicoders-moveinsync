@@ -7,7 +7,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties({MobilityDataProperties.class, SarvamProperties.class})
+@EnableConfigurationProperties({MobilityDataProperties.class, SarvamProperties.class,
+        com.moveinsync.mobilitycopilot.config.AnalyticsProperties.class})
 public class MobilityCopilotApplication {
 
     public static void main(String[] args) {

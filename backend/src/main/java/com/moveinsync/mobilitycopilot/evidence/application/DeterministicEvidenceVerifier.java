@@ -26,6 +26,7 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
     @Override
     public VerificationResult verify(RunContext context, List<Claim> candidates,
                                      List<MetricEvidence> evidence) {
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireAuthorized(context);
         Map<String, MetricEvidence> byId = index(evidence);
         List<VerifiedClaim> accepted = new ArrayList<>();
         Set<String> rejected = new HashSet<>();
@@ -34,6 +35,11 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
         for (Claim claim : candidates == null ? List.<Claim>of() : candidates) {
             List<MetricEvidence> cited = citedEvidence(context, claim, byId, rejected, warnings);
             if (cited.isEmpty()) {
+                continue;
+            }
+            if (!MetricClaimText.matches(claim.text(),cited)) {
+                rejected.add(claim.claimId());
+                warnings.add("Claim " + claim.claimId()+" is not a canonical statement of its cited metric value, population and scope.");
                 continue;
             }
             if (claim.kind() == VerifiedClaim.Kind.QUALIFIED_INFERENCE && cited.size() < 2) {
@@ -49,8 +55,8 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
                         + " uses causal or exclusive vendor language that governed evidence cannot establish.");
                 continue;
             }
-            String metricVersion = cited.getFirst().metricVersion();
-            if (cited.stream().anyMatch(item -> !metricVersion.equals(item.metricVersion()))) {
+            String metricVersion = context.versions().metrics();
+            if (cited.stream().anyMatch(item -> !validMetricVersion(context,item))) {
                 rejected.add(claim.claimId());
                 warnings.add("Claim " + claim.claimId() + " cites incompatible metric versions.");
                 continue;
@@ -66,6 +72,7 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
                     metricVersion, claim.text(), claim.evidenceIds(),
                     partial ? VerifiedClaim.Kind.QUALIFIED_INFERENCE : claim.kind()));
         }
+        if (accepted.isEmpty() && rejected.isEmpty()) warnings.add("No verifiable claims; evidence is insufficient.");
         VerificationResult.Status status = rejected.isEmpty()
                 ? (warnings.isEmpty() ? VerificationResult.Status.VERIFIED : VerificationResult.Status.QUALIFIED)
                 : (accepted.isEmpty() ? VerificationResult.Status.REJECTED : VerificationResult.Status.QUALIFIED);
@@ -87,7 +94,7 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
                                                 List<String> warnings) {
         if (claim == null || blank(claim.claimId()) || blank(claim.text()) || claim.kind() == null
                 || claim.evidenceIds() == null || claim.evidenceIds().isEmpty()) {
-            rejected.add(claim == null ? "<missing>" : claim.claimId());
+            rejected.add(claim == null || claim.claimId()==null ? "<missing>" : claim.claimId());
             warnings.add("A claim is missing its required text, type, or evidence references.");
             return List.of();
         }
@@ -110,11 +117,31 @@ public final class DeterministicEvidenceVerifier implements EvidenceVerifier {
                 && context.versions() != null && context.versions().data() != null
                 && context.versions().data().equals(item.request().dataVersion())
                 && item.request().window() != null && item.request().window().start() != null
-                && item.request().window().end() != null && !item.request().window().end().isAfter(context.asOfDate())
+                && item.request().window().end() != null && !item.request().window().start().isAfter(item.request().window().end()) && !item.request().window().end().isAfter(context.asOfDate())
                 && item.metricVersion() != null && context.versions().metrics() != null
-                && context.versions().metrics().equals(item.metricVersion())
+                && validMetricVersion(context,item)
                 && item.status() != MetricStatus.UNAVAILABLE && item.value() != null
-                && item.unit() == item.request().metricId().unit();
+                && item.request().metricId()!=null && item.unit() == item.request().metricId().unit()
+                && validArithmetic(item);
+    }
+
+    private boolean validArithmetic(MetricEvidence e) {
+        if(e.population()<0)return false;
+        int scale=switch(e.request().metricId()) {
+            case M02_DELAYED_TRIP_DELAY,M09_MEDIAN_BILLED_COST_PER_TRIP,M12_MEAN_DRIVER_SAFETY_RATING,M15_SEVERE_ACKNOWLEDGEMENT_P90 -> 0;
+            case M13_ALERT_RATE,M14_SEVERE_ALERT_RATE,M16_TRACKING_GAP_RATE -> 1000;
+            case M10_COST_PER_BILLED_KM -> 1;
+            default -> 100;
+        };
+        if(scale==0)return true;
+        if(e.numerator()==null||e.denominator()==null||e.numerator().signum()<0||e.denominator().signum()<=0)return false;
+        return e.numerator().multiply(java.math.BigDecimal.valueOf(scale)).divide(e.denominator(),2,java.math.RoundingMode.HALF_UP).compareTo(e.value())==0;
+    }
+
+    private boolean validMetricVersion(RunContext context,MetricEvidence e) {
+        return e.request().metricId()!=null && (context.versions().metrics().equals(e.metricVersion())
+                || (com.moveinsync.mobilitycopilot.metrics.adapter.duckdb.OfficialAnalyticsStore.REGISTRY_VERSION.equals(context.versions().metrics())
+                && (e.request().metricId().contractId()+"-v1.1").equals(e.metricVersion())));
     }
 
     private boolean blank(String value) {

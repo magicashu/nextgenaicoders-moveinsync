@@ -7,5 +7,7 @@ import java.util.Map;
 public record MetricRequest(TenantContext tenant, MetricId metricId, Measure measure,
                             MetricWindow window, Map<String, String> filters, String dataVersion) {
     /** M02 and M12 are metric families; preserve the requested statistic/rating dimension. */
-    public enum Measure { VALUE, MEAN_DELAY, P90_DELAY, DRIVER_RATING, SAFETY_RATING }
+    public MetricRequest { filters = filters == null ? Map.of() : Map.copyOf(filters); }
+    public enum Measure { VALUE, MEAN_DELAY, P90_DELAY, DRIVER_RATING, SAFETY_RATING,
+        REASON_EMPLOYEE, REASON_DRIVER, REASON_TRAFFIC }
 }

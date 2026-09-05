@@ -22,7 +22,7 @@ import java.util.List;
 
 /** Optional server-side Sarvam adapter. Provider output remains untrusted until agent validation. */
 @Service
-@ConditionalOnProperty(prefix = "mobility.ai.sarvam", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "mobility.ai", name = "provider", havingValue = "sarvam")
 public final class SarvamLanguageModelAdapter implements LanguageModelPort {
     private final SarvamProperties properties;
     private final ObjectMapper objectMapper;
@@ -64,9 +64,16 @@ public final class SarvamLanguageModelAdapter implements LanguageModelPort {
                 throw new IllegalStateException("Sarvam request failed with HTTP " + response.statusCode());
             }
             JsonNode root = objectMapper.readTree(response.body());
+            if (root == null || !"stop".equals(root.path("choices").path(0).path("finish_reason").asText())) {
+                throw new IllegalStateException("Sarvam response was incomplete or did not finish normally");
+            }
             String structuredOutput = root.path("choices").path(0).path("message").path("content").asText(null);
             if (structuredOutput == null || structuredOutput.isBlank()) {
                 throw new IllegalStateException("Sarvam response has no message content");
+            }
+            JsonNode structured = objectMapper.readTree(structuredOutput);
+            if (structured == null || !structured.isObject()) {
+                throw new IllegalStateException("Sarvam response must contain a JSON object");
             }
             JsonNode usage = root.path("usage");
             return new ModelResponse(properties.model(), structuredOutput,
@@ -87,6 +94,9 @@ public final class SarvamLanguageModelAdapter implements LanguageModelPort {
         payload.put("model", properties.model());
         payload.put("temperature", 0);
         payload.put("stream", false);
+        payload.put("max_tokens", 4096);
+        payload.put("n", 1);
+        payload.putNull("reasoning_effort");
         payload.putObject("response_format").put("type", "json_object");
         ArrayNode messages = payload.putArray("messages");
         messages.addObject().put("role", "system")
@@ -107,6 +117,12 @@ public final class SarvamLanguageModelAdapter implements LanguageModelPort {
             if (item.value() != null) value.put("value", item.value());
             value.put("population", item.population());
             value.put("metricVersion", item.metricVersion());
+            value.put("measure", item.request().measure().name());
+            value.put("periodStart", item.request().window().start().toString());
+            value.put("periodEnd", item.request().window().end().toString());
+            value.set("filters", objectMapper.valueToTree(item.request().filters()));
+            if (item.numerator() != null) value.put("numerator", item.numerator());
+            if (item.denominator() != null) value.put("denominator", item.denominator());
             ArrayNode warnings = value.putArray("warnings");
             if (item.warnings() != null) {
                 item.warnings().stream().filter(java.util.Objects::nonNull).forEach(warnings::add);
@@ -122,6 +138,12 @@ public final class SarvamLanguageModelAdapter implements LanguageModelPort {
                 || request.prompt().length() > properties.maxPromptChars()
                 || request.evidence() == null || request.evidence().size() > properties.maxEvidenceItems()) {
             throw new IllegalArgumentException("invalid or oversized Sarvam model request");
+        }
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireAuthorized(request.context());
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireTime(request.context());
+        for (MetricEvidence evidence : request.evidence()) {
+            if (evidence == null) throw new IllegalArgumentException("Missing model evidence");
+            com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireRequest(request.context(), evidence.request());
         }
     }
 }

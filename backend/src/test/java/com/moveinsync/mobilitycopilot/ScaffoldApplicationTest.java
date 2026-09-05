@@ -10,17 +10,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
+        "mobility.ai.provider=none", "mobility.demo.enabled=false"})
 class ScaffoldApplicationTest {
     @Autowired ApplicationContext context;
 
     @Test
-    void bootsWithTheOfficialM01ServiceButWithoutProviderOrLegacyDemoEndpoints() {
+    void bootsWithAllMetricContractsButWithoutProviderOrLegacyDemoEndpoints() {
         assertThat(context.getBeansOfType(DemoBriefController.class)).isEmpty();
         assertThat(context.getBeansOfType(GovernedMetricService.class)).hasSize(1);
         assertThat(context.getBeansOfType(LanguageModelPort.class)).isEmpty();
         var status = context.getBean(ScaffoldStatusController.class).capabilities();
         assertThat(status.governedRuntimeReady()).isFalse();
-        assertThat(status.implementedGovernedCapabilities()).containsExactly("M01_DELAYED_TRIP_RATE");
+        assertThat(status.implementedGovernedCapabilities()).containsExactlyElementsOf(
+                java.util.Arrays.stream(com.moveinsync.mobilitycopilot.metrics.domain.MetricId.values()).map(Enum::name).toList());
     }
 }
