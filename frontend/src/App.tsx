@@ -18,13 +18,14 @@ export default function App() {
         <SideNav page={page} setPage={setPage} />
         <main className="page-content">
           {page === 'dashboard' && <DashboardPage />}
-          {page === 'copilot' && <SupervisorCopilotPage />}
           {page === 'workflow' && <WorkflowGraph3D />}
           {page === 'brief' && <DecisionBriefPage />}
           {page === 'audit' && <AuditPage />}
           {page === 'scorecard' && <ScorecardPage />}
         </main>
       </div>
+      {/* Global Floating Supervisor Voice & Chat Copilot Widget */}
+      <SupervisorCopilotPage />
     </div>
   )
 }

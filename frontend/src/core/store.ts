@@ -29,6 +29,9 @@ interface AppStore {
   refresh: () => void
   
   // Copilot Voice & Chat State
+  isCopilotWidgetOpen: boolean
+  setCopilotWidgetOpen: (v: boolean) => void
+  toggleCopilotWidgetOpen: () => void
   isAudioModeEnabled: boolean
   setAudioModeEnabled: (v: boolean) => void
   isListening: boolean
@@ -37,6 +40,8 @@ interface AppStore {
   setIsPlayingAudio: (v: boolean) => void
   activeAudioMessageId: string | null
   setActiveAudioMessageId: (id: string | null) => void
+  sarvamSpeaker: string
+  setSarvamSpeaker: (speaker: string) => void
   copilotMessages: CopilotMessage[]
   addCopilotMessage: (msg: CopilotMessage) => void
   clearCopilotMessages: () => void
@@ -57,6 +62,9 @@ export const useAppStore = create<AppStore>((set) => ({
   refresh: () => set({ lastRefresh: Date.now() }),
 
   // Copilot Voice & Chat defaults
+  isCopilotWidgetOpen: false,
+  setCopilotWidgetOpen: (isCopilotWidgetOpen) => set({ isCopilotWidgetOpen }),
+  toggleCopilotWidgetOpen: () => set((state) => ({ isCopilotWidgetOpen: !state.isCopilotWidgetOpen })),
   isAudioModeEnabled: false,
   setAudioModeEnabled: (isAudioModeEnabled) => set({ isAudioModeEnabled }),
   isListening: false,
@@ -65,6 +73,8 @@ export const useAppStore = create<AppStore>((set) => ({
   setIsPlayingAudio: (isPlayingAudio) => set({ isPlayingAudio }),
   activeAudioMessageId: null,
   setActiveAudioMessageId: (activeAudioMessageId) => set({ activeAudioMessageId }),
+  sarvamSpeaker: 'assistant',
+  setSarvamSpeaker: (sarvamSpeaker) => set({ sarvamSpeaker }),
   copilotMessages: [
     {
       id: 'welcome-1',

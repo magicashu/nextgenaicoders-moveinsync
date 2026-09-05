@@ -12,22 +12,25 @@ const PRESET_PROMPTS = [
 export function SupervisorCopilotPage() {
   const {
     tenant,
-    isAudioModeEnabled,
-    setAudioModeEnabled,
+    isCopilotWidgetOpen,
+    setCopilotWidgetOpen,
     isListening,
     setIsListening,
     isPlayingAudio,
     setIsPlayingAudio,
     activeAudioMessageId,
     setActiveAudioMessageId,
+    sarvamSpeaker,
+    setSarvamSpeaker,
     copilotMessages,
     addCopilotMessage,
   } = useAppStore()
 
   const [inputQuery, setInputQuery] = useState('')
-  const [audienceProfile, setAudienceProfile] = useState<'operations' | 'executive'>('operations')
   const [pipelineStep, setPipelineStep] = useState<number | null>(null) // 0: supervisor, 1: investigator, 2: critic, 3: briefing
   const [sttTranscript, setSttTranscript] = useState('')
+  
+  const [loadingAudioMsgId, setLoadingAudioMsgId] = useState<string | null>(null)
   
   const sttEngineRef = useRef<SpeechToTextEngine | null>(null)
   const chatBottomRef = useRef<HTMLDivElement>(null)
@@ -37,8 +40,10 @@ export function SupervisorCopilotPage() {
   }, [])
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [copilotMessages, pipelineStep, sttTranscript])
+    if (isCopilotWidgetOpen) {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [copilotMessages, pipelineStep, sttTranscript, isCopilotWidgetOpen])
 
   // Handle STT Voice Microphone Click
   const toggleListening = () => {
@@ -57,10 +62,7 @@ export function SupervisorCopilotPage() {
           if (isFinal) {
             setIsListening(false)
             setSttTranscript('')
-            // Auto submit if Audio Mode is ON
-            if (isAudioModeEnabled) {
-              handleSendQuery(text, true)
-            }
+            handleSendQuery(text, true)
           }
         },
         onError: (err) => {
@@ -168,83 +170,107 @@ export function SupervisorCopilotPage() {
 
     addCopilotMessage(agentMsg)
     setPipelineStep(null)
-
-    // 4. Auto-Play Spoken Audio Response if Audio Mode is ON
-    if (isAudioModeEnabled) {
-      playAudioForMessage(agentMsgId, agentMsg.text)
-    }
   }
 
-  // Play Speech Audio via Sarvam TTS
-  const playAudioForMessage = (msgId: string, textToSpeak: string) => {
+  // Play Speech Audio via Sarvam TTS with Loading Spinner
+  const playAudioForMessage = (msgId: string, textToSpeak: string, speakerOverride?: string) => {
     stopSpeaking()
-    if (activeAudioMessageId === msgId && isPlayingAudio) {
+    if (activeAudioMessageId === msgId && isPlayingAudio && !speakerOverride) {
       setIsPlayingAudio(false)
       setActiveAudioMessageId(null)
+      setLoadingAudioMsgId(null)
       return
     }
 
-    // Clean markdown symbols for speech synthesis
+    const speakerToUse = speakerOverride || sarvamSpeaker
     const plainText = textToSpeak.replace(/\*\*/g, '').replace(/\[|\]/g, '')
     setActiveAudioMessageId(msgId)
-    setIsPlayingAudio(true)
 
     speakText(
       plainText,
-      () => setIsPlayingAudio(true),
+      speakerToUse,
+      () => {
+        setLoadingAudioMsgId(null)
+        setIsPlayingAudio(true)
+      },
       () => {
         setIsPlayingAudio(false)
         setActiveAudioMessageId(null)
+        setLoadingAudioMsgId(null)
+      },
+      (isLoading) => {
+        if (isLoading) {
+          setLoadingAudioMsgId(msgId)
+        } else {
+          setLoadingAudioMsgId(null)
+        }
       }
     )
   }
 
+  // Handle Instant Speaker Change
+  const handleSpeakerChange = (newSpeaker: string) => {
+    setSarvamSpeaker(newSpeaker)
+    if ((isPlayingAudio || loadingAudioMsgId) && activeAudioMessageId) {
+      const activeMsg = copilotMessages.find((m) => m.id === activeAudioMessageId)
+      if (activeMsg) {
+        playAudioForMessage(activeMsg.id, activeMsg.text, newSpeaker)
+      }
+    }
+  }
+
+  // Collapsed Floating Trigger Button (FAB)
+  if (!isCopilotWidgetOpen) {
+    return (
+      <button
+        className="copilot-floating-fab"
+        onClick={() => setCopilotWidgetOpen(true)}
+        title="Open Voice & Chat Copilot"
+      >
+        <span className="fab-icon">🎙</span>
+        <span className="fab-label">Voice Copilot</span>
+      </button>
+    )
+  }
+
+  // Expanded Floating Widget Box
   return (
-    <div className="copilot-page">
+    <div className="copilot-widget-container">
       {/* Header Bar */}
-      <div className="copilot-header">
+      <div className="copilot-widget-header">
         <div className="copilot-header-title">
           <span className="copilot-icon">🎙</span>
           <div>
-            <h2>Supervisor Voice & Chat Copilot</h2>
-            <p>Converse with the 4-agent Mobility Copilot in text or hands-free voice</p>
+            <h3>Supervisor Voice Copilot</h3>
+            <p>Multi-modal agent copilot</p>
           </div>
         </div>
 
         <div className="copilot-header-actions">
-          {/* Tenant Indicator */}
-          <div className="badge-pill">
-            <span className="dot cyan" />
-            <span>Tenant: {tenant}</span>
+          {/* Sarvam AI Speaker Voice Accent Selector */}
+          <div className="speaker-accent-wrapper">
+            <span className="accent-label">Voice:</span>
+            <select
+              className="speaker-accent-select"
+              value={sarvamSpeaker}
+              onChange={(e) => handleSpeakerChange(e.target.value)}
+              title="Select Sarvam AI Persona & Speaker (bulbul:v3)"
+            >
+              <option value="assistant">🤖 Assistant (Shubh)</option>
+              <option value="manager">👩‍💼 Manager (Ritu)</option>
+              <option value="expert">👨‍🏫 Expert (Rahul)</option>
+              <option value="executive">👔 Executive (Arvind)</option>
+              <option value="analyst">📊 Analyst (Meera)</option>
+            </select>
           </div>
 
-          {/* Audience Profile Switch */}
-          <div className="profile-toggle">
-            <button
-              className={`toggle-btn ${audienceProfile === 'operations' ? 'active' : ''}`}
-              onClick={() => setAudienceProfile('operations')}
-            >
-              Operations
-            </button>
-            <button
-              className={`toggle-btn ${audienceProfile === 'executive' ? 'active' : ''}`}
-              onClick={() => setAudienceProfile('executive')}
-            >
-              Executive
-            </button>
-          </div>
-
-          {/* Audio Mode Toggle Switch */}
+          {/* Minimize Button */}
           <button
-            className={`audio-mode-switch ${isAudioModeEnabled ? 'enabled' : ''}`}
-            onClick={() => {
-              const next = !isAudioModeEnabled
-              setAudioModeEnabled(next)
-              if (!next) stopSpeaking()
-            }}
+            className="widget-close-btn"
+            onClick={() => setCopilotWidgetOpen(false)}
+            title="Minimize Chat Widget"
           >
-            <span className="speaker-icon">{isAudioModeEnabled ? '🔊' : '🔇'}</span>
-            <span>Audio Mode: {isAudioModeEnabled ? 'ON' : 'OFF'}</span>
+            ✕
           </button>
         </div>
       </div>
@@ -252,22 +278,21 @@ export function SupervisorCopilotPage() {
       {/* Agent Execution Pipeline Status Bar */}
       {pipelineStep !== null && (
         <div className="pipeline-status-bar">
-          <div className="pipeline-title">Agent Workflow Execution:</div>
           <div className="pipeline-steps">
             <span className={`pipeline-step ${pipelineStep >= 0 ? 'active supervisor' : ''}`}>
-              🔵 1. Supervisor Plan
+              🔵 Plan
             </span>
             <span className="pipeline-arrow">→</span>
             <span className={`pipeline-step ${pipelineStep >= 1 ? 'active investigator' : ''}`}>
-              🟢 2. Investigator Workers
+              🟢 Workers
             </span>
             <span className="pipeline-arrow">→</span>
             <span className={`pipeline-step ${pipelineStep >= 2 ? 'active critic' : ''}`}>
-              🟡 3. Critic Verification
+              🟡 Critic
             </span>
             <span className="pipeline-arrow">→</span>
             <span className={`pipeline-step ${pipelineStep >= 3 ? 'active briefing' : ''}`}>
-              🩷 4. Briefing Summary
+              🩷 Brief
             </span>
           </div>
         </div>
@@ -281,9 +306,9 @@ export function SupervisorCopilotPage() {
             <div className="chat-bubble">
               <div className="chat-bubble-header">
                 <span className="chat-sender-name">
-                  {msg.sender === 'user' ? 'You' : 'Supervisor Copilot'}
+                  {msg.sender === 'user' ? 'You' : 'Supervisor Agent'}
                 </span>
-                {msg.isVoiceInput && <span className="voice-badge">🎙 Voice Input</span>}
+                {msg.isVoiceInput && <span className="voice-badge">🎙 Voice</span>}
                 <span className="chat-timestamp">{msg.timestamp}</span>
               </div>
 
@@ -306,7 +331,7 @@ export function SupervisorCopilotPage() {
               {/* Evidence Citations */}
               {msg.evidence && (
                 <div className="evidence-citation-box">
-                  <div className="evidence-box-title">📌 Governed Evidence Citations:</div>
+                  <div className="evidence-box-title">📌 Governed Evidence:</div>
                   <ul>
                     {msg.evidence.map((item, idx) => (
                       <li key={idx}>{item}</li>
@@ -318,21 +343,39 @@ export function SupervisorCopilotPage() {
               {/* Recommended Action Card */}
               {msg.recommendedAction && (
                 <div className="recommended-action-box">
-                  <div className="action-box-title">🎯 Draft Recommendation:</div>
+                  <div className="action-box-title">🎯 Draft Proposal:</div>
                   <div className="action-box-name">{msg.recommendedAction.title}</div>
                   <div className="action-box-desc">{msg.recommendedAction.rationale}</div>
                 </div>
               )}
 
-              {/* Interactive Sarvam Audio Player Bar */}
+              {/* Sarvam Audio Player Bar */}
               {msg.sender === 'agent' && (
                 <div className="audio-player-bar">
                   <button
-                    className="play-audio-btn"
+                    className={`play-audio-btn ${loadingAudioMsgId === msg.id ? 'loading' : ''}`}
                     onClick={() => playAudioForMessage(msg.id, msg.text)}
+                    disabled={loadingAudioMsgId === msg.id}
                   >
-                    {activeAudioMessageId === msg.id && isPlayingAudio ? '⏸ Pause Voice' : '▶ Speak Response (Sarvam AI)'}
+                    {loadingAudioMsgId === msg.id ? (
+                      <>
+                        <span className="spinner-icon">🌀</span> Generating Audio...
+                      </>
+                    ) : activeAudioMessageId === msg.id && isPlayingAudio ? (
+                      '⏸ Pause'
+                    ) : (
+                      '▶ Speak (Sarvam AI)'
+                    )}
                   </button>
+
+                  {loadingAudioMsgId === msg.id && (
+                    <div className="audio-loader-dots">
+                      <span>Sarvam AI bulbul:v3 synthesizing...</span>
+                      <span className="dot-pulse" />
+                      <span className="dot-pulse" />
+                      <span className="dot-pulse" />
+                    </div>
+                  )}
 
                   {activeAudioMessageId === msg.id && isPlayingAudio && (
                     <div className="audio-waveform-animation">
@@ -343,7 +386,7 @@ export function SupervisorCopilotPage() {
                       <span className="wave-bar" />
                     </div>
                   )}
-                  <span className="engine-tag">Powered by Sarvam AI TTS</span>
+                  <span className="engine-tag">Sarvam AI bulbul:v3 ({sarvamSpeaker})</span>
                 </div>
               )}
             </div>
@@ -354,7 +397,6 @@ export function SupervisorCopilotPage() {
 
       {/* Preset Prompt Suggestions */}
       <div className="prompt-suggestions">
-        <span className="suggestions-label">Suggested Queries:</span>
         {PRESET_PROMPTS.map((prompt, idx) => (
           <button
             key={idx}
@@ -387,7 +429,7 @@ export function SupervisorCopilotPage() {
         <input
           type="text"
           className="copilot-input"
-          placeholder={isListening ? 'Listening to speech input...' : 'Ask the Supervisor Agent a question or request an analysis...'}
+          placeholder={isListening ? 'Listening...' : 'Ask Supervisor Copilot...'}
           value={inputQuery}
           onChange={(e) => setInputQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -400,7 +442,7 @@ export function SupervisorCopilotPage() {
           onClick={() => handleSendQuery(inputQuery)}
           disabled={!inputQuery.trim()}
         >
-          Send ➔
+          ➔
         </button>
       </div>
     </div>
