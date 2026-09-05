@@ -1,10 +1,10 @@
 # Mobility Decision Copilot — selected architecture
 
-Version 1.1 · 2026-09-05 · Selected under D-052
+Version 1.2 · 2026-09-05 · Selected design and Java scaffold
 
 This is the agreed design for a separate team build. It describes responsibilities and acceptance boundaries; it does not claim that a new build is already implemented or benchmarked.
 
-Companion: [requirements and acceptance](requirement.md). Distribution guide: [plain-English team handbook](docs/team-handbook/README.md).
+Companion: [requirements and acceptance](requirement.md). Distribution guide: [Understanding the problem statement](<Understanding the problem statement.md>).
 
 ## 1. Architecture choice and reason
 
@@ -97,7 +97,7 @@ Anomaly category is initially metadata from the detector/metric registry. Cluste
 
 ## 5. Data and metric boundaries
 
-The [approved data rules](docs/dataset-profile-and-capability-matrix.md) are the numerical authority. Preserve the seven original files under the configured official-data location, with checksums. Synthetic data is separately labeled test material.
+The [approved data rules](requirement.md#official-data-and-metric-contracts) are the numerical authority. Preserve the seven original files under the configured official-data location, with checksums. Synthetic data is separately labeled test material.
 
 - Use the typed pair (business_unit, trip_id) for joins and trip identity. Carry tenant scope through caches, evidence, jobs, reports, actions and audit.
 - Remove known thousands separators and validate identifiers strictly. Reject malformed identifiers instead of deleting arbitrary characters.
@@ -116,7 +116,7 @@ Use asynchronous brief submission and status retrieval so expensive investigatio
 
 Use bounded queues, bounded task execution and bounded provider concurrency. Reject or defer work visibly at capacity. Authorize before cache lookup or reuse; include identity/roles, tenant, filters and relevant data/configuration/metric/workflow/prompt/model versions in the applicable reuse key.
 
-The starting operational bounds remain those in the team handbook: two brief workers, a 256-job queue, four investigation threads with a 64-task queue, twelve tool calls, investigation depth four, one correction cycle, ten-second investigation timeout and two concurrent provider calls. These are configurable resource settings, not business anomaly thresholds or latency measurements.
+The target starting operational bounds are: two brief workers, a 256-job queue, four investigation threads with a 64-task queue, twelve tool calls, investigation depth four, one correction cycle, ten-second investigation timeout and two concurrent provider calls. These are configurable resource settings, not business anomaly thresholds or latency measurements.
 
 Carry compact aggregates and evidence references through the workflow. Reuse versioned profiles/metrics instead of scanning every file for every node. Scheduled precomputation is optional and off until its scope is configured.
 
@@ -132,7 +132,7 @@ Shared records cover request context, brief job, workflow run, metric evidence, 
 
 Specify required fields, enums, authorization envelope, resource lookup policy, schema/data versions, pagination, errors and cancellation. Every claim maps to evidence. Action targets are tenant-qualified; decisions bind to proposal/evidence versions. Edits require policy checks and renewed validation. An action receipt is not incident resolution.
 
-Use the [plain-English guide](docs/team-handbook/plain-english-build-guide.md) for every component's inputs, outputs, failure behavior and acceptance checks.
+Use the [plain-English guide](<Understanding the problem statement.md>) for every component's inputs, outputs, failure behavior and acceptance checks.
 
 ## 8. User experience selected from the new guides
 
@@ -156,4 +156,78 @@ Delivery order:
 
 Later analytical publication/rollback, persistent row-level quality provenance and incident follow-up remain separate extensions. A mock execution never demonstrates real-world resolution.
 
-D-052 records the selection. Use this architecture, the requirements and the standalone team handbook as the aligned build instructions.
+Use this architecture for structure and ownership, requirement.md for data and acceptance, agents-guide.md for role responsibilities, and Understanding the problem statement.md for the plain-English walkthrough.
+
+## Java scaffold and team ownership
+
+**Current state: basic structure only.** The Java packages, four agent interfaces, node/worker/metric enums, DTOs and application ports are declared. The state-machine start/resume methods are explicit TODO stubs. Business logic, authorization, validators, metric implementations, provider calls, job execution and persistence adapters belong to the assigned team members.
+
+The capability endpoint reports SCAFFOLD with no implemented governed capabilities. The old demo endpoint is disabled. Legacy M01 sample types/calculation and its existing test are retained as isolated historical samples, not the authoritative implementation of the new contracts. Do not use their exploratory anomaly thresholds for official-data behavior.
+
+| Package / responsibility | Owner slot | Logic the owner will implement |
+|---|---|---|
+| access, approval, action, audit | WS3 — access and actions | Identity/roles, tenant checks, exact approval binding, expiry, revalidation, idempotency, durable audit and repository adapters |
+| ingestion, metrics, anomaly | WS1 — data and metrics | Official source loading/profile, strict normalization, reconciliation, capabilities, M01–M18, governed detection and contributions |
+| workflow/agents, workflow/domain, workflow/investigation | WS2 — workflow and agents | Four roles, eighteen-node routing, four-stage loop, seven workers, plan validation, budgets and fallbacks |
+| evidence | WS2 with WS1/WS3 review | Generic metric evidence, candidate/verified claims and deterministic value/scope/version/citation validation |
+| workflow/adapter/statemachine and workflow/adapter/sarvam | WS2 — workflow and agents | Implement the state-machine stub and optional provider port; the provider package is only a placeholder |
+| workflow/application, reporting/application, reporting/adapter | WS4 with WS3 | Bounded jobs, claims/reuse, scheduling, safe resume, status retrieval and orchestration coordination |
+| api, reporting | WS4 — API and reporting | Authorized product endpoints, request/error handling and deterministic leadership rendering |
+| observability and backend tests | WS6 — quality and telemetry | Redacted traces, acceptance cases, failure/recovery verification and measured performance |
+| frontend | WS5 — user experience | Display the agreed structured outputs; no KPI, policy or provider logic in the browser |
+| contracts and shared Java DTOs/interfaces | Integration owner | Freeze versions, fields, enums and handoff examples with both producers and consumers |
+
+Package layout under the Java application root:
+
+```text
+access/        application/ domain/
+ingestion/     application/ domain/
+metrics/       application/ domain/ adapter/duckdb/
+anomaly/       application/ domain/
+evidence/      application/ domain/
+workflow/      agents/ domain/ application/ports/
+               investigation/workers/ adapter/statemachine/
+               adapter/sarvam/ adapter/langgraph4j/
+approval/      application/ domain/ adapter/postgres/
+action/        application/ domain/
+audit/         application/ domain/
+reporting/     application/ domain/ adapter/
+api/           structural capability endpoint
+conversation/  existing question suggestions
+observability/ diagnostic ports
+config/        application settings
+```
+
+Records specify the required shape; they do not implement security or business validation. In particular, constructing an approval, verified claim or execution permit does not prove authorization or evidence validity. Team members must implement those checks and acceptance tests. The initial database migration is a historical scaffold, not a completed persistence model.
+
+Structural schemas are in contracts/schemas/team-contracts.schema.json with small entry schemas for briefs, metrics, proposals, decisions and receipts. OpenAPI 0.2.0 describes the actual scaffold capability endpoint. Product API paths and serialization behavior must be frozen and implemented by WS4 with the integration owner.
+
+### Shared handoff rules
+
+Use one integration owner and six responsibility packages; one person may own more than one package. Agree the input/output record and error states before implementing either side. An owner hands over their scope, requirement IDs, contract changes, tests, real-data evidence and remaining limitations. Changing a shared record requires producer and consumer review; copying an alternative implementation is not the handoff method.
+
+### Build and local checks
+
+Use Java 21 and the Maven wrapper. The scaffold must compile and the default application must start without source data, a provider key or a PostgreSQL instance. This verifies structure only; it is not the official-data release gate.
+
+```sh
+# macOS: select an installed Java 21 runtime for this shell.
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
+./mvnw -q test
+./mvnw -pl backend spring-boot:run
+```
+
+The current metadata endpoint is GET /api/v1/capabilities. It intentionally reports that the governed runtime is not ready. The team must implement and pass requirement.md's G1–G3 and control gates before changing that status.
+
+Configure the immutable official input through MOBILITY_DATA_DIR when the data owner implements the runtime. The tiny sample and corrupted/synthetic fixtures are test material, not official business definitions. AWS remains a deployment story for a future containerized application with durable control storage and observability; no cloud deployment is performed by this scaffold.
+
+## Current decisions
+
+| Decision | Status |
+|---|---|
+| D-039 — Metric v1.1 authority | Retain the exact M01–M18 eligibility, units, exclusions and qualified vendor comparison rules in requirement.md. |
+| D-052 — Selected design | Four agents, Java/Spring Boot, React, DuckDB analytics, PostgreSQL control state and optional Sarvam; document retrieval and replay remain conditional. |
+| D-053 — Separate team scaffold | Basic structure only. Individual members implement logic; no completed application or provider/persistence integration is claimed. |
+| D-054 — Documentation consolidation | Keep four content documents: requirements, architecture, agent responsibilities and the plain-English problem walkthrough. Technical workspace instructions and runtime prompt resources are separate. |
+
+Future material architecture, scope, metric, data, security, evaluation or demo decisions are recorded in this section alongside the relevant requirements change. Earlier review documents and decision history remain in Git history rather than separate current manuals.

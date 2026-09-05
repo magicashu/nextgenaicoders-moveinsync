@@ -1,33 +1,33 @@
 openapi: 3.1.0
 info:
-  title: Mobility Decision Copilot API
-  version: 0.1.0
+  title: Mobility Decision Copilot — team scaffold
+  version: 0.2.0
+  description: >
+    Only structural capability metadata is implemented. Product endpoints,
+    authorization, governed analytics, agents and approvals are team TODOs.
+    Shared request/output shapes are in schemas/team-contracts.schema.json.
 paths:
-  /api/v1/demo/brief:
+  /api/v1/capabilities:
     get:
-      summary: Run the deterministic sample briefing workflow
-      parameters:
-        - in: header
-          name: X-Business-Unit
-          required: true
-          schema:
-            type: string
-          description: Demo stand-in for authenticated tenant context.
-        - in: query
-          name: asOf
-          required: false
-          schema:
-            type: string
-            format: date
-            default: 2026-06-08
+      summary: Identify the scaffold without claiming a working governed runtime
       responses:
         "200":
-          description: Evidence-backed brief awaiting approval
+          description: Structural metadata; implemented governed capabilities remain empty
           content:
             application/json:
               schema:
-                $ref: ../schemas/decision-brief.schema.json
-        "400":
-          description: Invalid tenant or date
-        "500":
-          description: Dataset or metric computation failure
+                type: object
+                additionalProperties: false
+                required: [mode, governedRuntimeReady, agentRoles, workflowNodes, investigationStages, workers, declaredMetrics, implementedGovernedCapabilities, message]
+                properties:
+                  mode: { const: SCAFFOLD }
+                  governedRuntimeReady: { const: false }
+                  agentRoles: { type: integer }
+                  workflowNodes: { type: integer }
+                  investigationStages: { type: integer }
+                  workers: { type: integer }
+                  declaredMetrics: { type: integer }
+                  implementedGovernedCapabilities:
+                    type: array
+                    items: { type: string }
+                  message: { type: string }

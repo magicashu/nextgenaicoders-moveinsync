@@ -3,10 +3,12 @@ package com.moveinsync.mobilitycopilot.anomaly.application;
 import com.moveinsync.mobilitycopilot.anomaly.domain.AnomalyFinding;
 import com.moveinsync.mobilitycopilot.metrics.domain.MetricResult;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 
 import java.math.BigDecimal;
 
 @Service
+@Profile("legacy-sample")
 public final class AnomalyService {
 
     private static final BigDecimal MATERIAL_DELTA_PP = new BigDecimal("5.00");

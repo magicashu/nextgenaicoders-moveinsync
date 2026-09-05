@@ -1,14 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://moveinsync.example/schemas/action-proposal.schema.json",
-  "title": "ActionProposal",
-  "type": "object",
-  "required": ["actionId", "type", "title", "rationale", "status"],
-  "properties": {
-    "actionId": { "type": "string", "format": "uuid" },
-    "type": { "type": "string" },
-    "title": { "type": "string" },
-    "rationale": { "type": "string" },
-    "status": { "const": "DRAFT_REQUIRES_APPROVAL" }
-  }
+  "$ref": "team-contracts.schema.json#/$defs/actionProposal"
 }
