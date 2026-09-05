@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moveinsync.example/schemas/approval-request.schema.json",
+  "title": "ApprovalRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approvalId", "runId", "businessUnit", "proposal", "evidenceVersion", "createdAt", "expiresAt"],
+  "properties": {
+    "approvalId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "businessUnit": { "type": "string", "minLength": 1 },
+    "proposal": { "$ref": "action-proposal.schema.json" },
+    "evidenceVersion": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

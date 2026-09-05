@@ -1,0 +1,14 @@
+{
+  "caseId": "G3",
+  "description": "pinnacle-Slc EMPLOYEE_SIGN_OFF_TIME_VIOLATION step change must be a data-regime change, never an escalation (D-032)",
+  "input": {"businessUnit": "pinnacle-Slc", "asOfDates": ["2026-05-18", "2026-05-25", "2026-06-01"]},
+  "expected": {
+    "dataQualityNoteEventType": "EMPLOYEE_SIGN_OFF_TIME_VIOLATION",
+    "classification": "DATA_REGIME_CHANGE",
+    "stepDownWeek": "2026-05-18",
+    "operationalAnomalyForM13": false,
+    "actionProposalsFromAlerts": 0,
+    "approvalRequestsFromAlerts": 0,
+    "escalationCount": 0
+  }
+}

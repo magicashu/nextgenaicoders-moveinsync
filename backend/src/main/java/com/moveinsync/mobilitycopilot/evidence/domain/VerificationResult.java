@@ -1,10 +1,28 @@
 package com.moveinsync.mobilitycopilot.evidence.domain;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Set;
+import java.util.Objects;
 
-/** WS2: evidence presence alone does not imply claim support. */
-public record VerificationResult(Status status, List<VerifiedClaim> claims,
-                                 Set<String> rejectedClaimIds, List<String> warnings) {
-    public enum Status { VERIFIED, QUALIFIED, REJECTED }
+/** Deterministic verifier output (node 13). */
+public record VerificationResult(
+        boolean passed,
+        List<Violation> violations,
+        List<String> removedClaimIds,
+        BigDecimal confidence,
+        List<String> confidenceComponents) {
+
+    public record Violation(String code, String claimId, String message) {
+    }
+
+    public VerificationResult {
+        violations = violations == null ? List.of() : List.copyOf(violations);
+        removedClaimIds = removedClaimIds == null ? List.of() : List.copyOf(removedClaimIds);
+        confidenceComponents = confidenceComponents == null ? List.of() : List.copyOf(confidenceComponents);
+        Objects.requireNonNull(confidence);
+    }
+
+    public boolean hasBlocking() {
+        return violations.stream().anyMatch(v -> !v.code().startsWith("WARN"));
+    }
 }

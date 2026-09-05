@@ -1,0 +1,21 @@
+/** Human-readable governed contract text (metrics-v1.1). Definitions only; the browser never computes these. */
+export const METRIC_DEFINITIONS: Record<string, { name: string; numerator: string; denominator: string; exclusions: string; grain: string }> = {
+  M01_DELAYED_TRIP_RATE: { name: 'Delayed-trip rate', numerator: 'trips with delay_minutes > 0', denominator: 'trips', exclusions: 'none', grain: 'trip' },
+  M02_DELAY_MINUTES: { name: 'Delay of delayed trips', numerator: 'delay_minutes capped at 600', denominator: 'delayed trips', exclusions: 'delay = 0; > 1,440 min quarantined', grain: 'trip' },
+  M03_DELAY_REASON_MIX: { name: 'Delay-reason mix', numerator: 'delayed trips by delay_reason', denominator: 'delayed trips', exclusions: 'none', grain: 'trip' },
+  M04_ON_TIME_PICKUP_RATE: { name: 'On-time pickup rate', numerator: 'boarded legs picked up within 10 min', denominator: 'boarded legs with both pickup epochs', exclusions: 'null epochs, not boarded, stwid = 0', grain: 'leg' },
+  M05_ON_TIME_DROP_RATE: { name: 'On-time drop rate', numerator: 'boarded legs dropped within 10 min', denominator: 'boarded legs with both drop epochs', exclusions: 'null epochs, not boarded, stwid = 0', grain: 'leg' },
+  M06_NO_SHOW_RATE: { name: 'No-show rate', numerator: 'valid legs with is_no_show', denominator: 'all valid legs', exclusions: 'stwid = 0, exact duplicates', grain: 'leg' },
+  M07_DASHBOARD_CANCELLATION_RATE: { name: 'Dashboard-cancellation rate', numerator: 'legs cancelled from dashboard', denominator: 'planned valid legs', exclusions: 'stwid = 0, exact duplicates', grain: 'leg' },
+  M08_OCCUPANCY_RATE: { name: 'Occupancy', numerator: 'min(actual riders, capacity)', denominator: 'capacity', exclusions: 'capacity null', grain: 'trip' },
+  M09_MEDIAN_COST_PER_TRIP: { name: 'Median billed cost per trip', numerator: 'median of per-trip positive billed cost', denominator: 'billed trips', exclusions: 'negative lines (adjustments), null trip_id, exact duplicates', grain: 'bill/trip' },
+  M10_COST_PER_BILLED_KM: { name: 'Cost per billed km', numerator: 'sum trip_cost', denominator: 'sum total_trip_km', exclusions: 'zero km, negatives', grain: 'bill' },
+  M11_LOW_DRIVER_RATING_RATE: { name: 'Low driver-rating rate', numerator: 'driver_rating in {1, 2}', denominator: 'rows with driver_rating > 0', exclusions: 'rating 0, stwid = 0', grain: 'feedback' },
+  M12_MEAN_DRIVER_SAFETY_RATING: { name: 'Mean driver / safety rating', numerator: 'sum of ratings > 0', denominator: 'ratings > 0', exclusions: 'rating 0', grain: 'feedback' },
+  M13_ALERT_RATE: { name: 'Alert rate', numerator: 'alerts excluding sign-off violations', denominator: 'trips × 1,000', exclusions: 'EMPLOYEE_SIGN_OFF_TIME_VIOLATION', grain: 'trip' },
+  M14_SEVERE_ALERT_RATE: { name: 'Sev-1/2 alert rate', numerator: 'Sev-1/2 alerts', denominator: 'trips × 1,000', exclusions: 'sign-off violations', grain: 'trip' },
+  M15_SEVERE_ALERT_ACKNOWLEDGEMENT_P90: { name: 'Sev-1/2 acknowledgement P90', numerator: 'P90 of acknowledge − start', denominator: 'Sev-1/2 alerts', exclusions: 'other/null severity, negative durations', grain: 'alert' },
+  M16_TRACKING_GAP_RATE: { name: 'Tracking-gap rate', numerator: 'DEVICE_NOT_REACHABLE alerts', denominator: 'trips × 1,000', exclusions: 'tenants with zero events → unsupported', grain: 'trip' },
+  M17_EV_SHARE: { name: 'EV share', numerator: 'Electric trips', denominator: 'trips', exclusions: 'none', grain: 'trip' },
+  M18_ESCORT_PRESENT_RATE: { name: 'Escort-present rate', numerator: 'trips with escort among WOMAN_TRAVELLING_ALONE trips', denominator: 'trips with a WOMAN_TRAVELLING_ALONE alert', exclusions: 'no compliance claim without an external rule', grain: 'trip' },
+}

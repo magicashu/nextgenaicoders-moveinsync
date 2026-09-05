@@ -5,3 +5,9 @@ spring:
     password: ${POSTGRES_PASSWORD:mobility}
   flyway:
     enabled: true
+    locations: classpath:db/migration
+
+mobility:
+  workflow:
+    # Selects the PostgreSQL checkpoint, approval, idempotency and audit adapters (see ControlPlaneBeans).
+    control-plane: postgres

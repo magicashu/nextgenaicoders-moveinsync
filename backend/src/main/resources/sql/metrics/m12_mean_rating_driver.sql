@@ -1,0 +1,11 @@
+-- metrics-v1.1 / M12 mean driver rating over ratings > 0. Grain: feedback.
+SELECT
+    {{dimension}} AS member,
+    sum(driver_rating) AS numerator,
+    count(*) AS denominator,
+    sum(driver_rating) * 1.0 / nullif(count(*), 0) AS value,
+    count(*) AS supporting_count
+FROM feedback
+WHERE business_unit = {{bu}} AND trip_date BETWEEN {{start}} AND {{end}} {{filters}}
+  AND is_valid_rider AND driver_rating > 0
+GROUP BY 1;

@@ -1,5 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://moveinsync.example/schemas/approval-decision.schema.json",
-  "$ref": "team-contracts.schema.json#/$defs/approvalDecision"
+  "title": "ApprovalDecision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approvalId", "actionId", "runId", "decision", "decidedBy", "decidedAt"],
+  "properties": {
+    "approvalId": { "type": "string", "format": "uuid" },
+    "actionId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "decision": { "enum": ["APPROVE", "REJECT", "EDIT"] },
+    "decidedBy": { "type": "string" },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "comment": { "type": ["string", "null"] },
+    "editedProposal": {
+      "oneOf": [
+        { "$ref": "action-proposal.schema.json" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "const": "EDIT" } } },
+      "then": {
+        "required": ["editedProposal"],
+        "properties": { "editedProposal": { "$ref": "action-proposal.schema.json" } }
+      }
+    }
+  ]
 }

@@ -1,0 +1,41 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "foundation-green"
+      - "g1-green"
+      - "hardening-green"
+      - "demo-rc*"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Backend package (tests included, budget 10 min)
+        run: timeout 600 ./mvnw -q -pl backend -am package
+      - run: npm ci && npm run build
+      - name: Clean-start smoke (budget 3 min)
+        run: |
+          java -jar backend/target/*.jar > backend.log 2>&1 &
+          for i in $(seq 1 90); do curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 && break; sleep 1; done
+          timeout 60 sh scripts/demo/smoke.sh || (tail -50 backend.log; exit 1)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            backend/target/*.jar
+            frontend/dist/
+            evals/results/
+            docs/architecture/

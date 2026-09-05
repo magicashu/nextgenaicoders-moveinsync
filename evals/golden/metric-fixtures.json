@@ -1,0 +1,16 @@
+{
+  "contractVersion": "metrics-v1.1",
+  "source": "docs/dataset-profile-and-capability-matrix.md section 11, reconciled in DuckDB on 2026-09-05",
+  "fixtures": [
+    {"id": "F01", "metricId": "M01_DELAYED_TRIP_RATE", "businessUnit": "pinnacle-Slc", "window": ["2026-06-01", "2026-06-07"], "expected": {"numerator": 4357, "denominator": 19913, "value": 21.88}},
+    {"id": "F02", "metricId": "M01_DELAYED_TRIP_RATE", "businessUnit": "pinnacle-Slc", "window": ["2026-05-04", "2026-05-31"], "expected": {"numerator": 9186, "denominator": 74814, "value": 12.28}},
+    {"id": "F03", "metricId": "M04_ON_TIME_PICKUP_RATE", "businessUnit": "vanta-Aus", "window": ["2026-07-27", "2026-07-31"], "expected": {"denominator": 11794, "value": 88.18, "lateShare": 11.82}, "note": "contract v1.1 denominator (boarded legs with both epochs); the profile's illustrative 9.9% used all legs"},
+    {"id": "F04", "metricId": "M09_MEDIAN_COST_PER_TRIP", "businessUnit": "vanta-Sea", "window": ["2026-05-01", "2026-05-31"], "expected": {"value": 1390.34, "excludedNegativeLines": 158}},
+    {"id": "F05", "metricId": "M10_COST_PER_BILLED_KM", "businessUnit": ["vanta-Aus", "vanta-Sea"], "expected": {"status": "UNSUPPORTED", "reasonContains": "zero km"}},
+    {"id": "F06", "metricId": "M13_ALERT_RATE", "businessUnit": "pinnacle-Slc", "expected": {"excludedEventType": "EMPLOYEE_SIGN_OFF_TIME_VIOLATION", "excludedCount": 7736, "mayFlagMay": false}},
+    {"id": "F07", "check": "TRIP_ID_COLLISIONS", "expected": {"count": 6753, "tenants": ["orbit-Slc", "vanta-Aus"]}},
+    {"id": "F08", "check": "DEDUPE", "expected": {"duplicateLegsRemoved": 708, "exactDuplicateBillLinesRemoved": 72}},
+    {"id": "F09", "check": "DELAY_CAP", "vendor": "Pooja Mikhailov Travel", "expected": {"cappedAbove600": 77, "quarantinedAbove1440": 4, "meanBelow": 600}},
+    {"id": "F10", "check": "MARSHAL_ZERO_EXCLUDED", "expected": {"marshalZeroRows": 473692, "excludedFromM12": true}}
+  ]
+}

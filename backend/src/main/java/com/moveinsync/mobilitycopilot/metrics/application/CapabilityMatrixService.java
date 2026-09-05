@@ -3,7 +3,8 @@ package com.moveinsync.mobilitycopilot.metrics.application;
 import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
 import com.moveinsync.mobilitycopilot.metrics.domain.CapabilityMatrix;
 
-/** WS1: preserve the official per-tenant support and coverage rules. */
+/** Per-tenant, per-data-version statement of which analyses are supported, derivable or unsupported. */
 public interface CapabilityMatrixService {
-    CapabilityMatrix describe(TenantContext tenant, String dataVersion);
+
+    CapabilityMatrix matrix(TenantContext tenant);
 }

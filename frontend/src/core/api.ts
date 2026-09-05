@@ -1,65 +1,71 @@
-import type { DecisionBrief } from './contracts'
+import type {
+  ApiError,
+  ApprovalDecisionRequest,
+  ApprovalDecisionResponse,
+  ApprovalView,
+  AuditResponse,
+  Identity,
+  MorningBriefResponse,
+  QuestionRequest,
+  QuestionResponse,
+} from './contracts'
+import { identityHeaders } from './identity'
+import { mockApi } from '../mocks/mockApi'
 
-export const fixtureBrief: DecisionBrief = {
-  runId: '00000000-0000-0000-0000-000000000001',
-  businessUnit: 'pinnacle-Slc',
-  asOfDate: '2026-06-08',
-  headline: 'pinnacle-Slc: delayed-trip rate increased to 30.00%',
-  metric: {
-    metricId: 'M01_DELAYED_TRIP_RATE',
-    metricName: 'Delayed-trip rate',
-    valuePercent: 30,
-    baselinePercent: 10,
-    deltaPercentagePoints: 20,
-    numerator: 3,
-    denominator: 10,
-    periodStart: '2026-06-01',
-    periodEnd: '2026-06-07',
-    contractVersion: 'M01-v1',
-    dataVersion: 'fixture-v1',
-  },
-  findings: [
-    'Delayed-trip rate rose materially against the prior four complete weeks.',
-    'Current: 30.00%; prior four weeks: 10.00%; change: 20.00 percentage points.',
-    'Worker-specific attribution is the next implementation slice.',
-  ],
-  recommendedAction: {
-    actionId: '00000000-0000-0000-0000-000000000002',
-    type: 'CREATE_WATCHLIST',
-    title: 'Create a site-shift watchlist',
-    rationale: 'Investigate the deterioration before assigning vendor blame.',
-    status: 'DRAFT_REQUIRES_APPROVAL',
-  },
-  evidence: {
-    items: [
-      {
-        evidenceId: 'pinnacle-Slc:m01:2026-06-07',
-        metricId: 'M01_DELAYED_TRIP_RATE',
-        valuePercent: 30,
-        baselinePercent: 10,
-        numerator: 3,
-        denominator: 10,
-        source: 'sql/metrics/m01_delayed_trip_rate.sql',
-        contractVersion: 'M01-v1',
-        dataVersion: 'fixture-v1',
-      },
-    ],
-    confidence: 1,
-    coverage: 10,
-    caveats: ['Tiny fixture for scaffold verification; not a production claim.'],
-  },
-  status: 'AWAITING_APPROVAL',
+export class ApiRequestError extends Error {
+  readonly status: number
+  readonly error: ApiError | null
+
+  constructor(status: number, error: ApiError | null, fallbackMessage: string) {
+    super(error?.message ?? fallbackMessage)
+    this.status = status
+    this.error = error
+  }
 }
 
-export async function fetchDemoBrief(): Promise<DecisionBrief> {
-  if (import.meta.env.VITE_USE_MOCKS === 'true') {
-    return fixtureBrief
-  }
-  const response = await fetch('/api/v1/demo/brief?asOf=2026-06-08', {
-    headers: { 'X-Business-Unit': 'pinnacle-Slc' },
+export type CopilotApi = {
+  morningBrief(identity: Identity, asOf: string, persona?: string): Promise<MorningBriefResponse>
+  startWorkflow(identity: Identity, asOf: string, persona?: string): Promise<MorningBriefResponse>
+  getWorkflow(identity: Identity, workflowId: string): Promise<MorningBriefResponse>
+  ask(identity: Identity, request: QuestionRequest): Promise<QuestionResponse>
+  approvalPreview(identity: Identity, approvalId: string): Promise<ApprovalView>
+  decide(identity: Identity, approvalId: string, request: ApprovalDecisionRequest): Promise<ApprovalDecisionResponse>
+  audit(identity: Identity, workflowId: string): Promise<AuditResponse>
+}
+
+async function call<T>(identity: Identity, path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...identityHeaders(identity), ...(init.headers ?? {}) },
   })
   if (!response.ok) {
-    throw new Error(`Brief request failed with status ${response.status}`)
+    let parsed: ApiError | null = null
+    try {
+      parsed = (await response.json()) as ApiError
+    } catch {
+      parsed = null
+    }
+    throw new ApiRequestError(response.status, parsed, `Request failed with status ${response.status}`)
   }
-  return response.json() as Promise<DecisionBrief>
+  return (await response.json()) as T
 }
+
+/** Real HTTP client. Same business semantics as the mock; only transport differs. */
+export const httpApi: CopilotApi = {
+  morningBrief: (identity, asOf, persona) =>
+    call(identity, `/api/v1/briefs/morning?asOf=${encodeURIComponent(asOf)}${persona ? `&persona=${encodeURIComponent(persona)}` : ''}`),
+  startWorkflow: (identity, asOf, persona) =>
+    call(identity, '/api/v1/workflows', { method: 'POST', body: JSON.stringify({ asOfDate: asOf, persona: persona ?? null }) }),
+  getWorkflow: (identity, workflowId) => call(identity, `/api/v1/workflows/${encodeURIComponent(workflowId)}`),
+  ask: (identity, request) => call(identity, '/api/v1/questions', { method: 'POST', body: JSON.stringify(request) }),
+  approvalPreview: (identity, approvalId) => call(identity, `/api/v1/approvals/${encodeURIComponent(approvalId)}`),
+  decide: (identity, approvalId, request) =>
+    call(identity, `/api/v1/approvals/${encodeURIComponent(approvalId)}/decision`, { method: 'POST', body: JSON.stringify(request) }),
+  audit: (identity, workflowId) => call(identity, `/api/v1/audit/${encodeURIComponent(workflowId)}`),
+}
+
+export function useMocks(): boolean {
+  return import.meta.env.VITE_USE_MOCKS === 'true'
+}
+
+export const api: CopilotApi = useMocks() ? mockApi : httpApi

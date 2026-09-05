@@ -1,9 +1,10 @@
 package com.moveinsync.mobilitycopilot.action.application;
 
+import com.moveinsync.mobilitycopilot.action.domain.ActionExecutionCommand;
 import com.moveinsync.mobilitycopilot.action.domain.ExecutionReceipt;
-import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
+import com.moveinsync.mobilitycopilot.action.domain.RevalidationResult;
 
-/** WS3: must reject expired permits and atomically prevent duplicate effects across retries. */
 public interface ActionExecutor {
-    ExecutionReceipt executeMock(RunContext context, ExecutionPermit permit, String idempotencyKey);
+
+    ExecutionReceipt execute(ActionExecutionCommand command, RevalidationResult revalidation);
 }

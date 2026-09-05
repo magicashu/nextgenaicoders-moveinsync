@@ -1,20 +1,36 @@
 package com.moveinsync.mobilitycopilot.workflow.application.ports;
 
-import com.moveinsync.mobilitycopilot.evidence.domain.MetricEvidence;
-import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
-import java.util.List;
+import java.time.Duration;
+import java.util.Optional;
 
-/** WS2: optional Sarvam adapter, bounded provider calls, redaction and deterministic fallback. */
+/**
+ * Bounded access to a language model for the four roles. The model receives only versioned prompts
+ * and typed JSON payloads, returns text that the caller must parse and validate, and may be absent.
+ * Deterministic behaviour must never depend on it.
+ */
 public interface LanguageModelPort {
-    ModelResponse complete(ModelRequest request);
 
-    enum AgentRole { SUPERVISOR, INVESTIGATOR, EVIDENCE_CRITIC, BRIEFING_ACTION }
+    /** Returns empty when no model is configured or the call failed; callers fall back deterministically. */
+    Optional<Completion> complete(Request request);
 
-    /** Validate role, tenant, data/metric/prompt versions and payload limits before calling a provider. */
-    record ModelRequest(RunContext context, AgentRole role, String promptVersion,
-                        String prompt, List<MetricEvidence> evidence) {}
+    String modelId();
 
-    /** Structured output remains untrusted until the role parses and verifies it. */
-    record ModelResponse(String model, String structuredOutput, long inputTokens,
-                         long outputTokens, long latencyMillis) {}
+    record Request(String role, String promptVersion, String systemPrompt, String userPayloadJson, int maxOutputTokens, Duration timeout) {
+    }
+
+    record Completion(String text, long inputTokens, long outputTokens, long latencyMs) {
+    }
+
+    /** Default: no model. Every role uses its deterministic implementation. */
+    final class Unavailable implements LanguageModelPort {
+        @Override
+        public Optional<Completion> complete(Request request) {
+            return Optional.empty();
+        }
+
+        @Override
+        public String modelId() {
+            return "none";
+        }
+    }
 }
