@@ -1,83 +1,54 @@
 package com.moveinsync.mobilitycopilot.workflow.application;
 
-import com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief;
-import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
-import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowCheckpoint;
-import org.springframework.stereotype.Service;
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
 import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
-import com.moveinsync.mobilitycopilot.evidence.domain.VerificationResult;
-import com.moveinsync.mobilitycopilot.metrics.adapter.duckdb.OfficialAnalyticsStore;
-import com.moveinsync.mobilitycopilot.metrics.domain.MetricRequest;
-import com.moveinsync.mobilitycopilot.metrics.domain.MetricWindow;
-import com.moveinsync.mobilitycopilot.workflow.agents.SupervisorQueryRoute;
-import com.moveinsync.mobilitycopilot.workflow.agents.SupervisorQuestionRouter;
-import java.time.Duration;
-import java.time.DayOfWeek;
-import java.time.Instant;
+import com.moveinsync.mobilitycopilot.approval.domain.ApprovalDecision;
+import com.moveinsync.mobilitycopilot.config.WorkflowProperties;
+import com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief;
+import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
+import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowOutcome;
+import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowRun;
+import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowState;
+import org.springframework.stereotype.Service;
+
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** WS4: add authorized API-to-job/workflow coordination using shared contracts. */
+/** Application entry point for scheduled runs, on-demand runs, contextual questions and approval resume. */
 @Service
 public final class WorkflowCoordinator {
-    private final WorkflowEngine workflowEngine;
-    private final AgentWorkflowService agents;
-    private final OfficialAnalyticsStore analytics;
 
-    public WorkflowCoordinator(WorkflowEngine workflowEngine, AgentWorkflowService agents,
-                               OfficialAnalyticsStore analytics) {
+    private final ResumableWorkflowEngine workflowEngine;
+    private final WorkflowProperties properties;
+
+    public WorkflowCoordinator(ResumableWorkflowEngine workflowEngine, WorkflowProperties properties) {
         this.workflowEngine = workflowEngine;
-        this.agents = agents;
-        this.analytics = analytics;
+        this.properties = properties;
     }
 
-    public WorkflowCheckpoint start(RunContext context) {
-        return workflowEngine.start(context);
-    }
-
+    /** Scaffold-compatible demo entry: a scheduled transport-manager run for the tenant. */
     public DecisionBrief createDemoBrief(String businessUnit, LocalDate asOfDate) {
-        throw new UnsupportedOperationException("Legacy demo endpoint disabled; use role APIs");
+        ActorContext actor = new ActorContext("scheduler", businessUnit, Set.of("TRANSPORT_MANAGER"));
+        return run(actor, new TenantContext(businessUnit), asOfDate, RunContext.Persona.TRANSPORT_MANAGER, RunContext.RequestMode.SCHEDULED, null).brief();
     }
 
-    public com.moveinsync.mobilitycopilot.workflow.domain.InvestigationPlan supervisor(String businessUnit, LocalDate asOfDate, String prompt) {
-        var tenant = new TenantContext(businessUnit);
-        var route = new SupervisorQuestionRouter().route(prompt);
-        if (route.status() != SupervisorQueryRoute.Status.SUPPORTED) throw new IllegalArgumentException(route.message());
-        var context = context(tenant, asOfDate, analytics.dataVersion());
-        LocalDate end = asOfDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusDays(1);
-        var request = new MetricRequest(tenant, route.metric(), MetricRequest.Measure.VALUE,
-                new MetricWindow(end.minusDays(6), end), Map.of(), context.versions().data());
-        return agents.plan(context, request, prompt);
+    public WorkflowOutcome run(ActorContext actor, TenantContext tenant, LocalDate asOfDate, RunContext.Persona persona,
+                               RunContext.RequestMode mode, String question) {
+        WorkflowState state = WorkflowState.start(tenant, asOfDate, properties.maxInvestigationSteps(), properties.maxCorrectionCycles(), properties.maxToolCalls());
+        RunContext context = new RunContext(actor, persona, mode, state.runId().toString().replace("-", ""), RunContext.WORKFLOW_VERSION,
+                RunContext.PROMPT_VERSION, "unset", "unknown", question);
+        return workflowEngine.run(state, context);
     }
 
-    public com.moveinsync.mobilitycopilot.workflow.domain.InvestigationResult investigator(String businessUnit, LocalDate asOfDate, com.moveinsync.mobilitycopilot.workflow.domain.InvestigationPlan plan) {
-        var request = plan.tasks().stream().flatMap(task -> task.requests().stream()).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("plan has no metric request"));
-        return agents.investigatePlan(context(new TenantContext(businessUnit), asOfDate, request.dataVersion()), plan);
+    public WorkflowOutcome resume(ActorContext actor, ApprovalDecision decision) {
+        RunContext context = new RunContext(actor, RunContext.Persona.TRANSPORT_MANAGER, RunContext.RequestMode.RESUME,
+                decision.runId().toString(), RunContext.WORKFLOW_VERSION, RunContext.PROMPT_VERSION, "unset", "unknown", null);
+        return workflowEngine.resume(decision, context);
     }
 
-    public VerificationResult critic(String businessUnit, LocalDate asOfDate, com.moveinsync.mobilitycopilot.workflow.domain.InvestigationResult investigation) {
-        var evidence = investigation.evidence().stream().findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("investigation has no evidence"));
-        return agents.critique(context(evidence.request().tenant(), asOfDate, evidence.request().dataVersion()), investigation);
-    }
-
-    public DecisionBrief briefing(String businessUnit, LocalDate asOfDate, VerificationResult verification) {
-        var claim = verification.claims().stream().findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("verification has no claims"));
-        return agents.brief(context(new TenantContext(businessUnit), asOfDate, claim.dataVersion()), verification);
-    }
-
-    private RunContext context(TenantContext tenant, LocalDate asOfDate, String dataVersion) {
-        return new RunContext(UUID.randomUUID(), new ActorContext("docker-local", Set.of("TRANSPORT_MANAGER"), Set.of(tenant)),
-                tenant, "TRANSPORT_MANAGER", asOfDate,
-                new com.moveinsync.mobilitycopilot.workflow.domain.RunVersions(dataVersion, OfficialAnalyticsStore.REGISTRY_VERSION,
-                        "agents-v2", "v1", "sarvam", "v1"),
-                new com.moveinsync.mobilitycopilot.workflow.domain.WorkflowBudget(24, 2, 1, Duration.ofSeconds(30), 4),
-                Instant.now().plusSeconds(90));
+    public Optional<WorkflowRun> find(UUID runId) {
+        return workflowEngine.find(runId);
     }
 }

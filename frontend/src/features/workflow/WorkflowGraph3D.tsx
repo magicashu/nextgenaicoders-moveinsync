@@ -25,10 +25,12 @@ const NODE_POSITIONS: Record<WorkflowNode, [number, number, number]> = {
   MERGE_EVIDENCE:           [ -2.5, -0.5,  0.0],
   EVIDENCE_CRITIC:          [  2.5, -0.5, -0.7],
   VERIFY_EVIDENCE:          [  7.5, -0.5,  0.5],
-  // Briefing
-  COMPOSE_DECISION_BRIEF:   [ -4.5, -4.0,  0.5],
-  ACTION_POLICY_GATE:       [  0.0, -4.0, -0.5],
-  APPROVAL_INTERRUPT:       [  4.5, -4.0,  0.9],
+  // Briefing + post-approval (2 extra nodes from main)
+  COMPOSE_DECISION_BRIEF:   [ -6.0, -4.0,  0.5],
+  ACTION_POLICY_GATE:       [ -2.0, -4.0, -0.5],
+  APPROVAL_INTERRUPT:       [  1.5, -4.0,  0.9],
+  REVALIDATE_AND_EXECUTE:   [  5.0, -4.0,  0.0],
+  APPEND_AUDIT_EVENT:       [  8.5, -4.0,  0.6],
 }
 
 const EDGES: [WorkflowNode, WorkflowNode][] = [
@@ -40,6 +42,7 @@ const EDGES: [WorkflowNode, WorkflowNode][] = [
   ['MERGE_EVIDENCE','EVIDENCE_CRITIC'], ['EVIDENCE_CRITIC','VERIFY_EVIDENCE'],
   ['VERIFY_EVIDENCE','COMPOSE_DECISION_BRIEF'], ['COMPOSE_DECISION_BRIEF','ACTION_POLICY_GATE'],
   ['ACTION_POLICY_GATE','APPROVAL_INTERRUPT'],
+  ['APPROVAL_INTERRUPT','REVALIDATE_AND_EXECUTE'], ['REVALIDATE_AND_EXECUTE','APPEND_AUDIT_EVENT'],
 ]
 
 const NODE_DURATIONS: Record<string, number> = {
@@ -48,6 +51,7 @@ const NODE_DURATIONS: Record<string, number> = {
   SUPERVISOR_PLAN: 62, VALIDATE_PLAN: 18, RUN_INVESTIGATIONS: 88, MERGE_EVIDENCE: 31,
   EVIDENCE_CRITIC: 55, VERIFY_EVIDENCE: 22, COMPOSE_DECISION_BRIEF: 71,
   ACTION_POLICY_GATE: 9, APPROVAL_INTERRUPT: 5,
+  REVALIDATE_AND_EXECUTE: 18, APPEND_AUDIT_EVENT: 6,
 }
 
 const NODE_DESCRIPTIONS: Record<string, string> = {
@@ -67,6 +71,8 @@ const NODE_DESCRIPTIONS: Record<string, string> = {
   COMPOSE_DECISION_BRIEF:   'Briefing agent writes summary and findings',
   ACTION_POLICY_GATE:       'Evaluate proposed actions against policy rules',
   APPROVAL_INTERRUPT:       'Pause pipeline — await human approval',
+  REVALIDATE_AND_EXECUTE:   'Re-check approved action then execute it',
+  APPEND_AUDIT_EVENT:       'Write immutable audit record for the run',
 }
 
 // ── 3D scene ──────────────────────────────────────────────────────────────────
@@ -234,7 +240,7 @@ const PIPELINE_STAGES = [
   { id: 'supervisor',   label: 'Supervisor',    color: AGENT_COLORS.supervisor,   nodeCount: 2 },
   { id: 'investigator', label: 'Investigator',  color: AGENT_COLORS.investigator, nodeCount: 2 },
   { id: 'critic',       label: 'Critic',        color: AGENT_COLORS.critic,       nodeCount: 2 },
-  { id: 'briefing',     label: 'Briefing',      color: AGENT_COLORS.briefing,     nodeCount: 3 },
+  { id: 'briefing',     label: 'Briefing',      color: AGENT_COLORS.briefing,     nodeCount: 5 },
 ]
 
 export function WorkflowGraph3D() {
@@ -370,7 +376,7 @@ export function WorkflowGraph3D() {
               ▶ Replay
             </button>
             <button
-              onClick={() => { setTimelineStep(15); setLive(false) }}
+              onClick={() => { setTimelineStep(17); setLive(false) }}
               style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 600, background: '#F0F3FA', color: '#16211B', border: '1px solid #E0E0E0', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-ui)' }}
             >
               ⏭ Final

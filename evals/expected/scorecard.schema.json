@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvaluationScorecard",
+  "type": "object",
+  "required": ["generatedAt", "target", "gates", "zeroTolerance", "measures"],
+  "properties": {
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "target": {"type": "string"},
+    "gates": {
+      "type": "array",
+      "items": {"type": "object", "required": ["id", "name", "status", "detail"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "status": {"enum": ["PASS", "FAIL", "SKIPPED"]}, "detail": {"type": "string"}}}
+    },
+    "zeroTolerance": {
+      "type": "object",
+      "required": ["crossTenantLeaks", "unsupportedDisplayedNumbers", "unauthorizedActions", "duplicateEffects", "g3Escalations", "unboundedLoops"],
+      "additionalProperties": {"type": "integer", "const": 0}
+    },
+    "measures": {
+      "type": "object",
+      "required": ["latencyMsP50", "latencyMsMax", "modelCalls", "inputTokens", "outputTokens", "estimatedCostUsd", "toolCalls"],
+      "additionalProperties": {"type": "number"}
+    }
+  }
+}

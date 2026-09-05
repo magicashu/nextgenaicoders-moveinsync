@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { TENANTS } from '../core/mockData'
+import { TENANTS } from '../core/workflowDesign'
 import { useAppStore } from '../core/store'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '◈', label: 'Dashboard' },
+  { id: 'ask', icon: '◇', label: 'Ask Copilot' },
+  { id: 'trust', icon: '◌', label: 'LLM & Trust' },
   { id: 'workflow', icon: '⬡', label: '3D Workflow' },
   { id: 'brief', icon: '◉', label: 'Decision Brief' },
   { id: 'audit', icon: '◎', label: 'Audit Trail' },
@@ -16,16 +17,9 @@ interface Props {
 }
 
 export function TopNav({ page, setPage }: Props) {
-  const { tenant, setTenant, refresh, lastRefresh } = useAppStore()
-  const [spinning, setSpinning] = useState(false)
-
-  function handleRefresh() {
-    setSpinning(true)
-    refresh()
-    setTimeout(() => setSpinning(false), 800)
-  }
-
-  const lastRefreshStr = new Date(lastRefresh).toLocaleTimeString()
+  const { tenant, setTenant, refresh, lastRefresh, busy: spinning, run } = useAppStore()
+  const handleRefresh = () => { void refresh() }
+  const lastRefreshStr = lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : '—'
 
   return (
     <nav className="topnav">
@@ -42,7 +36,7 @@ export function TopNav({ page, setPage }: Props) {
         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
           Last updated {lastRefreshStr}
         </span>
-        <button className="refresh-btn" onClick={handleRefresh} title="Refresh data" type="button">
+        <button className="refresh-btn" onClick={handleRefresh} title="Reload current run" type="button" disabled={!run || spinning}>
           <svg
             width="14" height="14" viewBox="0 0 14 14" fill="none"
             style={{ transition: 'transform 0.8s ease', transform: spinning ? 'rotate(360deg)' : 'rotate(0deg)' }}
@@ -54,7 +48,7 @@ export function TopNav({ page, setPage }: Props) {
           Refresh
         </button>
         <select
-          className="tenant-select"
+          className="tenant-select" aria-label="Business unit"
           value={tenant}
           onChange={(e) => setTenant(e.target.value as typeof tenant)}
         >

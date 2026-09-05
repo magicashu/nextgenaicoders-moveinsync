@@ -1,0 +1,36 @@
+{
+  "runId": "00000000-0000-0000-0000-00000000a001",
+  "traceId": "00000000000000000000000000a001",
+  "businessUnit": "pinnacle-Slc",
+  "finalStep": "AWAITING_APPROVAL",
+  "transitions": ["INITIALIZE_RUN", "AUTHORIZE_SCOPE", "PROFILE_DATASET", "BUILD_CAPABILITY_MATRIX", "COMPUTE_METRIC_SNAPSHOT", "DETECT_ANOMALIES", "PRIORITIZE_ISSUE", "SUPERVISOR_PLAN", "VALIDATE_PLAN", "RUN_INVESTIGATIONS", "MERGE_EVIDENCE", "EVIDENCE_CRITIC", "VERIFY_EVIDENCE", "COMPOSE_DECISION_BRIEF", "ACTION_POLICY_GATE", "APPROVAL_INTERRUPT"],
+  "toolCalls": 7,
+  "maxToolCalls": 12,
+  "correctionCycles": 0,
+  "maxCorrectionCycles": 1,
+  "evidence": {
+    "items": [
+      {"evidenceId": "pinnacle-Slc:m01_delayed_trip_rate:2026-06-07", "metricId": "M01_DELAYED_TRIP_RATE", "value": 21.88, "unit": "PERCENT", "baselineValue": 12.28, "delta": 9.6, "numerator": 4357, "denominator": 19913, "supportingCount": 19913, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {}, "source": "sql/metrics/m01_delayed_trip_rate.sql", "contractVersion": "metrics-v1.1", "dataVersion": "data-8ed5b4eae158"},
+      {"evidenceId": "pinnacle-Slc:m01_delayed_trip_rate:2026-06-07:impact", "metricId": "M01_DELAYED_TRIP_RATE", "value": 1912, "unit": "COUNT", "baselineValue": null, "delta": null, "numerator": 3414, "denominator": 7780, "supportingCount": 19913, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {"derivation": "excess"}, "source": "anomaly-rules", "contractVersion": "metrics-v1.1", "dataVersion": "data-8ed5b4eae158"},
+      {"evidenceId": "pinnacle-Slc:m01_delayed_trip_rate:site_id:2026-06-07:clearwater-campus", "metricId": "M01_DELAYED_TRIP_RATE", "value": 24.07, "unit": "PERCENT", "baselineValue": 12.86, "delta": 11.21, "numerator": 2226, "denominator": 9247, "supportingCount": 9247, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {"site_id": "Clearwater Campus"}, "source": "sql/metrics/m01_delayed_trip_rate.sql", "contractVersion": "metrics-v1.1", "dataVersion": "data-8ed5b4eae158"},
+      {"evidenceId": "pinnacle-Slc:m01_delayed_trip_rate:site_id:2026-06-07:clearwater-campus:share", "metricId": "M01_DELAYED_TRIP_RATE", "value": 51.1, "unit": "PERCENT", "baselineValue": null, "delta": null, "numerator": 2226, "denominator": 4357, "supportingCount": 9247, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {"site_id": "Clearwater Campus", "measure": "share"}, "source": "sql/metrics/m01_delayed_trip_rate.sql", "contractVersion": "metrics-v1.1", "dataVersion": "data-8ed5b4eae158"}
+    ],
+    "confidence": 0.84,
+    "coverage": 19913,
+    "caveats": ["severe_ack: Fewer than 20 Sev-1/2 alerts; P90 not meaningful"]
+  },
+  "claims": [
+    {"claimId": "c1", "text": "Delayed-trip rate reached 21.88% (4,357 of 19,913) in the week to 2026-06-07, up from 12.28% in the prior four complete weeks (+9.6 points).", "kind": "DIRECT", "evidenceIds": ["pinnacle-Slc:m01_delayed_trip_rate:2026-06-07"]},
+    {"claimId": "c2", "text": "About 1,912 excess delayed trips affected 7,780 rider legs (about 3,414 more than the baseline rate implies).", "kind": "INFERRED", "evidenceIds": ["pinnacle-Slc:m01_delayed_trip_rate:2026-06-07:impact"]},
+    {"claimId": "c3", "text": "Site 'Clearwater Campus' carries 51.1% of delayed trips at 24.07% (baseline 12.86%).", "kind": "DIRECT", "evidenceIds": ["pinnacle-Slc:m01_delayed_trip_rate:site_id:2026-06-07:clearwater-campus", "pinnacle-Slc:m01_delayed_trip_rate:site_id:2026-06-07:clearwater-campus:share"]},
+    {"claimId": "c4", "text": "severe_ack: Fewer than 20 Sev-1/2 alerts; P90 not meaningful", "kind": "CAVEAT", "evidenceIds": ["pinnacle-Slc:m01_delayed_trip_rate:2026-06-07"]}
+  ],
+  "leadershipNarrative": [
+    "pinnacle-Slc: delayed-trip rate reached 21.88% in the week to 2026-06-07, up from 12.28% in the prior four weeks (configured target 10%).",
+    "About 1,900 excess delayed trips affected roughly 3,400 rider legs; confidence 0.84."
+  ],
+  "action": {"actionId": "00000000-0000-0000-0000-00000000a002", "type": "CREATE_SITE_SHIFT_WATCHLIST", "scope": {"businessUnit": "pinnacle-Slc", "site_id": "Clearwater Campus", "followUp": "CREATE_INVESTIGATION_TICKET"}, "evidenceVersion": "evidence-3f2a9c1b7d44", "status": "DRAFT_REQUIRES_APPROVAL"},
+  "approval": {"approvalId": "00000000-0000-0000-0000-00000000a003", "status": "PENDING", "evidenceVersion": "evidence-3f2a9c1b7d44"},
+  "receipts": [],
+  "auditEvents": ["BRIEF_CREATED", "ACTION_POLICY_APPROVAL_REQUIRED", "ACTION_AWAITING_APPROVAL"]
+}

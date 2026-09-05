@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moveinsync.example/schemas/evidence-bundle.schema.json",
+  "title": "EvidenceBundle",
+  "type": "object",
+  "required": ["items", "confidence", "coverage", "caveats"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["evidenceId", "metricId", "value", "unit", "supportingCount", "periodStart", "periodEnd", "filters", "source", "contractVersion", "dataVersion"],
+        "properties": {
+          "evidenceId": { "type": "string" },
+          "metricId": { "type": "string" },
+          "value": { "type": "number" },
+          "unit": { "type": "string" },
+          "baselineValue": { "type": ["number", "null"] },
+          "delta": { "type": ["number", "null"] },
+          "numerator": { "type": ["number", "null"] },
+          "denominator": { "type": ["number", "null"] },
+          "supportingCount": { "type": "integer", "minimum": 0 },
+          "periodStart": { "type": "string", "format": "date" },
+          "periodEnd": { "type": "string", "format": "date" },
+          "filters": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "source": { "type": "string" },
+          "contractVersion": { "const": "metrics-v1.1" },
+          "dataVersion": { "type": "string" }
+        }
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "coverage": { "type": "integer", "minimum": 0 },
+    "caveats": { "type": "array", "items": { "type": "string" } }
+  }
+}

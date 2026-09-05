@@ -1,6 +1,19 @@
 package com.moveinsync.mobilitycopilot.access.domain;
 
+import java.util.Objects;
 import java.util.Set;
 
-/** WS3: populate from authenticated server identity and implement role/scope validation. */
-public record ActorContext(String actorId, Set<String> roles, Set<TenantContext> allowedTenants) {}
+public record ActorContext(
+        String actorId,
+        String businessUnit,
+        Set<String> roles) {
+
+    public ActorContext {
+        Objects.requireNonNull(actorId, "actorId is required");
+        Objects.requireNonNull(businessUnit, "businessUnit is required");
+        if (actorId.isBlank() || businessUnit.isBlank()) {
+            throw new IllegalArgumentException("actorId and businessUnit must not be blank");
+        }
+        roles = roles == null ? Set.of() : Set.copyOf(roles);
+    }
+}

@@ -1,16 +1,21 @@
 package com.moveinsync.mobilitycopilot.reporting.domain;
 
 import com.moveinsync.mobilitycopilot.action.domain.ActionProposal;
-import com.moveinsync.mobilitycopilot.evidence.domain.VerificationResult;
-import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
-import java.util.List;
+import com.moveinsync.mobilitycopilot.evidence.domain.EvidenceBundle;
+import com.moveinsync.mobilitycopilot.metrics.domain.MetricResult;
 
-/** WS4: both summaries use the same verified facts; an empty proposedActions list is valid. */
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
 public record DecisionBrief(
-        RunContext context,
-        String operationalSummary,
-        String leadershipSummary,
-        VerificationResult verification,
-        List<ActionProposal> proposedActions,
-        List<String> caveats) {
+        UUID runId,
+        String businessUnit,
+        LocalDate asOfDate,
+        String headline,
+        MetricResult metric,
+        List<String> findings,
+        ActionProposal recommendedAction,
+        EvidenceBundle evidence,
+        String status) {
 }

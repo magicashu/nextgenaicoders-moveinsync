@@ -13,98 +13,19 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
-  supervisor:
+  backend:
     build:
       context: .
       dockerfile: infra/docker/backend.Dockerfile
     environment:
-      MOBILITY_AGENT_ROLE: supervisor
-      MOBILITY_DATA_DIR: /workspace/data/official
-      MOBILITY_AI_PROVIDER: sarvam
-      SARVAM_API_KEY: ${SARVAM_API_KEY:?SARVAM_API_KEY is required}
-      SARVAM_MODEL: ${SARVAM_MODEL:-sarvam-105b}
-      SARVAM_ENDPOINT: ${SARVAM_ENDPOINT:-https://api.sarvam.ai/v1/chat/completions}
-      MOBILITY_ANALYTICS_DATABASE: /workspace/runtime/analytics.duckdb
+      MOBILITY_DATA_DIR: /workspace/data/fixtures
       POSTGRES_URL: jdbc:postgresql://postgres:5432/mobility
       POSTGRES_USER: mobility
       POSTGRES_PASSWORD: mobility
     volumes:
-      - ./outputs/MoveInSync - Anonymised Trip-Log Dataset:/workspace/data/official:ro
-      - supervisor-runtime:/workspace/runtime
+      - ./data/fixtures:/workspace/data/fixtures:ro
     ports:
-      - "8081:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  investigator:
-    build:
-      context: .
-      dockerfile: infra/docker/backend.Dockerfile
-    environment:
-      MOBILITY_AGENT_ROLE: investigator
-      MOBILITY_DATA_DIR: /workspace/data/official
-      MOBILITY_AI_PROVIDER: sarvam
-      SARVAM_API_KEY: ${SARVAM_API_KEY:?SARVAM_API_KEY is required}
-      SARVAM_MODEL: ${SARVAM_MODEL:-sarvam-105b}
-      SARVAM_ENDPOINT: ${SARVAM_ENDPOINT:-https://api.sarvam.ai/v1/chat/completions}
-      MOBILITY_ANALYTICS_DATABASE: /workspace/runtime/analytics.duckdb
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/mobility
-      POSTGRES_USER: mobility
-      POSTGRES_PASSWORD: mobility
-    volumes:
-      - ./outputs/MoveInSync - Anonymised Trip-Log Dataset:/workspace/data/official:ro
-      - investigator-runtime:/workspace/runtime
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  evidence-critic:
-    build:
-      context: .
-      dockerfile: infra/docker/backend.Dockerfile
-    environment:
-      MOBILITY_AGENT_ROLE: evidence-critic
-      MOBILITY_DATA_DIR: /workspace/data/official
-      MOBILITY_AI_PROVIDER: sarvam
-      SARVAM_API_KEY: ${SARVAM_API_KEY:?SARVAM_API_KEY is required}
-      SARVAM_MODEL: ${SARVAM_MODEL:-sarvam-105b}
-      SARVAM_ENDPOINT: ${SARVAM_ENDPOINT:-https://api.sarvam.ai/v1/chat/completions}
-      MOBILITY_ANALYTICS_DATABASE: /workspace/runtime/analytics.duckdb
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/mobility
-      POSTGRES_USER: mobility
-      POSTGRES_PASSWORD: mobility
-    volumes:
-      - ./outputs/MoveInSync - Anonymised Trip-Log Dataset:/workspace/data/official:ro
-      - evidence-critic-runtime:/workspace/runtime
-    ports:
-      - "8083:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  briefing-action:
-    build:
-      context: .
-      dockerfile: infra/docker/backend.Dockerfile
-    environment:
-      MOBILITY_AGENT_ROLE: briefing-action
-      MOBILITY_DATA_DIR: /workspace/data/official
-      MOBILITY_AI_PROVIDER: sarvam
-      SARVAM_API_KEY: ${SARVAM_API_KEY:?SARVAM_API_KEY is required}
-      SARVAM_MODEL: ${SARVAM_MODEL:-sarvam-105b}
-      SARVAM_ENDPOINT: ${SARVAM_ENDPOINT:-https://api.sarvam.ai/v1/chat/completions}
-      MOBILITY_ANALYTICS_DATABASE: /workspace/runtime/analytics.duckdb
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/mobility
-      POSTGRES_USER: mobility
-      POSTGRES_PASSWORD: mobility
-    volumes:
-      - ./outputs/MoveInSync - Anonymised Trip-Log Dataset:/workspace/data/official:ro
-      - briefing-runtime:/workspace/runtime
-    ports:
-      - "8084:8080"
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,14 +37,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - supervisor
-      - investigator
-      - evidence-critic
-      - briefing-action
+      - backend
 
 volumes:
   postgres-data:
-  supervisor-runtime:
-  investigator-runtime:
-  evidence-critic-runtime:
-  briefing-runtime:

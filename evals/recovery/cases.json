@@ -1,0 +1,13 @@
+{
+  "description": "Recovery cases. A retried or resumed workflow must never duplicate an external effect.",
+  "cases": [
+    {"id": "REC-TIMEOUT-001", "kind": "tool_timeout", "setup": "worker latency exceeds tool timeout", "expected": {"branchStatus": "FAILED", "qualityWarningPrefix": "TIMEOUT", "otherBranchesPreserved": true, "workflowCrashed": false, "actionExecuted": false}},
+    {"id": "REC-RETRY-001", "kind": "retry_exhaustion", "setup": "model returns malformed JSON twice", "expected": {"fallbackUsed": true, "modelUsageRecorded": true, "planIsDeterministic": true}},
+    {"id": "REC-PARTIAL-001", "kind": "partial_branch_failure", "setup": "cost_billing worker throws", "expected": {"finalStatusIn": ["AWAITING_APPROVAL", "REPORT_ONLY"], "branchStatus": {"cost_billing": "FAILED", "vendor": "COMPLETE"}, "caveatContains": "cost_billing", "confidenceLowerThanClean": true}},
+    {"id": "REC-MALFORMED-001", "kind": "malformed_model_output", "setup": "model proposes worker 'gps' and filter 'employee_id'", "expected": {"workerRejected": "gps", "filterRejected": "employee_id", "toolCallsWithinBudget": true}},
+    {"id": "REC-CRASH-001", "kind": "crash_resume", "setup": "process restarts between approval interrupt and decision", "expected": {"checkpointStep": "AWAITING_APPROVAL", "resumeRebuildsEvidence": true, "executedExactlyOnce": true, "auditEvents": ["ACTION_REVALIDATED", "ACTION_EXECUTED"]}},
+    {"id": "REC-DUP-001", "kind": "duplicate_effect", "setup": "the same approval is resumed twice and executed concurrently from two processes", "expected": {"effects": 1, "receiptsIdentical": true, "secondResumeRejected": "not awaiting approval"}},
+    {"id": "REC-ADAPTER-001", "kind": "adapter_failure", "setup": "mock downstream throws on first call", "expected": {"status": "APPROVED_NOT_EXECUTED", "auditEventType": "ACTION_NOT_EXECUTED", "retrySafe": true, "effectsAfterRetry": 1}},
+    {"id": "REC-LANGFUSE-001", "kind": "telemetry_outage", "setup": "Langfuse endpoint unreachable", "expected": {"workflowCompleted": true, "localTraceIdPresent": true, "exporterDegraded": true, "workflowLatencyImpactMs": "< 50"}}
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "caseId": "G1",
+  "description": "pinnacle-Slc morning LOGIN delay spike, as-of 2026-06-08 (D-032)",
+  "input": {"businessUnit": "pinnacle-Slc", "asOfDate": "2026-06-08", "persona": "TRANSPORT_MANAGER"},
+  "expected": {
+    "status": "AWAITING_APPROVAL",
+    "headlineMetric": {"metricId": "M01_DELAYED_TRIP_RATE", "value": 21.88, "baselineValue": 12.28, "numerator": 4357, "denominator": 19913},
+    "trajectory": ["INITIALIZE_RUN", "AUTHORIZE_SCOPE", "PROFILE_DATASET", "BUILD_CAPABILITY_MATRIX", "COMPUTE_METRIC_SNAPSHOT", "DETECT_ANOMALIES", "PRIORITIZE_ISSUE", "SUPERVISOR_PLAN", "VALIDATE_PLAN", "RUN_INVESTIGATIONS", "MERGE_EVIDENCE", "EVIDENCE_CRITIC", "VERIFY_EVIDENCE", "COMPOSE_DECISION_BRIEF", "ACTION_POLICY_GATE", "APPROVAL_INTERRUPT"],
+    "workersPlanned": ["vendor", "site_shift_direction", "delay_reason", "feedback", "cost_billing", "noshow_roster"],
+    "maxToolCalls": 12,
+    "maxCorrectionCycles": 1,
+    "requiredFindings": [
+      {"contains": "Clearwater Campus", "and": "51.1%"},
+      {"contains": "LOGIN", "and": "23.91%"},
+      {"contains": "Every vendor with at least 500 trips", "and": "not attributable to a single vendor"},
+      {"contains": "DRIVER rose to 39.3%"}
+    ],
+    "forbiddenClaims": ["is to blame", "caused by", "sole driver", "escalate the vendor"],
+    "recommendedAction": {"type": "CREATE_SITE_SHIFT_WATCHLIST", "scopeContains": {"site_id": "Clearwater Campus", "followUp": "CREATE_INVESTIGATION_TICKET"}},
+    "actionExecutedBeforeApproval": false,
+    "confidenceAtLeast": 0.6,
+    "leadershipSubsetOfOperations": true
+  }
+}
