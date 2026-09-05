@@ -110,7 +110,7 @@ Each requirement needs an owner, a test or inspection criterion, and completion 
 
 | ID | Requirement and acceptance |
 |---|---|
-| FR-AG-01 | The Supervisor proposes an allowed bounded investigation plan for a query or proactive issue; deterministic validation preserves mandatory comparisons. |
+| FR-AG-01 | The Supervisor proposes an allowed bounded investigation plan for a query or proactive issue. An optional server-side LLM may reason over a bounded user question/context treated as untrusted data and select typed allowlisted workers/metrics; deterministic fallback and validation preserve mandatory comparisons, scope and budget. |
 | FR-AG-02 | The Investigator selects governed analytical workers, validates their structured results and stops within shared tool/depth/time limits. |
 | FR-AG-03 | The Evidence Critic challenges unsupported interpretation and vendor blame; deterministic verification checks claims against the evidence actually cited. |
 | FR-AG-04 | The Briefing/Action role selects and explains verified findings and drafts a bounded proposal. Deterministic services own policy and action state. |
@@ -118,6 +118,8 @@ Each requirement needs an owner, a test or inspection criterion, and completion 
 | FR-AG-06 | Insufficient evidence produces a limitation or bounded clarification; unsupported numbers, sources and causal claims are not invented. |
 | FR-AG-07 | Safe retries and one correction cycle remain bounded. Failure, cancellation, partial evidence and fallback are visible; abandoned work is not blindly replayed. |
 | FR-AG-08 | Runs retain identity/scope, versions, plan, safe tool records, evidence, usage, timings and approval outcome, with redaction. |
+
+FR-AG-01 implementation boundary: planner input includes only a detector-selected issue, authorized run context and matching capability matrix. Its emitted requests use the run tenant and data version, a current versus prior-four-complete-week window, registered workers/metrics, and remaining tool-call allowance. Node 9 remains the final request validator.
 
 ### Questions, proactive work, actions and reports
 
