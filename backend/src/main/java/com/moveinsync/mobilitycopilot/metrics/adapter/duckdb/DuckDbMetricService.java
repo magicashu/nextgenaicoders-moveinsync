@@ -6,6 +6,7 @@ import com.moveinsync.mobilitycopilot.metrics.application.MetricService;
 import com.moveinsync.mobilitycopilot.metrics.domain.MetricId;
 import com.moveinsync.mobilitycopilot.metrics.domain.MetricResult;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ import java.sql.Statement;
 import java.time.LocalDate;
 
 @Service
+@Profile("legacy-sample")
 public final class DuckDbMetricService implements MetricService {
 
     private static final String CONTRACT_VERSION = "M01-v1";

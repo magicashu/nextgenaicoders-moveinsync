@@ -1,0 +1,780 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moveinsync.example/schemas/team-contracts.schema.json",
+  "title": "Team scaffold contracts v0.2.0",
+  "$comment": "Structural handoff only. Team members implement validation, authorization, business rules, adapters and endpoint serialization tests. Java records do not enforce these rules yet.",
+  "$defs": {
+    "tenant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "businessUnit": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "businessUnit"
+      ]
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allowedTenants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tenant"
+          }
+        }
+      },
+      "required": [
+        "actorId",
+        "roles",
+        "allowedTenants"
+      ]
+    },
+    "tripKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "tripId": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "tenant",
+        "tripId"
+      ]
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metrics": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "data",
+        "metrics",
+        "workflow",
+        "prompts",
+        "model",
+        "configuration"
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxToolCalls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxCorrections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "investigationTimeout": {
+          "type": "string",
+          "format": "duration"
+        },
+        "maxParallelTasks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxToolCalls",
+        "maxDepth",
+        "maxCorrections",
+        "investigationTimeout",
+        "maxParallelTasks"
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "actor": {
+          "$ref": "#/$defs/actor"
+        },
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "persona": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asOfDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "versions": {
+          "$ref": "#/$defs/versions"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "runId",
+        "actor",
+        "tenant",
+        "persona",
+        "asOfDate",
+        "versions",
+        "budget",
+        "deadline"
+      ]
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date"
+        },
+        "end": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "metricRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "metricId": {
+          "type": "string",
+          "enum": [
+            "M01_DELAYED_TRIP_RATE",
+            "M02_DELAYED_TRIP_DELAY",
+            "M03_DELAY_REASON_MIX",
+            "M04_ON_TIME_PICKUP_RATE",
+            "M05_ON_TIME_DROP_RATE",
+            "M06_NO_SHOW_RATE",
+            "M07_DASHBOARD_CANCELLATION_RATE",
+            "M08_OCCUPANCY",
+            "M09_MEDIAN_BILLED_COST_PER_TRIP",
+            "M10_COST_PER_BILLED_KM",
+            "M11_LOW_DRIVER_RATING_RATE",
+            "M12_MEAN_DRIVER_SAFETY_RATING",
+            "M13_ALERT_RATE",
+            "M14_SEVERE_ALERT_RATE",
+            "M15_SEVERE_ACKNOWLEDGEMENT_P90",
+            "M16_TRACKING_GAP_RATE",
+            "M17_EV_SHARE",
+            "M18_ESCORT_PRESENT_RATE"
+          ]
+        },
+        "measure": {
+          "type": "string",
+          "enum": [
+            "VALUE",
+            "MEAN_DELAY",
+            "P90_DELAY",
+            "DRIVER_RATING",
+            "SAFETY_RATING"
+          ]
+        },
+        "window": {
+          "$ref": "#/$defs/window"
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dataVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "tenant",
+        "metricId",
+        "measure",
+        "window",
+        "filters",
+        "dataVersion"
+      ]
+    },
+    "metricEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidenceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request": {
+          "$ref": "#/$defs/metricRequest"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "AVAILABLE",
+            "PARTIAL",
+            "UNAVAILABLE"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "PERCENT",
+            "MINUTES",
+            "CURRENCY",
+            "CURRENCY_PER_KM",
+            "RATING",
+            "PER_THOUSAND_TRIPS"
+          ]
+        },
+        "numerator": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "denominator": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "population": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metricVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceReference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "evidenceId",
+        "request",
+        "status",
+        "value",
+        "unit",
+        "numerator",
+        "denominator",
+        "population",
+        "metricVersion",
+        "sourceReference",
+        "warnings"
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "claimId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "dataVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metricVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "DIRECT",
+            "QUALIFIED_INFERENCE"
+          ]
+        }
+      },
+      "required": [
+        "claimId",
+        "tenant",
+        "dataVersion",
+        "metricVersion",
+        "text",
+        "evidenceIds",
+        "kind"
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "VERIFIED",
+            "QUALIFIED",
+            "REJECTED"
+          ]
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        },
+        "rejectedClaimIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "claims",
+        "rejectedClaimIds",
+        "warnings"
+      ]
+    },
+    "actionTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "trips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tripKey"
+          }
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "tenant",
+        "trips",
+        "dimensions"
+      ]
+    },
+    "actionProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "proposalVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/actionTarget"
+        },
+        "dataVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metricVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "actionId",
+        "runId",
+        "proposalVersion",
+        "type",
+        "title",
+        "rationale",
+        "status",
+        "target",
+        "dataVersion",
+        "metricVersion",
+        "evidenceIds",
+        "parameters",
+        "createdAt",
+        "expiresAt"
+      ]
+    },
+    "approvalDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "actionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "proposalVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dataVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metricVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REJECT",
+            "CANCEL"
+          ]
+        },
+        "decidedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "approvalId",
+        "actionId",
+        "runId",
+        "tenant",
+        "proposalVersion",
+        "dataVersion",
+        "metricVersion",
+        "evidenceIds",
+        "decision",
+        "decidedBy",
+        "decidedAt",
+        "comment"
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant": {
+          "$ref": "#/$defs/tenant"
+        },
+        "approvalId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "proposalVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auditId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "executedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "MOCK_EXECUTED",
+            "DUPLICATE_PREVENTED"
+          ]
+        }
+      },
+      "required": [
+        "actionId",
+        "runId",
+        "tenant",
+        "approvalId",
+        "proposalVersion",
+        "idempotencyKey",
+        "auditId",
+        "executedAt",
+        "status"
+      ]
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "operationalSummary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "leadershipSummary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "proposedActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/actionProposal"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "context",
+        "operationalSummary",
+        "leadershipSummary",
+        "verification",
+        "proposedActions",
+        "caveats"
+      ]
+    },
+    "briefJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "QUEUED",
+            "RUNNING",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "failureReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "jobId",
+        "context",
+        "status",
+        "createdAt",
+        "expiresAt",
+        "failureReason"
+      ]
+    }
+  }
+}
