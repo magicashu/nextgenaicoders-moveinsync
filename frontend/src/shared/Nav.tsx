@@ -3,6 +3,7 @@ import { useAppStore } from '../core/store'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '◈', label: 'Dashboard' },
+  { id: 'copilot', icon: '🎙', label: 'Voice Copilot' },
   { id: 'workflow', icon: '⬡', label: '3D Workflow' },
   { id: 'brief', icon: '◉', label: 'Decision Brief' },
   { id: 'audit', icon: '◎', label: 'Audit Trail' },
