@@ -561,6 +561,7 @@ Append entries using this template:
 - **Data:** All three views use the selected persona, tenant and report capture. Audit refresh reads only the audit endpoint. Graph replay animates recorded transitions and cannot start a workflow; distinguish the static node layout from actually traversed edges.
 - **Resilience:** Clear stale details when scope changes, expose empty/error/retry states, provide readable execution records when WebGL is unavailable, and preserve the current evidence and incident-response links in the brief.
 - **Visual follow-up:** Use a white 3D canvas with contrasting nodes, labels and paths. Remove unused standalone Ask page/drawer components and obsolete pipeline/page styles; the single FloatingCopilot remains the bottom-right chat entry point.
+- **Publication reconciliation:** Retain the incoming SVG navigation icons and Docker/PostgreSQL build changes from main, but keep Incidents correctly labelled and the restored inspection routes visible. Continue to exclude the unused legacy InvestigationController: it hardcodes a manager actor from body-supplied tenant data and bypasses the current scoped capture API. No frontend consumer uses that endpoint.
 
 ## D-054: Refresh the hackathon presentation with current product evidence
 

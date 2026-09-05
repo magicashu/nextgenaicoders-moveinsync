@@ -4,7 +4,7 @@ COPY pom.xml ./
 COPY backend/pom.xml backend/pom.xml
 RUN mvn -Ppostgres -pl backend -am dependency:go-offline
 COPY backend backend
-RUN mvn -Ppostgres -pl backend -am package -DskipTests
+RUN mvn -Ppostgres -pl backend -am clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
