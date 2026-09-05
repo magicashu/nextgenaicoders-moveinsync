@@ -1,7 +1,5 @@
 package com.moveinsync.mobilitycopilot.workflow.agents.impl;
 
-import com.moveinsync.mobilitycopilot.action.domain.ActionProposal;
-import com.moveinsync.mobilitycopilot.action.domain.ActionTarget;
 import com.moveinsync.mobilitycopilot.evidence.domain.VerificationResult;
 import com.moveinsync.mobilitycopilot.evidence.domain.VerifiedClaim;
 import com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief;
@@ -9,135 +7,143 @@ import com.moveinsync.mobilitycopilot.workflow.agents.BriefingActionAgent;
 import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Node 14 — deterministic brief renderer.
- *
- * No LLM required: derives both summary paragraphs entirely from verified claims and
- * the run context. Action proposals are constructed for each DIRECT verified claim.
- *
- * Operational summary — fact-level: metric name, value, window, tenant.
- * Leadership summary  — impact-level: qualified/verified claim count, degraded dimensions,
- *                        data version, key caveats from warnings.
+ * Deterministic Agent 4 implementation. It composes verified claims only;
+ * policy and action execution remain outside this class.
  */
 @Service
 public final class BriefingActionAgentImpl implements BriefingActionAgent {
 
     @Override
     public DecisionBrief draft(RunContext context, VerificationResult verifiedEvidence) {
-        List<VerifiedClaim> claims = verifiedEvidence.claims();
-        List<String> warnings = verifiedEvidence.warnings();
+        Objects.requireNonNull(context, "context is required");
+        Objects.requireNonNull(verifiedEvidence, "verifiedEvidence is required");
 
-        String operational = buildOperationalSummary(context, claims, verifiedEvidence.status());
-        String leadership  = buildLeadershipSummary(context, claims, warnings, verifiedEvidence.status());
-        List<ActionProposal> proposals = buildProposals(context, claims);
-        List<String> caveats = extractCaveats(warnings);
+        var caveats = new ArrayList<String>();
+        var claims = eligibleClaims(context, verifiedEvidence, caveats);
+        var findings = renderFindings(claims);
+        var status = verifiedEvidence.status().name();
 
-        return new DecisionBrief(context, operational, leadership, verifiedEvidence, proposals, caveats);
-    }
-
-    // -------------------------------------------------------------------------
-
-    private String buildOperationalSummary(RunContext context,
-                                            List<VerifiedClaim> claims,
-                                            VerificationResult.Status status) {
         if (claims.isEmpty()) {
-            return String.format(
-                    "No verified metrics available for tenant %s (data version %s). " +
-                    "Verification status: %s. Review evidence warnings before acting.",
-                    context.tenant().businessUnit(), context.versions().data(), status);
+            findings = "No verified findings are available for this run.";
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("Verified metrics for %s (data v%s, metrics v%s):\n",
-                context.tenant().businessUnit(),
-                context.versions().data(),
-                context.versions().metrics()));
+        var operational = renderSummary("Operations decision brief", context, status, findings, caveats);
+        var leadership = renderSummary("Leadership summary", context, status, findings, caveats);
 
-        for (VerifiedClaim claim : claims) {
-            sb.append("  • ").append(claim.text()).append("\n");
-        }
-
-        if (status == VerificationResult.Status.QUALIFIED) {
-            sb.append("Note: one or more claims were rejected during review — see caveats.");
-        }
-        return sb.toString().trim();
+        return new DecisionBrief(
+                context,
+                operational,
+                leadership,
+                verifiedEvidence,
+                List.of(),
+                List.copyOf(caveats));
     }
 
-    private String buildLeadershipSummary(RunContext context,
-                                           List<VerifiedClaim> claims,
-                                           List<String> warnings,
-                                           VerificationResult.Status status) {
-        long directCount = claims.stream()
-                .filter(c -> c.kind() == VerifiedClaim.Kind.DIRECT)
-                .count();
-        long inferredCount = claims.size() - directCount;
-
-        String statusPhrase = switch (status) {
-            case VERIFIED  -> "All claims fully verified.";
-            case QUALIFIED -> "Some claims were qualified or removed; remaining claims are verified.";
-            case REJECTED  -> "Verification failed — no claims survived review.";
-        };
-
-        long regimeChangeWarnings = warnings.stream()
-                .filter(w -> w.contains("recording regime change") || w.contains("R3:"))
-                .count();
-        long vendorWarnings = warnings.stream()
-                .filter(w -> w.contains("R1:") || w.contains("universal vendor"))
-                .count();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format(
-                "Decision brief for %s — data version %s. %s\n",
-                context.tenant().businessUnit(), context.versions().data(), statusPhrase));
-
-        sb.append(String.format(
-                "%d direct metric(s) verified; %d qualified inference(s).\n",
-                directCount, inferredCount));
-
-        if (regimeChangeWarnings > 0) {
-            sb.append("Tracking regime change detected — alert volume reflects instrumentation change, not operational incident.\n");
+    private List<VerifiedClaim> eligibleClaims(
+            RunContext context,
+            VerificationResult verification,
+            List<String> caveats) {
+        if (verification.status() == VerificationResult.Status.REJECTED) {
+            caveats.add("Verified evidence was rejected; no action draft was created.");
         }
-        if (vendorWarnings > 0) {
-            sb.append("Cross-vendor degradation observed — single-vendor attribution requires further investigation.\n");
+
+        var rejected = verification.rejectedClaimIds() == null
+                ? Set.<String>of()
+                : verification.rejectedClaimIds();
+        var seen = new LinkedHashSet<String>();
+        var eligible = new ArrayList<VerifiedClaim>();
+
+        if (verification.claims() == null) {
+            caveats.add("The verification result contained no claim list.");
+            return eligible;
         }
-        if (claims.isEmpty()) {
-            sb.append("Insufficient verified evidence to support operational decisions at this time.");
+
+        for (var claim : verification.claims()) {
+            if (claim == null || claim.claimId() == null || claim.claimId().isBlank()) {
+                caveats.add("A verified claim without an identifier was suppressed.");
+                continue;
+            }
+            if (!seen.add(claim.claimId())) {
+                caveats.add("Duplicate claim " + claim.claimId() + " was suppressed.");
+                continue;
+            }
+            if (rejected.contains(claim.claimId())) {
+                caveats.add("Rejected claim " + claim.claimId() + " was suppressed.");
+                continue;
+            }
+            if (claim.tenant() == null || !context.tenant().equals(claim.tenant())) {
+                caveats.add("Claim " + claim.claimId() + " was suppressed because its tenant differs from the run scope.");
+                continue;
+            }
+            if (!Objects.equals(context.versions().data(), claim.dataVersion())
+                    || !Objects.equals(context.versions().metrics(), claim.metricVersion())) {
+                caveats.add("Claim " + claim.claimId() + " was suppressed because its data or metric version differs from the run.");
+                continue;
+            }
+            if (claim.text() == null || claim.text().isBlank()) {
+                caveats.add("Claim " + claim.claimId() + " was suppressed because it has no approved wording.");
+                continue;
+            }
+            if (claim.evidenceIds() == null || claim.evidenceIds().isEmpty()) {
+                caveats.add("Claim " + claim.claimId() + " was suppressed because it has no evidence reference.");
+                continue;
+            }
+            eligible.add(claim);
         }
-        return sb.toString().trim();
+
+        eligible.sort(Comparator
+                .comparingInt((VerifiedClaim claim) -> claim.kind() == VerifiedClaim.Kind.DIRECT ? 0 : 1)
+                .thenComparing(VerifiedClaim::claimId));
+
+        if (verification.warnings() != null) {
+            caveats.addAll(verification.warnings().stream()
+                    .filter(Objects::nonNull)
+                    .filter(warning -> !warning.isBlank())
+                    .toList());
+        }
+        return eligible;
     }
 
-    private List<ActionProposal> buildProposals(RunContext context, List<VerifiedClaim> claims) {
-        List<ActionProposal> proposals = new ArrayList<>();
-        for (VerifiedClaim claim : claims) {
-            if (claim.kind() != VerifiedClaim.Kind.DIRECT) continue;
-
-            ActionTarget target = new ActionTarget(claim.tenant(), Set.of(), Map.of());
-            proposals.add(new ActionProposal(
-                    UUID.randomUUID(),
-                    context.runId(),
-                    1L,
-                    "METRIC_ALERT",
-                    "Alert: " + claim.text(),
-                    "Supported by verified evidence: " + claim.evidenceIds(),
-                    "DRAFT",
-                    target,
-                    claim.dataVersion(),
-                    claim.metricVersion(),
-                    claim.evidenceIds(),
-                    Map.of(),
-                    Instant.now(),
-                    Instant.now().plusSeconds(86400)));
-        }
-        return Collections.unmodifiableList(proposals);
+    private String renderFindings(List<VerifiedClaim> claims) {
+        return claims.stream()
+                .map(claim -> "- " + claim.text() + " [evidence: " + evidenceIds(claim.evidenceIds()) + "]")
+                .collect(Collectors.joining(System.lineSeparator()));
     }
 
-    private List<String> extractCaveats(List<String> warnings) {
-        return warnings.stream()
-                .filter(w -> w.startsWith("critic ") || w.startsWith("verify ") || w.contains("caveat")
-                        || w.contains("partial") || w.contains("PARTIAL"))
-                .toList();
+    private String evidenceIds(Set<String> evidenceIds) {
+        return evidenceIds.stream().sorted().collect(Collectors.joining(", "));
+    }
+
+    private String renderSummary(
+            String heading,
+            RunContext context,
+            String verificationStatus,
+            String findings,
+            List<String> caveats) {
+        var builder = new StringBuilder()
+                .append(heading)
+                .append(" | tenant=").append(context.tenant().businessUnit())
+                .append(" | asOf=").append(context.asOfDate())
+                .append(System.lineSeparator())
+                .append("Verification status: ").append(verificationStatus)
+                .append(System.lineSeparator())
+                .append("Verified findings:").append(System.lineSeparator())
+                .append(findings);
+
+        if (!caveats.isEmpty()) {
+            builder.append(System.lineSeparator()).append("Caveats:").append(System.lineSeparator());
+            caveats.stream().distinct().forEach(caveat -> builder.append("- ").append(caveat).append(System.lineSeparator()));
+        }
+        builder.append("Draft actions require separate policy validation and human approval.");
+        return builder.toString();
     }
 }
