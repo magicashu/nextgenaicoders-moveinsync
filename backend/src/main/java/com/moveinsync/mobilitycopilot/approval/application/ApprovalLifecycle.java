@@ -147,6 +147,22 @@ public class ApprovalLifecycle {
         if (edited.expiresAt().isAfter(original.expiresAt())) {
             throw new ApprovalTransitionException("EDIT_EXPIRY", "An edit may not extend the expiry");
         }
+        if (!original.scope().keySet().equals(edited.scope().keySet())) {
+            throw new ApprovalTransitionException("EDIT_SCOPE", "An edit must retain the original scope fields");
+        }
+        java.util.Set<String> memberFields = java.util.Set.of("site", "sites", "site_id", "shift", "shifts", "shift_id", "direction", "vendor", "vendor_id");
+        for (var entry : original.scope().entrySet()) {
+            String key = entry.getKey(), before = entry.getValue(), after = edited.scope().get(key);
+            if (java.util.Objects.equals(before, after)) continue;
+            if (!memberFields.contains(key) || after == null || after.isBlank()) {
+                throw new ApprovalTransitionException("EDIT_SCOPE", "Only existing affected sites, shifts, directions or vendors may be narrowed");
+            }
+            var originalMembers = java.util.Arrays.stream(before.split(",")).map(String::trim).collect(java.util.stream.Collectors.toSet());
+            var editedMembers = java.util.Arrays.stream(after.split(",", -1)).map(String::trim).toList();
+            if (editedMembers.stream().anyMatch(value -> value.isBlank() || !originalMembers.contains(value))) {
+                throw new ApprovalTransitionException("EDIT_SCOPE", "Edited scope must be a nonempty subset of the original affected members");
+            }
+        }
         return edited;
     }
 

@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ContextualQuestionServiceTest {
 
-    private final ContextualQuestionService service = new ContextualQuestionService(null);
+    private final ContextualQuestionService service = new ContextualQuestionService(null, new com.moveinsync.mobilitycopilot.access.application.RoleBasedAccessAuthorizer());
     private final ActorContext manager = new ActorContext("m", "pinnacle-Slc", Set.of("TRANSPORT_MANAGER"));
 
     @Test

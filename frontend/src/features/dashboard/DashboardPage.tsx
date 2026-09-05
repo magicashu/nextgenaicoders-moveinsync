@@ -4,10 +4,14 @@ import {
   PieChart, Pie, Cell, Legend, CartesianGrid, LabelList, Area, AreaChart
 } from 'recharts'
 import {
-  startInvestigation, fetchCharts, dashboardView, rangeFor,
+  startInvestigation, fetchCharts, cachedCharts, dashboardView, rangeFor,
   type DashboardData, type VendorRow, type SiteRow, type TrendPoint,
 } from '../../core/dashboardApi'
 import { useAppStore } from '../../core/store'
+import { plain, MANAGER_ROLES } from '../../core/presentation'
+import type { Ranking } from '../../core/dashboardTypes'
+import type { MetricResult } from '../../core/contracts'
+import { formatValue } from '../../shared/format'
 import { DateRangePicker } from '../../shared/DateRangePicker'
 
 const SITE_COLORS = ['#3C68D0','#3FA535','#10ADAE','#FF9D00','#C13D6D','#638FE7','#815FD5','#2E7D3E','#FF6B35','#1E5F8E']
@@ -21,14 +25,15 @@ function evidenceConfidence(confidence: number) {
 // ── Components ──────────────────────────────────────────────────────────────
 
 function AnomalyAlerts({ data }: { data: DashboardData }) {
-  if (data.status === 'HEALTHY') return <div className="caveat-ribbon">No escalation required by the workflow for this window.</div>
+  if (data.status === 'REPORT_ONLY') return null
+  if (data.status === 'HEALTHY') return <div className="caveat-ribbon">No material issue was detected for this window.</div>
   return <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
     {data.findings.slice(0, 3).map((finding, index) => <div key={index} style={{
       flex: 1, minWidth: 220, background: 'linear-gradient(135deg, #FFF0F0 0%, #FFF8F0 100%)',
       border: '1px solid rgba(176,0,32,0.25)', borderLeft: '3px solid #B00020', borderRadius: 10,
       padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14,
     }}><span style={{ color: '#B00020', fontSize: '1.1rem' }}>⚠</span>
-      <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>{finding}</div></div>)}
+      <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>{plain(finding)}</div></div>)}
   </div>
 }
 
@@ -103,16 +108,16 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
 
       {/* On-time rate */}
       <div style={{ background: '#fff', border: '1px solid #E0E0E0', borderTop: '3px solid #3FA535', borderRadius: 10, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>On-Time Pickup Rate · M04</div>
+        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>On-Time Pickup Rate</div>
         <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#2E7D3E', lineHeight: 1, marginBottom: 4 }}>{data.onTime.value == null ? '—' : `${data.onTime.value.toFixed(1)}%`}</div>
         <div style={{ fontSize: '0.71rem', color: '#A8B2AB' }}>{data.onTime.numerator?.toLocaleString() ?? '—'} / {data.onTime.denominator?.toLocaleString() ?? '—'} eligible pickups</div>
-        <div style={{ marginTop: 10, fontSize: '0.71rem', color: '#6B7A70' }}>{data.onTime.caveats.join(' ')}</div>
+        <div style={{ marginTop: 10, fontSize: '0.71rem', color: '#6B7A70' }}>Only valid, boarded passenger trips with recorded pickup times are included.</div>
       </div>
 
       {/* Fleet health score */}
       <div style={{ background: '#fff', border: '1px solid #E0E0E0', borderTop: `3px solid ${health.color}`, borderRadius: 10, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>Evidence Confidence</div>
-        <FleetHealthGauge score={health.score} label={health.label} color={health.color} delayRate={m.value} totalTrips={m.denominator} />
+        {data.status === 'REPORT_ONLY' ? <p>Read-only metric report. Explanations of causes have not been assessed.</p> : <FleetHealthGauge score={health.score} label={health.label} color={health.color} delayRate={m.value} totalTrips={m.denominator} />}
       </div>
 
       {/* Period + evidence */}
@@ -126,11 +131,11 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
             <span style={{ color: '#6B7A70' }}>Confidence</span>
-            <span style={{ fontWeight: 700, color: '#3C68D0' }}>{Math.round(data.evidence.confidence * 100)}%</span>
+            <span style={{ fontWeight: 700, color: '#3C68D0' }}>{data.status === 'REPORT_ONLY' ? 'Not assessed' : `${Math.round(data.evidence.confidence * 100)}%`}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-            <span style={{ color: '#6B7A70' }}>Contract</span>
-            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.7rem' }}>{m.contractVersion}</span>
+            <span style={{ color: '#6B7A70' }}>Comparison</span>
+            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.7rem' }}>Previous four weeks</span>
           </div>
         </div>
       </div>
@@ -340,54 +345,41 @@ function AgentInsightPanel({ data }: { data: DashboardData }) {
   const health = evidenceConfidence(data.evidence.confidence)
   return (
     <div className="card" style={{ gridColumn: 'span 2' }}>
-      <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="card-title">AI Agent Analysis</div>
-          <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700, marginLeft: 8 }}>
-            4-agent pipeline
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: '0.72rem' }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(60,104,208,0.1)', color: '#3C68D0', fontWeight: 700 }}>supervisor</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(16,173,174,0.1)', color: '#10ADAE', fontWeight: 700 }}>investigator</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(212,144,12,0.1)', color: '#D4900C', fontWeight: 700 }}>critic</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700 }}>briefing</span>
-        </div>
-      </div>
+      <div className="card-header"><div className="card-title">What changed and why it matters</div></div>
       <div className="card-body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div>
             {data.findings.length > 0 ? (
               <>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Verified Findings</div>
-                {data.findings.map((f, i) => (
+                {data.findings.slice(0, 4).map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                     <div style={{ minWidth: 20, height: 20, borderRadius: '50%', background: 'rgba(63,165,53,0.12)', border: '1px solid rgba(63,165,53,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3FA535', fontWeight: 800, flexShrink: 0 }}>{i + 1}</div>
-                    <div style={{ fontSize: '0.84rem', color: '#16211B', lineHeight: 1.6 }}>{f}</div>
+                    <div style={{ fontSize: '0.84rem', color: '#16211B', lineHeight: 1.6 }}>{plain(f)}</div>
                   </div>
                 ))}
               </>
             ) : (
               <>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Agent Summary</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Summary</div>
                 <p style={{ fontSize: '0.85rem', color: '#6B7A70', lineHeight: 1.7, marginBottom: 10 }}>
-                  {data.operationalSummary || 'Investigation pipeline completed.'}
+                  {data.operationalSummary || 'Your report is ready.'}
                 </p>
                 <p style={{ fontSize: '0.78rem', color: '#A8B2AB', lineHeight: 1.6 }}>
-                  Open the workflow and trust record to inspect the evidence checks, model calls and recorded node decisions.
+                  Open the report to review the supporting facts and recommended next steps.
                 </p>
               </>
             )}
           </div>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Pipeline Summary</div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>At a glance</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
                 { label: 'Evidence Confidence', value: `${health.score}/100`, color: health.color },
                 { label: 'Evidence items', value: String(data.evidenceCount), color: '#16211B' },
                 { label: 'Coverage', value: data.metric.denominator.toLocaleString(), color: '#16211B' },
-                { label: 'Contract', value: data.metric.contractVersion, color: '#3C68D0' },
-                { label: 'Status', value: data.status.replace(/_/g, ' '), color: '#16211B' },
+                { label: 'Comparison', value: 'Previous four weeks', color: '#3C68D0' },
+                { label: 'Status', value: data.status === 'AWAITING_APPROVAL' ? 'Needs review' : data.status === 'EXECUTED' ? 'Response recorded' : data.status.toLowerCase().replaceAll('_', ' '), color: '#16211B' },
                 { label: 'Confidence', value: `${Math.round(data.evidence.confidence * 100)}%`, color: '#3FA535' },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ padding: '8px 10px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #E0E0E0' }}>
@@ -414,21 +406,25 @@ function LoadingOverlay() {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(245,245,245,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100, gap: 16 }}>
       <div style={{ width: 44, height: 44, border: '3px solid #E0E0E0', borderTopColor: '#3FA535', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#16211B' }}>Running 4-agent pipeline…</div>
+      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#16211B' }}>Preparing your report…</div>
       <div style={{ fontSize: '0.78rem', color: '#6B7A70', textAlign: 'center', maxWidth: 320 }}>
-        Supervisor → Investigator → Critic → Briefing<br />
-        Waiting for the backend workflow and governed charts
+
+        Reviewing the available records for your selected period.
       </div>
     </div>
   )
 }
 
-interface AllData { dashboard: DashboardData; vendors: VendorRow[]; sites: SiteRow[]; trend: TrendPoint[] }
+interface AllData { dashboard: DashboardData; vendors: VendorRow[]; sites: SiteRow[]; trend: TrendPoint[]; shifts: Ranking; noShow: MetricResult; cost: MetricResult }
 
 export function DashboardPage() {
-  const { tenant, run, busy } = useAppStore()
-  const [dateRange, setDateRange] = useState(run ? rangeFor(run.asOfDate) : { from: '2026-06-01', to: '2026-06-07' })
-  const [allData, setAllData] = useState<AllData | null>(null)
+  const { tenant, role, run, busy, asOf, lastRefresh } = useAppStore()
+  const [dateRange, setDateRange] = useState(rangeFor(asOf))
+  const [allData, setAllData] = useState<AllData | null>(() => {
+    if (!run) return null
+    const charts = cachedCharts(tenant, run.asOfDate, run.trust.dataVersion)
+    try { return charts ? dashboardView(run, charts) : null } catch { return null }
+  })
   const [chartLoading, setChartLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loading = busy || chartLoading
@@ -439,13 +435,27 @@ export function DashboardPage() {
     catch (e) { setError(e instanceof Error ? e.message : 'Investigation failed') }
   }
   useEffect(() => {
+    if (run) return
     let active = true
-    setAllData(null)
+    const range = rangeFor(asOf)
+    startInvestigation(tenant, range.from, range.to)
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Unable to load dashboard') })
+    return () => { active = false }
+  }, [tenant, asOf, run])
+
+  useEffect(() => {
+    let active = true
     if (!run) return
     setDateRange(rangeFor(run.asOfDate))
+    const cached = cachedCharts(tenant, run.asOfDate, run.trust.dataVersion)
+    if (cached) {
+      try { setAllData(dashboardView(run, cached)); setError(null) }
+      catch (e) { setError(e instanceof Error ? e.message : 'No data for this window'); setAllData(null) }
+      return
+    }
     setChartLoading(true)
-    fetchCharts(tenant, run.asOfDate).then(charts => {
-      if (active) setAllData(dashboardView(run, charts))
+    fetchCharts(tenant, run.asOfDate, run.trust.dataVersion).then(charts => {
+      if (active) { setAllData(dashboardView(run, charts)); setError(null) }
     }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Charts unavailable') })
       .finally(() => { if (active) setChartLoading(false) })
     return () => { active = false }
@@ -455,14 +465,17 @@ export function DashboardPage() {
 
   return (
     <div>
-      {loading && <LoadingOverlay />}
+      {loading && !allData && <LoadingOverlay />}
+      {loading && allData && <div className="caveat-ribbon" role="status">Updating capture… The previous result remains visible.</div>}
 
+      <h1 className="page-title">{role === 'LINE_MANAGER' ? 'Arrival and shift overview' : role === 'FACILITIES_HEAD' ? 'Performance and cost overview' : 'Your transport overview'}</h1>
+      <p className="page-subtitle">{MANAGER_ROLES[role]} · {tenant} · Review what changed and the next steps for your business unit.</p>
       <div className="filter-bar">
         <div className="filter-group">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: '#3FA535' }}>
             <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          <span className="filter-label">Tenant</span>
+          <span className="filter-label">Business unit</span>
           <span className="filter-value">{tenant}</span>
         </div>
         <div className="filter-divider" />
@@ -470,10 +483,10 @@ export function DashboardPage() {
         <button className="filter-apply-btn" type="button" onClick={loadAll} disabled={loading}>
           {loading ? 'Running…' : 'Analyse'}
         </button>
-        {d && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#3FA535', fontWeight: 700 }}>● DATASET RESULT</span>}
+        {d && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#3FA535', fontWeight: 700 }}>● CAPTURED DATA</span>}
       </div>
 
-      <p className="page-subtitle">Select seven days; comparisons use the preceding four weeks. Results below retain their recorded dates.</p>
+      <p className="page-subtitle">{lastRefresh ? `Captured ${new Date(lastRefresh).toLocaleString()}. ` : ''}Unchanged selections reuse this capture. Refresh requests a new investigation; date windows compare seven days with the prior four weeks.</p>
       {error && (
         <div className="caveat-ribbon" style={{ background: '#FFF0F0', borderColor: '#FFCCCC', color: '#B00020', marginBottom: 12 }}>⚠ {error}</div>
       )}
@@ -489,11 +502,10 @@ export function DashboardPage() {
           </div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: '#16211B' }}>Ready to analyse</div>
           <div style={{ fontSize: '0.85rem', textAlign: 'center', maxWidth: 380, color: '#6B7A70', lineHeight: 1.7 }}>
-            Select a tenant and seven-day window, then click <strong style={{ color: '#16211B' }}>Analyse</strong> to run the 4-agent pipeline.<br />
-            Supervisor · Investigator · Critic · Briefing
+            Select a business unit and seven-day window, then click <strong style={{ color: '#16211B' }}>Analyse</strong> to review your transport performance.
           </div>
           <div style={{ fontSize: '0.78rem', color: '#A8B2AB', textAlign: 'center', maxWidth: 400 }}>
-            Dataset: May–July 2026 · Tenants: pinnacle-Slc · vanta-Sea · vanta-Aus · catalyst-Sac · orbit-Slc
+            Dataset: May–July 2026 · Business units: pinnacle-Slc · vanta-Sea · vanta-Aus · catalyst-Sac · orbit-Slc
           </div>
         </div>
       )}
@@ -511,14 +523,14 @@ export function DashboardPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: '#FEF3C7', border: '1px solid #F59E0B', color: '#92400E', fontSize: '0.71rem', fontWeight: 700 }}>
-                    M01 · Delayed Trip Rate
+                    Delayed Trip Rate
                   </span>
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(60,104,208,0.1)', border: '1px solid rgba(60,104,208,0.3)', color: '#3C68D0', fontSize: '0.71rem', fontWeight: 700 }}>
-                    4-Agent Pipeline
+                    Transport overview
                   </span>
                 </div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16211B', marginBottom: 6, lineHeight: 1.3 }}>
-                  {d.headline}
+                  {plain(d.headline)}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#6B7A70' }}>
                   {tenant} · {d.metric.periodStart} → {d.metric.periodEnd} · {d.metric.denominator.toLocaleString()} eligible trips
@@ -533,6 +545,16 @@ export function DashboardPage() {
             </div>
           </div>
 
+          {role === 'FACILITIES_HEAD' && <div className="card card-body" style={{ marginBottom: 16 }}><h3>Leadership summary</h3><p>{plain(d.leadershipSummary)}</p><h4>Median billed cost per trip</h4><p>{formatValue(allData!.cost.value, allData!.cost.unit)} · previous four weeks: {formatValue(allData!.cost.baselineValue, allData!.cost.unit)}</p><p>{allData!.cost.caveats.map(plain).join(' ')}</p></div>}
+          {role === 'LINE_MANAGER' && <div className="card card-body" style={{ marginBottom: 16 }}>
+            <h3>Arrival readiness</h3><p>Review recorded no-shows and delays by shift. These are business-unit totals, not a count of your team members.</p>
+            <p>No-show rate: <strong>{formatValue(allData!.noShow.value, allData!.noShow.unit)}</strong> · {allData!.noShow.numerator?.toLocaleString() ?? '—'} of {allData!.noShow.denominator?.toLocaleString() ?? '—'} eligible passenger trip legs.</p>
+            <details><summary>No-show data coverage</summary>{allData!.noShow.caveats.map(c => <p key={c}>{plain(c)}</p>)}</details>
+            <table className="data-table"><thead><tr><th>Shift</th><th>Late trips</th><th>Eligible trips</th><th>Delay rate</th></tr></thead>
+              <tbody>{allData!.shifts.rows.filter(row => row.currentValue != null).slice(0, 12).map(row => <tr key={row.member}><td>{row.member}</td><td>{row.currentNumerator.toLocaleString()}</td><td>{row.currentDenominator.toLocaleString()}</td><td>{formatValue(row.currentValue, 'PERCENT')}</td></tr>)}</tbody>
+            </table>
+            <details><summary>Shift data coverage</summary>{allData!.shifts.caveats.map(c => <p key={c}>{plain(c)}</p>)}</details>
+          </div>}
           {/* Findings from the actual workflow */}
           <AnomalyAlerts data={d} />
 
@@ -543,7 +565,7 @@ export function DashboardPage() {
           {allData!.trend.length > 0 && <TrendChart data={allData!.trend} />}
 
           {/* Vendor + Site side by side */}
-          {(allData!.vendors.length > 0 || allData!.sites.length > 0) && (
+          {role !== 'LINE_MANAGER' && (allData!.vendors.length > 0 || allData!.sites.length > 0) && (
             <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
               {allData!.vendors.length > 0 && <VendorChart data={allData!.vendors} />}
               {allData!.sites.length > 0 && <SiteDonut data={allData!.sites} />}
@@ -551,7 +573,7 @@ export function DashboardPage() {
           )}
 
           {/* Delta bars + Site table */}
-          {(allData!.vendors.length > 0 || allData!.sites.length > 0) && (
+          {role !== 'LINE_MANAGER' && (allData!.vendors.length > 0 || allData!.sites.length > 0) && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               {allData!.vendors.length > 0 && <VendorDeltaBars data={allData!.vendors} />}
               {allData!.sites.length > 0 && <SiteDelayTable data={allData!.sites} />}
@@ -560,12 +582,13 @@ export function DashboardPage() {
 
           {/* Agent analysis full-width */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 8 }}>
-            <AgentInsightPanel data={d} />
+            {role !== 'LINE_MANAGER' && <AgentInsightPanel data={d} />}
           </div>
 
+          <details className="card card-body"><summary>Data coverage and limitations</summary>
           {d.evidence.caveats.map((c, i) => (
-            <div key={i} className="caveat-ribbon" style={{ marginTop: 8 }}>⚠ {c}</div>
-          ))}
+            <div key={i} className="caveat-ribbon" style={{ marginTop: 8 }}>⚠ {plain(c)}</div>
+          ))}</details>
         </>
       )}
     </div>

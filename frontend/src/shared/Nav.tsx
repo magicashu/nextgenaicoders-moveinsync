@@ -1,12 +1,14 @@
 import { TENANTS } from '../core/workflowDesign'
 import { useAppStore } from '../core/store'
+import { diagnosticsEnabled, MANAGER_ROLES } from '../core/presentation'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '◈', label: 'Dashboard' },
   { id: 'ask', icon: '◇', label: 'Ask Copilot' },
+  { id: 'incidents', icon: '⚑', label: 'Incidents' },
   { id: 'trust', icon: '◌', label: 'LLM & Trust' },
   { id: 'workflow', icon: '⬡', label: '3D Workflow' },
-  { id: 'brief', icon: '◉', label: 'Decision Brief' },
+  { id: 'brief', icon: '◉', label: 'Reports' },
   { id: 'audit', icon: '◎', label: 'Audit Trail' },
   { id: 'scorecard', icon: '◆', label: 'Scorecard' },
 ]
@@ -17,7 +19,7 @@ interface Props {
 }
 
 export function TopNav({ page, setPage }: Props) {
-  const { tenant, setTenant, refresh, lastRefresh, busy: spinning, run } = useAppStore()
+  const { tenant, setTenant, role, changePersona, refresh, lastRefresh, busy: spinning, run } = useAppStore()
   const handleRefresh = () => { void refresh() }
   const lastRefreshStr = lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : '—'
 
@@ -34,9 +36,9 @@ export function TopNav({ page, setPage }: Props) {
       <div className="topnav-right">
         <span className="live-dot" />
         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          Last updated {lastRefreshStr}
+          Captured {lastRefreshStr}
         </span>
-        <button className="refresh-btn" onClick={handleRefresh} title="Reload current run" type="button" disabled={!run || spinning}>
+        <button className="refresh-btn" onClick={handleRefresh} title="Capture a new investigation for the selected tenant and dates" type="button" disabled={!run || spinning}>
           <svg
             width="14" height="14" viewBox="0 0 14 14" fill="none"
             style={{ transition: 'transform 0.8s ease', transform: spinning ? 'rotate(360deg)' : 'rotate(0deg)' }}
@@ -47,6 +49,7 @@ export function TopNav({ page, setPage }: Props) {
           </svg>
           Refresh
         </button>
+        <button className="btn btn-secondary" type="button" onClick={changePersona}>{MANAGER_ROLES[role]} · Switch persona</button>
         <select
           className="tenant-select" aria-label="Business unit"
           value={tenant}
@@ -63,7 +66,7 @@ export function SideNav({ page, setPage }: Props) {
   return (
     <aside className="sidenav">
       <div className="sidenav-section">Navigation</div>
-      {NAV_ITEMS.map((item) => (
+      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'ask', 'brief', 'incidents'].includes(item.id)).map((item) => (
         <button
           key={item.id}
           className={`sidenav-item ${page === item.id ? 'active' : ''}`}

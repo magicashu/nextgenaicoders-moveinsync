@@ -25,7 +25,7 @@ export class ApiRequestError extends Error {
 
 export type CopilotApi = {
   morningBrief(identity: Identity, asOf: string, persona?: string): Promise<MorningBriefResponse>
-  startWorkflow(identity: Identity, asOf: string, persona?: string): Promise<MorningBriefResponse>
+  startWorkflow(identity: Identity, asOf: string, persona?: string, refresh?: boolean): Promise<MorningBriefResponse>
   getWorkflow(identity: Identity, workflowId: string): Promise<MorningBriefResponse>
   ask(identity: Identity, request: QuestionRequest): Promise<QuestionResponse>
   approvalPreview(identity: Identity, approvalId: string): Promise<ApprovalView>
@@ -54,8 +54,8 @@ async function call<T>(identity: Identity, path: string, init: RequestInit = {})
 export const httpApi: CopilotApi = {
   morningBrief: (identity, asOf, persona) =>
     call(identity, `/api/v1/briefs/morning?asOf=${encodeURIComponent(asOf)}${persona ? `&persona=${encodeURIComponent(persona)}` : ''}`),
-  startWorkflow: (identity, asOf, persona) =>
-    call(identity, '/api/v1/workflows', { method: 'POST', body: JSON.stringify({ asOfDate: asOf, persona: persona ?? null }) }),
+  startWorkflow: (identity, asOf, persona, refresh = false) =>
+    call(identity, `/api/v1/workflows?refresh=${refresh}`, { method: 'POST', body: JSON.stringify({ asOfDate: asOf, persona: persona ?? null }) }),
   getWorkflow: (identity, workflowId) => call(identity, `/api/v1/workflows/${encodeURIComponent(workflowId)}`),
   ask: (identity, request) => call(identity, '/api/v1/questions', { method: 'POST', body: JSON.stringify(request) }),
   approvalPreview: (identity, approvalId) => call(identity, `/api/v1/approvals/${encodeURIComponent(approvalId)}`),

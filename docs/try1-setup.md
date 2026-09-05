@@ -262,17 +262,22 @@ npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
 npm run dev
 ```
 
-Open http://localhost:5173 and select `pinnacle-Slc`, `2026-06-01 → 2026-06-07`, then **Analyse**.
+Open http://localhost:5173. First choose a persona and business unit, then **Open my dashboard**. No dashboard request starts before this choice. The initial date window is `2026-06-01 → 2026-06-07`.
 The picker retains the incoming design; the current backend requires seven consecutive days and compares against the preceding four weeks.
 
-- **Dashboard:** governed M01/M04 metrics, daily trend, vendor/site comparisons, actual findings and evidence confidence.
-- **Decision Brief:** the same run, evidence provenance, approval scope/expiry and the actual execution receipt. Effects are explicitly mock watchlists/tickets.
-- **3D Workflow:** all 18 main nodes; replay recorded transitions and select nodes for actual timings and decisions. This is recorded replay, not a live stream.
-- **LLM & Trust:** provider/model, calls, tokens, fallback results, worker spans, structured outputs and Langfuse link.
-- **Ask Copilot:** contextual questions with cited findings and a question-specific trace; open a resulting investigation to inspect its brief, graph and audit.
-- **Audit Trail:** real tenant-scoped events, with payload inspection and filtering.
-- **Scorecard:** actual run performance; acceptance gates remain **Not evaluated** until a versioned evaluation is run.
+- **Transport Manager:** operational findings, arrival reliability, vendor/site comparisons and incident responses.
+- **Transport & Facilities Head:** performance and cost overview, leadership report and incident responses.
+- **Team / Line Manager:** read-only arrival, no-show and shift information. No investigation or approval permissions. Business-unit data is not an authenticated manager-to-team mapping.
+- **Ask Copilot:** simple-English explanations; covered questions reuse current findings. Supporting evidence is grouped and collapsed initially.
+- **Reports:** readable narratives and supporting figures.
+- **Incidents:** actual proposals from retained captures, with current approval state, affected scope, review expiry and a confirmation step. Approve, narrow existing multi-site/shift scope where available, or dismiss with a reason. Actions remain simulated; recording a response does not resolve the underlying real-world issue.
 
-Refresh reloads the active run without launching a fresh investigation. Switching tenants clears its results.
+**Analyse** reuses the same role/business-unit/date capture. **Refresh** explicitly captures a replacement and keeps the previous data visible while it loads. Changing dates or business unit loads the matching capture or creates one if absent. **Switch persona** returns to the selection screen. Reload returns to selection but retains up to eight tab-local captures.
+
+Developer diagnostics are hidden by default. To inspect recorded node decisions, Sarvam calls and Langfuse links, set `VITE_SHOW_DIAGNOSTICS=true` in `frontend/.env.local` and restart Vite; this enables **3D Workflow**, **LLM & Trust**, **Audit Trail** and **Scorecard**. These views replay records; they are not a live event stream. Provider credentials stay on the backend.
+
+The CSV source is not a live ingestion feed. Backend caches are bounded and process-local; production with multiple replicas needs a shared capture/job store and durable coordination. The incident queue currently covers retained reports rather than complete server-side history.
 The browser calls the local backend; Sarvam and Langfuse secret keys remain backend-only.
 For a non-default backend port, launch Vite with `VITE_API_TARGET=http://127.0.0.1:18080 npm run dev`.
+
+If the backend was restarted and a retained report's response details are unavailable, use **Refresh** to capture a new report. Session storage preserves the display, but the default local backend does not preserve all run objects across restarts.

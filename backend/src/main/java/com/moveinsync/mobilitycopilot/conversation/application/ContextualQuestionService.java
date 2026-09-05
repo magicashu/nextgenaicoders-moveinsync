@@ -1,6 +1,8 @@
 package com.moveinsync.mobilitycopilot.conversation.application;
 
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
+import com.moveinsync.mobilitycopilot.access.application.AccessAuthorizer;
+import com.moveinsync.mobilitycopilot.access.domain.Permission;
 import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
 import com.moveinsync.mobilitycopilot.conversation.domain.QuestionScope;
 import com.moveinsync.mobilitycopilot.reporting.application.DecisionRunGateway;
@@ -32,25 +34,27 @@ public class ContextualQuestionService {
             "EXPERIENCE", List.of("rating", "feedback", "experience", "complain"),
             "SAFETY", List.of("alert", "safety", "device", "panic", "escort", "tracking"),
             "ROSTER", List.of("no-show", "no show", "roster", "pickup", "drop", "leg", "boarded"),
-            "EVIDENCE", List.of("evidence", "support", "confident", "confidence", "how do you know"));
+            "EVIDENCE", List.of("evidence", "support", "confident", "confidence", "how do you know", "reliable", "what should", "explain", "happened", "anomal"));
     private static final Pattern FORBIDDEN = Pattern.compile(
             "(select\\s+.+\\s+from|drop\\s+table|delete\\s+from|insert\\s+into|update\\s+\\w+\\s+set|;--|\\bexec(ute)?\\b.*\\b(action|escalation|ticket)|\\bsend\\b.*\\b(email|mail|message)\\b|https?://|\\bcurl\\b|\\bshell\\b|\\bpassword\\b|ignore (all|your|previous) (rules|instructions))",
             Pattern.CASE_INSENSITIVE);
     private static final List<String> OTHER_TENANTS = List.of("pinnacle-Slc", "vanta-Sea", "vanta-Aus", "catalyst-Sac", "orbit-Slc");
 
     private final DecisionRunGateway gateway;
+    private final AccessAuthorizer authorizer;
 
-    public ContextualQuestionService(DecisionRunGateway gateway) {
+    public ContextualQuestionService(DecisionRunGateway gateway, AccessAuthorizer authorizer) {
         this.gateway = gateway;
+        this.authorizer = authorizer;
     }
 
     public List<String> suggestedQuestions() {
         return List.of(
-                "Where is this anomaly concentrated by site and shift?",
-                "Did every high-volume vendor deteriorate, or is one vendor driving the change?",
-                "Which delay reasons changed among delayed trips?",
-                "Did billed cost per trip move with the operational change?",
-                "What evidence supports the recommended action, and how confident are we?");
+                "Which sites and shifts were most affected?",
+                "Were delays spread across vendors or concentrated with one vendor?",
+                "What reasons were recorded for the delays?",
+                "Did the cost per trip also increase?",
+                "How reliable is this explanation, and what should I do next?");
     }
 
     public QuestionScope classify(ActorContext actor, String question) {
@@ -83,6 +87,21 @@ public class ContextualQuestionService {
     public Optional<RunView> answer(ActorContext actor, TenantContext tenant, LocalDate asOfDate, String persona, QuestionScope scope, UUID relatedRunId) {
         if (scope.refused()) {
             return Optional.empty();
+        }
+        authorizer.require(actor, tenant, Permission.READ_TENANT_METRICS);
+        if (relatedRunId != null) {
+            var captured = gateway.find(actor, relatedRunId);
+            if (captured.isPresent()) {
+                var run = captured.get();
+                boolean sameScope = run.businessUnit().equals(tenant.businessUnit())
+                        && run.brief().asOfDate().equals(asOfDate) && run.persona().equals(persona);
+                boolean covered = scope.workers().stream().allMatch(worker ->
+                        run.claims().stream().anyMatch(claim -> worker.equals(claim.worker()) && !"CAVEAT".equals(claim.kind())));
+                if (sameScope && (covered || "LINE_MANAGER".equals(persona)) && !"FAILED".equals(run.finalStep())) return captured;
+            }
+        }
+        if ("LINE_MANAGER".equals(persona)) {
+            return Optional.of(gateway.morningBrief(actor, tenant, asOfDate, persona));
         }
         return Optional.of(gateway.ask(actor, tenant, asOfDate, persona, scope.normalisedQuestion(), relatedRunId));
     }

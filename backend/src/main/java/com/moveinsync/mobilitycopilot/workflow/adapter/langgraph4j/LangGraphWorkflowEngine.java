@@ -351,7 +351,9 @@ public class LangGraphWorkflowEngine implements ResumableWorkflowEngine {
                 throw new SecurityException("actor tenant does not match requested tenant");
             }
             authorizer.require(actor, tenant, Permission.READ_TENANT_METRICS);
-            authorizer.require(actor, tenant, Permission.INVESTIGATE_TENANT);
+            if (run.context().persona() != RunContext.Persona.LINE_MANAGER || run.context().mode() != RunContext.RequestMode.ON_DEMAND) {
+                authorizer.require(actor, tenant, Permission.INVESTIGATE_TENANT);
+            }
         } catch (RuntimeException denied) {
             run.addError(new WorkflowError(WorkflowNode.AUTHORIZE_SCOPE, "ACCESS_DENIED", "Tenant scope denied", false, Instant.now()));
             run.step(WorkflowStep.FAILED);
@@ -390,7 +392,8 @@ public class LangGraphWorkflowEngine implements ResumableWorkflowEngine {
         DetectionSnapshot snapshot = run.detection();
         attributes.put("material", String.valueOf(snapshot.material().size()));
         attributes.put("dataQualityNotes", String.valueOf(snapshot.dataQualityNotes().size()));
-        if (snapshot.healthy()) {
+        boolean readOnly = run.context().persona() == RunContext.Persona.LINE_MANAGER;
+        if (snapshot.healthy() || readOnly) {
             MetricResult headline = snapshot.candidates().stream().filter(c -> c.metricId() == MetricId.M01_DELAYED_TRIP_RATE).map(DetectionSnapshot.IssueCandidate::metric)
                     .findFirst().orElseGet(() -> snapshot.candidates().isEmpty() ? null : snapshot.candidates().getFirst().metric());
             if (headline == null) {
@@ -403,10 +406,10 @@ public class LangGraphWorkflowEngine implements ResumableWorkflowEngine {
                     c.reasons().isEmpty() ? "" : c.reasons().getFirst())));
             snapshot.dataQualityNotes().forEach(n -> notes.add("Data-quality note: " + n.note()));
             EvidenceBundle bundle = healthyBundle(run, snapshot);
-            run.briefing(briefing.composeHealthy(run, headline, bundle, "HEALTHY", notes));
-            run.step(WorkflowStep.HEALTHY);
-            events.add(auditEvent(run, "HEALTHY_BRIEF", Map.of("dataVersion", snapshot.dataVersion(), "candidates", String.valueOf(snapshot.candidates().size()))));
-            return Routing.to(WorkflowNode.APPEND_AUDIT_EVENT, "healthy");
+            run.briefing(briefing.composeHealthy(run, headline, bundle, readOnly ? "REPORT_ONLY" : "HEALTHY", notes));
+            run.step(readOnly ? WorkflowStep.REPORT_ONLY : WorkflowStep.HEALTHY);
+            events.add(auditEvent(run, readOnly ? "READ_ONLY_BRIEF" : "HEALTHY_BRIEF", Map.of("dataVersion", snapshot.dataVersion(), "candidates", String.valueOf(snapshot.candidates().size()))));
+            return Routing.to(WorkflowNode.APPEND_AUDIT_EVENT, readOnly ? "read-only report" : "healthy");
         }
         return Routing.to(WorkflowNode.PRIORITIZE_ISSUE, "issue");
     }

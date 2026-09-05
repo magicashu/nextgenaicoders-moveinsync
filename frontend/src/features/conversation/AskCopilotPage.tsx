@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { httpApi } from '../../core/api'
 import { identityFor, useAppStore } from '../../core/store'
 import type { QuestionResponse } from '../../core/contracts'
-import { TrustPanelView } from '../trust-panel/TrustPanelView'
+import { EvidenceSummary } from '../../shared/EvidenceSummary'
+import { plain } from '../../core/presentation'
 
 export function AskCopilotPage({ onOpenRun }: { onOpenRun: () => void }) {
   const { tenant, run, epoch, busy } = useAppStore()
@@ -30,22 +31,18 @@ export function AskCopilotPage({ onOpenRun }: { onOpenRun: () => void }) {
   }
   return <div>
     <h1 className="page-title">Ask Copilot</h1>
-    <p className="page-subtitle">Ask about {tenant}. {run ? `Context: run ${run.runId}, as of ${run.asOfDate}.` : 'Default analysis date: 8 June 2026.'}</p>
+    <p className="page-subtitle">Ask about {tenant}. {run ? `Report as of ${run.asOfDate}.` : 'Default analysis date: 8 June 2026.'}</p>
     <form className="card card-body" onSubmit={e => { e.preventDefault(); void ask(question) }}>
       <label htmlFor="copilot-question">Your question</label>
-      <textarea id="copilot-question" value={question} onChange={e => setQuestion(e.target.value)} rows={3} maxLength={4000} placeholder="Which vendors contributed to the increase in delays?" />
-      <button className="btn btn-primary" disabled={busy || !question.trim()}>{busy ? 'Investigating…' : 'Ask Copilot'}</button>
+      <textarea id="copilot-question" value={question} onChange={e => setQuestion(e.target.value)} rows={3} maxLength={500} placeholder="Which vendors contributed to the increase in delays?" />
+      <button className="btn btn-primary" disabled={busy || !question.trim()}>{busy ? 'Preparing your answer…' : 'Ask Copilot'}</button>
     </form>
     <div className="suggestion-row">{(answer?.followUps ?? run?.suggestedQuestions ?? []).map(q => <button className="btn btn-secondary" disabled={busy} key={q} onClick={() => void ask(q)}>{q}</button>)}</div>
     {error && <div className="caveat-ribbon" role="alert">{error}</div>}
     {answer && <>
-      <div className="hero-banner"><div className="hero-badge">{answer.refused ? 'Request declined' : answer.intent}</div><p style={{ whiteSpace: 'pre-wrap' }}>{answer.answer}</p>{answer.refusalReason && <p>{answer.refusalReason}</p>}</div>
-      <div className="card card-body"><h3>Supporting evidence</h3>{answer.supportingFindings.map(f => <p key={f.claimId}>{f.text}<small> · {f.evidenceIds.join(', ')}</small></p>)}
-        {answer.caveats.map(f => <p className="caveat-ribbon" key={f.claimId}>{f.text}</p>)}
-        {answer.evidence && <details><summary>Evidence values and provenance</summary><pre>{JSON.stringify(answer.evidence, null, 2)}</pre></details>}
-      </div>
-      {answer.runId && answer.runId !== run?.runId && <button className="btn btn-primary" disabled={busy} onClick={() => void openAnswerRun()}>Open this investigation's brief, workflow and audit</button>}
-      {answer.trust && <TrustPanelView trust={answer.trust} traceUrl={import.meta.env.VITE_LANGFUSE_URL ?? null} />}
+      <div className="hero-banner"><div className="hero-badge">{answer.refused ? 'Request declined' : 'Your explanation'}</div><p style={{ whiteSpace: 'pre-wrap' }}>{plain(answer.answer)}</p>{answer.refusalReason && <p>{answer.refusalReason}</p>}</div>
+      <EvidenceSummary findings={answer.supportingFindings} caveats={answer.caveats} evidence={answer.evidence} />
+      {answer.runId && answer.runId !== run?.runId && <button className="btn btn-primary" disabled={busy} onClick={() => void openAnswerRun()}>Open the supporting report</button>}
     </>}
   </div>
 }

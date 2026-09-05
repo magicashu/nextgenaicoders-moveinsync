@@ -1,6 +1,6 @@
 import { httpApi } from './api'
 import { identityHeaders } from './identity'
-import { identityFor, useAppStore } from './store'
+import { captureKey, chartKey, identityFor, useAppStore } from './store'
 import type { MetricResult, MorningBriefResponse } from './contracts'
 
 export function asOfFor(from: string, to: string): string {
@@ -13,27 +13,70 @@ export function rangeFor(asOf: string) {
   const end = Date.parse(asOf + 'T00:00:00Z')
   return { from: new Date(end - 7 * 86400000).toISOString().slice(0, 10), to: new Date(end - 86400000).toISOString().slice(0, 10) }
 }
-export async function startInvestigation(tenant: string, from: string, to: string) {
+const investigations = new Map<string, Promise<MorningBriefResponse>>()
+export async function startInvestigation(tenant: string, from: string, to: string, refresh = false) {
   const asOf = asOfFor(from, to)
+  const key = captureKey(tenant, asOf)
   const state = useAppStore.getState()
+  if (tenant !== state.tenant) throw new Error('Tenant selection changed')
+  // Join an existing request before considering a second capture, including refresh clicks.
+  const pending = investigations.get(key)
+  if (pending) {
+    useAppStore.setState({ busy: true })
+    try {
+      const run = await pending
+      useAppStore.getState().capture(run, state.epoch)
+      return run
+    } finally {
+      if (useAppStore.getState().epoch === state.epoch) useAppStore.setState({ busy: false })
+    }
+  }
+  if (!refresh) {
+    const captured = state.selectCapture(key)
+    if (captured) return captured
+  }
   if (state.busy) throw new Error('An operation is already running.')
   useAppStore.setState({ busy: true, error: null })
-  try {
-    const run = await httpApi.startWorkflow(identityFor(tenant), asOf)
-    useAppStore.getState().setRun(run, state.epoch)
-    return run
-  } finally {
-    if (useAppStore.getState().epoch === state.epoch) useAppStore.setState({ busy: false })
-  }
+  const request = (async () => {
+    try {
+      const run = refresh
+        ? await httpApi.startWorkflow(identityFor(tenant), asOf, undefined, true)
+        : await httpApi.morningBrief(identityFor(tenant), asOf)
+      await fetchCharts(tenant, asOf, run.trust.dataVersion)
+      useAppStore.getState().capture(run, state.epoch)
+      return run
+    } finally {
+      investigations.delete(key)
+      if (useAppStore.getState().epoch === state.epoch) useAppStore.setState({ busy: false })
+    }
+  })()
+  investigations.set(key, request)
+  return request
 }
 
-type RankingRow = { member: string; currentValue: number | null; baselineValue: number | null; delta: number | null; currentNumerator: number; currentDenominator: number; shareOfCurrentNumerator: number; qualified: boolean }
-type Ranking = { rows: RankingRow[]; caveats: string[]; evidenceId: string; source: string }
-export type Charts = { metric: MetricResult; onTime: MetricResult; vendors: Ranking; sites: Ranking; trend: { points: { date: string; value: number | null }[]; source: string } }
-export async function fetchCharts(tenant: string, asOf: string): Promise<Charts> {
-  const response = await fetch(`/api/v1/dashboard?asOf=${encodeURIComponent(asOf)}`, { headers: identityHeaders(identityFor(tenant)) })
-  if (!response.ok) throw new Error(`Charts unavailable (${response.status}). The investigation is still available in Decision Brief.`)
-  return response.json()
+import type { Charts, RankingRow } from './dashboardTypes'
+const chartRequests = new Map<string, Promise<Charts>>()
+export function cachedCharts(tenant: string, asOf: string, dataVersion: string) {
+  return useAppStore.getState().charts[chartKey(tenant, asOf, dataVersion)]
+}
+export async function fetchCharts(tenant: string, asOf: string, dataVersion: string): Promise<Charts> {
+  const key = chartKey(tenant, asOf, dataVersion)
+  const cached = cachedCharts(tenant, asOf, dataVersion)
+  if (cached) return cached
+  const pending = chartRequests.get(key)
+  if (pending) return pending
+  const request = (async () => {
+    try {
+      const response = await fetch(`/api/v1/dashboard?asOf=${encodeURIComponent(asOf)}`, { headers: identityHeaders(identityFor(tenant)) })
+      if (!response.ok) throw new Error(`Charts unavailable (${response.status}). The investigation is still available in Decision Brief.`)
+      const charts: Charts = await response.json()
+      if (charts.metric.dataVersion !== dataVersion) throw new Error('The dataset version changed. Refresh to capture a consistent investigation and charts.')
+      useAppStore.getState().saveCharts(key, charts)
+      return charts
+    } finally { chartRequests.delete(key) }
+  })()
+  chartRequests.set(key, request)
+  return request
 }
 export type VendorRow = { vendor: string; value: number; baseline: number | null; delta: number | null; trips: number; share: number }
 export type SiteRow = Omit<VendorRow, 'vendor'> & { site: string }
@@ -58,6 +101,9 @@ export function dashboardView(run: MorningBriefResponse, charts: Charts) {
       operationalSummary: run.operations.headline, leadershipSummary: run.leadership.narrative.join(' '),
       verificationStatus: run.trust.finalStep, status: run.operations.receipt?.status ?? run.status, toolCalls: run.trust.toolCalls, evidenceCount: run.evidence.items.length,
     } satisfies DashboardData,
+    shifts: charts.shifts,
+    noShow: charts.noShow,
+    cost: charts.cost,
     vendors: charts.vendors.rows.filter(r => r.currentValue != null).map(r => ({ ...row(r), vendor: r.member })),
     sites: charts.sites.rows.filter(r => r.currentValue != null).map(r => ({ ...row(r), site: r.member })),
     trend: charts.trend.points.map(p => ({ week: p.date, delayed: p.value, baseline: metric.baselineValue })),
