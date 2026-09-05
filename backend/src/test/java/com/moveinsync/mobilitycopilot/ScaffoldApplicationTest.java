@@ -15,12 +15,12 @@ class ScaffoldApplicationTest {
     @Autowired ApplicationContext context;
 
     @Test
-    void bootsWithoutRegisteringUnimplementedDataProviderOrLegacyDemoEndpoints() {
+    void bootsWithTheOfficialM01ServiceButWithoutProviderOrLegacyDemoEndpoints() {
         assertThat(context.getBeansOfType(DemoBriefController.class)).isEmpty();
-        assertThat(context.getBeansOfType(GovernedMetricService.class)).isEmpty();
+        assertThat(context.getBeansOfType(GovernedMetricService.class)).hasSize(1);
         assertThat(context.getBeansOfType(LanguageModelPort.class)).isEmpty();
         var status = context.getBean(ScaffoldStatusController.class).capabilities();
         assertThat(status.governedRuntimeReady()).isFalse();
-        assertThat(status.implementedGovernedCapabilities()).isEmpty();
+        assertThat(status.implementedGovernedCapabilities()).containsExactly("M01_DELAYED_TRIP_RATE");
     }
 }

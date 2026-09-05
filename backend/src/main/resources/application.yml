@@ -10,7 +10,7 @@ mobility:
   demo:
     enabled: false
   data:
-    directory: ${MOBILITY_DATA_DIR:outputs/official dataset}
+    directory: ${MOBILITY_DATA_DIR:outputs/MoveInSync - Anonymised Trip-Log Dataset}
   ai:
     # No provider is required for the deterministic fallback. Set to ollama only for local semantic critique.
     provider: ${MOBILITY_AI_PROVIDER:none}
