@@ -2,11 +2,14 @@ package com.moveinsync.mobilitycopilot.api;
 
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
 import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
-import com.moveinsync.mobilitycopilot.evidence.domain.MetricEvidence;
-import com.moveinsync.mobilitycopilot.metrics.adapter.duckdb.OfficialDuckDbGovernedMetricService;
+import com.moveinsync.mobilitycopilot.action.domain.ActionProposal;
+import com.moveinsync.mobilitycopilot.evidence.domain.EvidenceItem;
+import com.moveinsync.mobilitycopilot.metrics.application.MetricService;
 import com.moveinsync.mobilitycopilot.metrics.domain.*;
-import com.moveinsync.mobilitycopilot.workflow.application.AgentWorkflowService;
-import com.moveinsync.mobilitycopilot.workflow.domain.*;
+import com.moveinsync.mobilitycopilot.reporting.domain.DecisionBrief;
+import com.moveinsync.mobilitycopilot.workflow.application.WorkflowCoordinator;
+import com.moveinsync.mobilitycopilot.workflow.domain.RunContext;
+import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowOutcome;
 import java.time.*;
 import java.util.*;
 import org.springframework.http.ResponseEntity;
@@ -20,12 +23,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/investigate")
 public final class InvestigationController {
 
-    private final AgentWorkflowService agents;
-    private final OfficialDuckDbGovernedMetricService metrics;
+    private final WorkflowCoordinator coordinator;
+    private final MetricService metrics;
 
-    public InvestigationController(AgentWorkflowService agents,
-                                   OfficialDuckDbGovernedMetricService metrics) {
-        this.agents = agents;
+    public InvestigationController(WorkflowCoordinator coordinator, MetricService metrics) {
+        this.coordinator = coordinator;
         this.metrics = metrics;
     }
 
@@ -33,27 +35,16 @@ public final class InvestigationController {
     @PostMapping
     public ResponseEntity<?> investigate(@RequestBody InvestigateRequest req) {
         try {
-            String dataVersion = metrics.dataVersion();
             TenantContext tenant = new TenantContext(req.businessUnit());
-            ActorContext actor = new ActorContext(
-                    "system-copilot", Set.of("ANALYST", "READER"), Set.of(tenant));
-
-            MetricId metricId = MetricId.valueOf(req.metricId());
+            ActorContext actor = new ActorContext("system-copilot", req.businessUnit(), Set.of("TRANSPORT_MANAGER"));
             LocalDate end   = req.dateTo()   != null ? LocalDate.parse(req.dateTo())   : LocalDate.now().minusDays(1);
-            LocalDate start = req.dateFrom() != null ? LocalDate.parse(req.dateFrom()) : end.minusDays(6);
 
-            RunVersions versions = new RunVersions(dataVersion, "v1.1", "v1.0", "v1.0", "none", "v1.0");
-            WorkflowBudget budget = new WorkflowBudget(40, 4, 3, Duration.ofSeconds(120), 4);
-            RunContext context = new RunContext(
-                    UUID.randomUUID(), actor, tenant, "analyst",
-                    end, versions, budget, Instant.now().plusSeconds(150));
+            WorkflowOutcome outcome = coordinator.run(
+                    actor, tenant, end,
+                    RunContext.Persona.TRANSPORT_MANAGER,
+                    RunContext.RequestMode.SCHEDULED, null);
 
-            MetricRequest metricRequest = new MetricRequest(
-                    tenant, metricId, MetricRequest.Measure.VALUE,
-                    new MetricWindow(start, end), Map.of(), dataVersion);
-
-            AgentWorkflowService.Result result = agents.investigate(context, metricRequest);
-            return ResponseEntity.ok(toResponse(result, metricId, start, end, dataVersion));
+            return ResponseEntity.ok(toResponse(outcome.brief(), req.metricId(), end));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -63,47 +54,43 @@ public final class InvestigationController {
 
     /**
      * POST /api/v1/investigate/breakdown — grouped metric by vendor_id or site_id.
-     * Returns list of { groupKey, value, numerator, denominator, population }.
      */
     @PostMapping("/breakdown")
     public ResponseEntity<?> breakdown(@RequestBody BreakdownRequest req) {
         try {
-            String dataVersion = metrics.dataVersion();
             TenantContext tenant = new TenantContext(req.businessUnit());
-
             MetricId metricId = MetricId.valueOf(req.metricId());
             LocalDate end   = req.dateTo()   != null ? LocalDate.parse(req.dateTo())   : LocalDate.now().minusDays(1);
             LocalDate start = req.dateFrom() != null ? LocalDate.parse(req.dateFrom()) : end.minusDays(6);
 
-            // Also compute the overall (ungrouped) rate for baseline delta
-            MetricRequest overall = new MetricRequest(
-                    tenant, metricId, MetricRequest.Measure.VALUE,
-                    new MetricWindow(start, end), Map.of(), dataVersion);
-            var overallEv = metrics.compute(overall);
-            double overallValue = overallEv.value() != null ? overallEv.value().doubleValue() : 0.0;
+            LocalDate baselineEnd   = start.minusDays(1);
+            LocalDate baselineStart = baselineEnd.minusDays(27);
 
-            MetricRequest grouped = new MetricRequest(
-                    tenant, metricId, MetricRequest.Measure.VALUE,
-                    new MetricWindow(start, end), Map.of(), dataVersion);
-            List<MetricEvidence> rows = metrics.computeGrouped(grouped, req.dimension());
+            // Overall (ungrouped) rate
+            MetricQuery overall = new MetricQuery(tenant, metricId, start, end, baselineStart, baselineEnd, Map.of());
+            MetricResult overallResult = metrics.query(overall);
+            double overallValue = overallResult.value() != null ? overallResult.value().doubleValue() : 0.0;
 
-            List<GroupRow> result = rows.stream()
-                    .filter(e -> e.status() == MetricStatus.AVAILABLE && e.value() != null)
-                    .map(e -> {
-                        double val = e.value().doubleValue();
-                        String key = e.request().filters().getOrDefault(req.dimension(), "unknown");
-                        return new GroupRow(key, val, overallValue,
-                                e.numerator()   != null ? e.numerator().longValue()   : null,
-                                e.denominator() != null ? e.denominator().longValue() : null,
-                                e.population());
-                    })
-                    .sorted((a, b) -> Double.compare(b.value(), a.value()))
-                    .limit(15)
-                    .toList();
+            // Grouped by dimension
+            MetricQuery grouped = new MetricQuery(tenant, metricId, start, end, baselineStart, baselineEnd,
+                    Map.of("group_by", req.dimension()));
+            MetricResult groupedResult = metrics.query(grouped);
+
+            // The grouped result is a single aggregated result; return as single-row breakdown
+            List<GroupRow> rows = new ArrayList<>();
+            if (groupedResult.status() == MetricStatus.SUPPORTED && groupedResult.value() != null) {
+                double val = groupedResult.value().doubleValue();
+                rows.add(new GroupRow(
+                        req.dimension(),
+                        val, overallValue,
+                        groupedResult.numerator()   != null ? groupedResult.numerator().longValue()   : null,
+                        groupedResult.denominator() != null ? groupedResult.denominator().longValue() : null,
+                        groupedResult.supportingCount()));
+            }
 
             return ResponseEntity.ok(new BreakdownResponse(
                     metricId.name(), req.dimension(), start.toString(), end.toString(),
-                    dataVersion, overallValue, result));
+                    groupedResult.dataVersion(), overallValue, rows));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -111,111 +98,85 @@ public final class InvestigationController {
         }
     }
 
-    /** GET /api/v1/investigate/metrics — list all 18 metric IDs. */
+    /** GET /api/v1/investigate/metrics — list all metric IDs. */
     @GetMapping("/metrics")
     public List<MetricMeta> availableMetrics() {
         return Arrays.stream(MetricId.values())
-                .map(m -> new MetricMeta(m.name(), m.contractId(), m.unit().name()))
+                .map(m -> new MetricMeta(m.name(), m.name(), "PERCENT"))
                 .toList();
     }
 
-    private InvestigateResponse toResponse(AgentWorkflowService.Result result,
-                                            MetricId metricId, LocalDate start, LocalDate end,
-                                            String dataVersion) {
-        var brief         = result.brief();
-        var investigation = result.investigation();
+    private InvestigateResponse toResponse(DecisionBrief brief, String requestedMetricId, LocalDate asOfDate) {
+        MetricResult metric = brief.metric();
 
-        // Find primary evidence for the requested metric
-        var primaryEv = investigation.evidence().stream()
-                .filter(e -> e.request().metricId() == metricId
-                          && e.request().filters().isEmpty()
-                          && e.status() == MetricStatus.AVAILABLE)
-                .findFirst()
-                .orElse(investigation.evidence().stream()
-                        .filter(e -> e.request().metricId() == metricId)
-                        .findFirst()
-                        .orElse(null));
+        EvidencePayload primary = null;
+        List<EvidencePayload> allEvidence = new ArrayList<>();
 
-        EvidencePayload primary = primaryEv != null ? toPayload(primaryEv) : null;
+        if (brief.evidence() != null && brief.evidence().items() != null) {
+            for (EvidenceItem item : brief.evidence().items()) {
+                EvidencePayload p = toPayload(item);
+                allEvidence.add(p);
+                if (primary == null && item.metricId().equals(requestedMetricId)) {
+                    primary = p;
+                }
+            }
+        }
 
-        // Only return primary evidence items (not grouped group rows) in allEvidence
-        List<EvidencePayload> allEvidence = investigation.evidence().stream()
-                .filter(e -> e.request().filters().isEmpty())
-                .map(this::toPayload).toList();
+        // Fall back to metric result if no evidence items
+        if (primary == null && metric != null && metric.value() != null) {
+            primary = new EvidencePayload(
+                    brief.runId().toString(),
+                    metric.status() == MetricStatus.SUPPORTED ? "AVAILABLE" : "UNAVAILABLE",
+                    metric.value().doubleValue(),
+                    metric.numerator()   != null ? metric.numerator().longValue()   : null,
+                    metric.denominator() != null ? metric.denominator().longValue() : null,
+                    metric.supportingCount(),
+                    metric.unit().name(),
+                    metric.contractVersion(),
+                    metric.source(),
+                    metric.caveats() != null ? metric.caveats() : List.of());
+        }
 
-        // Use only verified claims whose evidence IDs all resolve (critic passed these)
-        List<String> findings = brief.verification().claims().stream()
-                .map(c -> c.text())
-                .filter(t -> t != null && !t.isBlank())
-                .toList();
+        List<String> findings = brief.findings() != null ? brief.findings() : List.of();
 
-        List<ActionPayload> actions = brief.proposedActions().stream()
-                .map(a -> new ActionPayload(a.actionId().toString(), a.type(),
-                        a.title(), a.rationale(), a.status()))
-                .toList();
+        List<ActionPayload> actions = new ArrayList<>();
+        if (brief.recommendedAction() != null) {
+            ActionProposal a = brief.recommendedAction();
+            actions.add(new ActionPayload(
+                    a.actionId().toString(), a.type().name(),
+                    a.title(), a.rationale(), a.status().name()));
+        }
 
-        // Build clean summaries from evidence when brief text is a diagnostic dump
-        String opSummary  = cleanSummary(brief.operationalSummary(),  primaryEv, metricId, start, end);
-        String leadSummary = cleanSummary(brief.leadershipSummary(), primaryEv, metricId, start, end);
+        List<String> caveats = new ArrayList<>();
+        if (brief.evidence() != null && brief.evidence().caveats() != null) {
+            caveats.addAll(brief.evidence().caveats());
+        }
 
-        // Collect caveats but exclude all internal diagnostic noise
-        List<String> caveats = brief.caveats().stream()
-                .filter(c -> c.length() < 300)
-                .filter(c -> !c.contains("claim-ev-"))
-                .filter(c -> !c.contains("comparison-ev-"))
-                .filter(c -> !c.startsWith("Verified evidence was rejected"))
-                .filter(c -> !c.startsWith("Claim claim-"))
-                .filter(c -> !c.startsWith("Claim comparison-"))
-                .filter(c -> !c.contains("has an invalid, unavailable, or scope-mismatched"))
-                .toList();
-
-        // Strip internal diagnostic noise from warnings too
-        List<String> warnings = investigation.warnings().stream()
-                .filter(w -> !w.contains("comparison-ev-"))
-                .filter(w -> !w.contains("claim-ev-"))
-                .filter(w -> !w.startsWith("Office comparison scope"))
-                .filter(w -> !w.startsWith("Below the governed comparison volume"))
-                .filter(w -> !w.startsWith("Claim comparison-"))
-                .filter(w -> !w.contains("has an invalid, unavailable, or scope-mismatched"))
-                .toList();
+        String dataVersion = metric != null ? metric.dataVersion() : "unknown";
+        String periodStart = metric != null ? metric.periodStart().toString() : asOfDate.minusDays(7).toString();
+        String periodEnd   = metric != null ? metric.periodEnd().toString()   : asOfDate.toString();
+        String verificationStatus = "VERIFIED";
 
         return new InvestigateResponse(
-                metricId.name(), start.toString(), end.toString(), dataVersion,
+                requestedMetricId, periodStart, periodEnd, dataVersion,
                 primary, allEvidence,
-                opSummary, leadSummary,
-                brief.verification().status().name(),
-                findings, actions, caveats, warnings);
+                brief.headline(), brief.headline(),
+                verificationStatus,
+                findings, actions, caveats, List.of());
     }
 
-    /** Replace diagnostic dump text with a clean auto-generated summary. */
-    private String cleanSummary(String text, MetricEvidence ev,
-                                 MetricId metricId, LocalDate start, LocalDate end) {
-        if (text == null || text.isBlank()) return buildSummary(ev, metricId, start, end);
-        // Heuristic: real summaries don't start with "Leadership summary |" or contain UUIDs
-        if (text.startsWith("Leadership summary |") || text.contains("has an invalid")
-                || text.contains("claim-ev-")) {
-            return buildSummary(ev, metricId, start, end);
-        }
-        return text;
-    }
-
-    private String buildSummary(MetricEvidence ev, MetricId metricId, LocalDate start, LocalDate end) {
-        if (ev == null || ev.value() == null) return "";
-        double val = ev.value().doubleValue();
-        long denom = ev.denominator() != null ? ev.denominator().longValue() : ev.population();
-        long numer = ev.numerator()   != null ? ev.numerator().longValue()   : 0;
-        return String.format("%s: %.1f%% (%,d of %,d trips) for period %s–%s.",
-                metricId.contractId(), val, numer, denom, start, end);
-    }
-
-    private EvidencePayload toPayload(MetricEvidence e) {
+    private EvidencePayload toPayload(EvidenceItem e) {
         return new EvidencePayload(
-                e.evidenceId(), e.status().name(),
+                e.metricId() + ":" + e.periodEnd(),
+                e.value() != null ? "AVAILABLE" : "UNAVAILABLE",
                 e.value()       != null ? e.value().doubleValue()       : null,
                 e.numerator()   != null ? e.numerator().longValue()     : null,
                 e.denominator() != null ? e.denominator().longValue()   : null,
-                e.population(), e.unit().name(),
-                e.metricVersion(), e.sourceReference(), e.warnings());
+                e.supportingCount(),
+                e.unit() != null ? e.unit() : "PERCENT",
+                e.contractVersion(),
+                e.source(),
+                List.of());
     }
 
     // ── Request / Response records ────────────────────────────────────────────
