@@ -1,5 +1,5 @@
 import type { EvidenceBundle, Finding } from '../core/contracts'
-import { plain } from '../core/presentation'
+import { plain, plainCaveat } from '../core/presentation'
 import { formatValue, metricLabel } from './format'
 
 const topics: Record<string, string> = { vendor: 'Vendor patterns', site_shift_direction: 'Sites and shifts', delay_reason: 'Recorded delay reasons', cost_billing: 'Cost and billing', feedback: 'Passenger experience', tracking_safety_alerts: 'Safety and tracking', noshow_roster: 'Attendance and pickups' }
@@ -11,9 +11,9 @@ export function EvidenceSummary({ findings = [], caveats = [], evidence }: { fin
   const limitations = [...new Set([...caveats.map(c => c.text), ...(evidence?.caveats ?? [])])]
   return <details className="card evidence-summary"><summary>Supporting evidence · {findings.length} findings</summary>
     <div className="card-body">
-      {[...groups].map(([name, values]) => <section key={name}><h3>{name}</h3>{values.map(f => <p key={f.claimId}>{plain(f.text)}</p>)}</section>)}
-      {metrics.length > 0 && <details><summary>Key figures and comparison</summary><div style={{ overflowX: 'auto' }}><table className="data-table"><thead><tr><th>Measure</th><th>Selected period</th><th>Previous four weeks</th></tr></thead><tbody>{metrics.map(m => <tr key={m.evidenceId}><td>{metricLabel(m.metricId)}</td><td>{formatValue(m.value, m.unit)}</td><td>{formatValue(m.baselineValue, m.unit)}</td></tr>)}</tbody></table></div></details>}
-      {limitations.length > 0 && <details style={{ marginTop: 16 }}><summary>What these records cannot tell us</summary>{limitations.map(c => <p key={c}>{plain(c)}</p>)}</details>}
+      {[...groups].map(([name, values]) => <section className="evidence-findings" key={name}><h3>{name}</h3><div className="evidence-finding-list">{values.map(f => <p className="evidence-finding" key={f.claimId}>{plain(f.text)}</p>)}</div></section>)}
+      {metrics.length > 0 && <details className="evidence-table-details"><summary>Key figures and comparison</summary><div className="evidence-table-wrap"><table className="data-table"><thead><tr><th>Measure</th><th>Selected period</th><th>Previous four weeks</th></tr></thead><tbody>{metrics.map(m => <tr key={m.evidenceId}><td>{metricLabel(m.metricId)}</td><td>{formatValue(m.value, m.unit)}</td><td>{formatValue(m.baselineValue, m.unit)}</td></tr>)}</tbody></table></div></details>}
+      {limitations.length > 0 && <details className="evidence-limitations"><summary>What these records cannot tell us</summary><div className="evidence-limitation-list">{limitations.map(c => <p className="evidence-limitation" key={c}>{plainCaveat(c)}</p>)}</div></details>}
       {!findings.length && !metrics.length && <p>No supporting detail is available for this report.</p>}
     </div>
   </details>

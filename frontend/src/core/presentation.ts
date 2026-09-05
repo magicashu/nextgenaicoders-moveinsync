@@ -7,5 +7,8 @@ export function plain(text: string): string {
     .replaceAll('rider legs', 'passenger trip legs').replaceAll('attributable to', 'explained by')
     .replaceAll('Leg-level on-time pickups', 'On-time passenger pickups').replaceAll('Median billed cost per trip', 'The middle billed cost per trip')
 }
+export function plainCaveat(text: string): string {
+  return plain(text).replace(/^(cost_per_km|feedback|severe_ack|gps_location|budget_variance|site_shift_direction):\s*/i, '')
+}
 export const scopeLabels: Record<string, string> = { businessUnit: 'Business unit', site: 'Site', site_id: 'Site', sites: 'Sites', shift: 'Shift', shift_id: 'Shift', shifts: 'Shifts', direction: 'Journey direction', watchDays: 'Monitoring period (days)', windowEnd: 'Period end', windowDays: 'Monitoring period (days)', durationDays: 'Monitoring period (days)', vendor_id: 'Vendor', vendor: 'Vendor', from: 'From', to: 'To', currentStart: 'Period start', currentEnd: 'Period end' }
 export function labelForScope(key: string): string { return scopeLabels[key] ?? key.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ') }
