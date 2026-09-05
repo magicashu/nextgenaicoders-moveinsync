@@ -41,9 +41,11 @@ public final class WorkflowRun {
     private ApprovalRequest approvalRequest;
     private ApprovalDecision approvalDecision;
     private ExecutionReceipt receipt;
-    private final List<TransitionEvent> transitions = new ArrayList<>();
+    private final List<TransitionEvent> transitions = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private com.moveinsync.mobilitycopilot.workflow.application.ports.TransitionListener transitionListener =
+            com.moveinsync.mobilitycopilot.workflow.application.ports.TransitionListener.NONE;
     private final List<WorkflowError> errors = new ArrayList<>();
-    private final List<ModelUsage> modelUsage = new ArrayList<>();
+    private final List<ModelUsage> modelUsage = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public WorkflowRun(WorkflowState state, RunContext context) {
         this.state = Objects.requireNonNull(state);
@@ -93,6 +95,14 @@ public final class WorkflowRun {
     public void approvalDecision(ApprovalDecision value) { this.approvalDecision = value; }
     public void receipt(ExecutionReceipt value) { this.receipt = value; }
     public void addTransition(TransitionEvent value) { this.transitions.add(value); }
+    public void transitionListener(com.moveinsync.mobilitycopilot.workflow.application.ports.TransitionListener value) { this.transitionListener = value; }
+    public void emitTransition(TransitionEvent value) {
+        addTransition(value);
+        try { transitionListener.onTransition(value); }
+        catch (RuntimeException failure) {
+            org.slf4j.LoggerFactory.getLogger(WorkflowRun.class).warn("Trace recording failed: run={} type={}", state.runId(), failure.getClass().getSimpleName());
+        }
+    }
     public void addError(WorkflowError value) { this.errors.add(value); }
     public void addModelUsage(ModelUsage value) { this.modelUsage.add(value); }
 

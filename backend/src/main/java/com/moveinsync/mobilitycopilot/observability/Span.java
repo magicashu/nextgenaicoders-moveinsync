@@ -24,11 +24,15 @@ public final class Span {
     private final List<Span> children = new ArrayList<>();
 
     Span(String parentSpanId, String name, Kind kind, Map<String, String> attributes) {
+        this(parentSpanId, name, kind, attributes, Instant.now());
+    }
+
+    Span(String parentSpanId, String name, Kind kind, Map<String, String> attributes, Instant startedAt) {
         this.spanId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         this.parentSpanId = parentSpanId;
         this.name = name;
         this.kind = kind;
-        this.startedAt = Instant.now();
+        this.startedAt = startedAt;
         this.attributes.putAll(attributes);
     }
 
@@ -45,7 +49,11 @@ public final class Span {
     void addChild(Span child) { children.add(child); }
 
     void end(String status, Map<String, String> extra) {
-        this.endedAt = Instant.now();
+        endAt(status, extra, Instant.now());
+    }
+
+    void endAt(String status, Map<String, String> extra, Instant endedAt) {
+        this.endedAt = endedAt;
         this.status = status;
         this.attributes.putAll(extra);
     }

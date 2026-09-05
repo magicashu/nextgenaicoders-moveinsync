@@ -160,7 +160,7 @@ public final class WorkflowDecisionRunGateway implements DecisionRunGateway {
 
     private static RunView.ModelUsageSummary modelUsage(List<ModelUsage> values) {
         return new RunView.ModelUsageSummary(
-                values.size(),
+                (int) values.stream().filter(value -> !value.modelId().equals("none")).count(),
                 (int) values.stream().filter(ModelUsage::fallbackUsed).count(),
                 values.stream().mapToLong(ModelUsage::inputTokens).sum(),
                 values.stream().mapToLong(ModelUsage::outputTokens).sum(),

@@ -36,7 +36,7 @@ public final class LangfuseOtlpExporter implements TraceExporter, AutoCloseable 
     private final String serviceName;
     private final String environment;
     private final HttpClient client;
-    private final BlockingQueue<TraceRecorder.Trace> queue;
+    private final BlockingQueue<String> queue;
     private final Thread worker;
     private final AtomicLong exported = new AtomicLong();
     private final AtomicLong dropped = new AtomicLong();
@@ -45,8 +45,14 @@ public final class LangfuseOtlpExporter implements TraceExporter, AutoCloseable 
     private volatile boolean running = true;
 
     public LangfuseOtlpExporter(String baseUrl, String publicKey, String secretKey, String serviceName, String environment, int queueCapacity, Duration timeout) {
-        this.endpoint = URI.create(baseUrl.replaceAll("/$", "") + "/api/public/otel/v1/traces");
-        this.authorization = "Basic " + Base64.getEncoder().encodeToString((publicKey + ":" + secretKey).getBytes(StandardCharsets.UTF_8));
+        this(URI.create(baseUrl.replaceAll("/$", "") + "/api/public/otel/v1/traces"),
+                "Basic " + Base64.getEncoder().encodeToString((publicKey + ":" + secretKey).getBytes(StandardCharsets.UTF_8)),
+                serviceName, environment, queueCapacity, timeout);
+    }
+
+    public LangfuseOtlpExporter(URI endpoint, String authorization, String serviceName, String environment, int queueCapacity, Duration timeout) {
+        this.endpoint = endpoint;
+        this.authorization = authorization;
         this.serviceName = serviceName;
         this.environment = environment;
         this.client = HttpClient.newBuilder().connectTimeout(timeout).build();
@@ -58,16 +64,17 @@ public final class LangfuseOtlpExporter implements TraceExporter, AutoCloseable 
 
     @Override
     public void export(TraceRecorder.Trace trace) {
-        if (!queue.offer(trace)) {
+        String snapshot = MAPPER.writeValueAsString(OtlpJson.request(trace, serviceName, environment));
+        if (!queue.offer(snapshot)) {
             dropped.incrementAndGet();
             lastError.set("export queue full; trace " + trace.traceId() + " dropped (local id preserved)");
         }
     }
 
     private void drain(Duration timeout) {
-        while (running) {
+        while (running || !queue.isEmpty()) {
             try {
-                TraceRecorder.Trace trace = queue.poll(500, TimeUnit.MILLISECONDS);
+                String trace = queue.poll(100, TimeUnit.MILLISECONDS);
                 if (trace == null) {
                     continue;
                 }
@@ -82,27 +89,26 @@ public final class LangfuseOtlpExporter implements TraceExporter, AutoCloseable 
         }
     }
 
-    void send(TraceRecorder.Trace trace, Duration timeout) {
+    void send(String body, Duration timeout) {
         try {
-            String body = MAPPER.writeValueAsString(OtlpJson.request(trace, serviceName, environment));
-            HttpRequest request = HttpRequest.newBuilder(endpoint)
+            var builder = HttpRequest.newBuilder(endpoint)
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
-                    .header("Authorization", authorization)
                     .header("x-langfuse-ingestion-version", "4")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                    .POST(HttpRequest.BodyPublishers.ofString(body));
+            if (authorization != null && !authorization.isBlank()) builder.header("Authorization", authorization);
+            HttpRequest request = builder.build();
+            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 exported.incrementAndGet();
             } else {
                 failures.incrementAndGet();
-                lastError.set("Langfuse responded " + response.statusCode());
+                lastError.set("OTLP endpoint responded " + response.statusCode());
             }
         } catch (Exception e) {
             failures.incrementAndGet();
             lastError.set(Redaction.text(e.getClass().getSimpleName() + ": " + e.getMessage()));
-            log.debug("Langfuse export failed for trace {} (workflow unaffected): {}", trace.traceId(), lastError.get());
+            log.warn("OTLP export failed (workflow unaffected): {}", lastError.get());
         }
     }
 
@@ -115,6 +121,9 @@ public final class LangfuseOtlpExporter implements TraceExporter, AutoCloseable 
     @Override
     public void close() {
         running = false;
-        worker.interrupt();
+        try { worker.join(5000); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        if (worker.isAlive()) worker.interrupt();
+        client.shutdownNow();
     }
 }

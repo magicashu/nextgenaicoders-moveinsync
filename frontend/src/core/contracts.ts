@@ -128,6 +128,7 @@ export type TransitionView = {
   outcome: string
   durationMs: number
   startedAt: string
+  attributes?: Record<string, string>
 }
 
 export type TrustPanel = {

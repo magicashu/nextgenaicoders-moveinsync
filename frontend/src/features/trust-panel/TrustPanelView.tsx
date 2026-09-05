@@ -5,7 +5,8 @@ type Props = { trust: TrustPanel; traceUrl: string | null }
 /** Versions, capability gaps, latency, model use and the node-by-node transition trace (no chain-of-thought). */
 export function TrustPanelView({ trust, traceUrl }: Props) {
   const mainNodes = trust.transitions.filter((t) => !t.subNode)
-  const toolSpans = trust.transitions.filter((t) => t.subNode)
+  const modelSpans = trust.transitions.filter((t) => t.subNode?.startsWith('llm.') || t.subNode?.startsWith('fallback.'))
+  const toolSpans = trust.transitions.filter((t) => t.subNode && !t.subNode.startsWith('llm.') && !t.subNode.startsWith('fallback.'))
   return (
     <>
       <section className="panel">
@@ -13,7 +14,7 @@ export function TrustPanelView({ trust, traceUrl }: Props) {
         <h3>Everything shown is versioned, traceable and reproducible</h3>
         <dl className="kv grid">
           <div><dt>Run</dt><dd><code>{trust.runId}</code></dd></div>
-          <div><dt>Trace</dt><dd><code>{trust.traceId}</code>{traceUrl && <> · <a href={`${traceUrl.replace(/\/$/, '')}/trace/${encodeURIComponent(trust.traceId)}`} target="_blank" rel="noreferrer">Langfuse</a></>}</dd></div>
+          <div><dt>Trace</dt><dd><code>{trust.traceId}</code>{traceUrl && <> · <a href={`${traceUrl.replace(/\/$/, '')}/traces/${encodeURIComponent(trust.traceId)}`} target="_blank" rel="noreferrer">Langfuse</a></>}</dd></div>
           <div><dt>Final step</dt><dd>{trust.finalStep}</dd></div>
           <div><dt>Data version</dt><dd>{trust.dataVersion}</dd></div>
           <div><dt>Metric contract</dt><dd>{trust.contractVersion}</dd></div>
@@ -49,6 +50,22 @@ export function TrustPanelView({ trust, traceUrl }: Props) {
         </article>
       </section>
       <section className="panel">
+        <p className="eyebrow">LLM execution</p>
+        <h3>{trust.modelCalls} model attempts · {trust.inputTokens + trust.outputTokens} tokens</h3>
+        {modelSpans.length === 0 ? <p>No LLM calls were needed on this route.</p> : modelSpans.map((t, i) => (
+          <details key={`${t.subNode}-${i}`} className="model-execution">
+            <summary>{t.attributes?.['model.role'] ?? t.subNode} · {t.outcome} · {t.durationMs} ms</summary>
+            <dl className="kv">
+              <div><dt>Model</dt><dd>{t.attributes?.['gen_ai.request.model'] ?? trust.modelId}</dd></div>
+              <div><dt>Input / output tokens</dt><dd>{t.attributes?.['gen_ai.usage.input_tokens'] ?? '0'} / {t.attributes?.['gen_ai.usage.output_tokens'] ?? '0'}</dd></div>
+              <div><dt>Result</dt><dd>{t.attributes?.['model.note']}</dd></div>
+              <div><dt>Structured proposal</dt><dd><pre>{t.attributes?.['langfuse.observation.output']}</pre></dd></div>
+            </dl>
+            <p className="muted">The following graph nodes validate this proposal before using it.</p>
+          </details>
+        ))}
+      </section>
+      <section className="panel">
         <p className="eyebrow">Workflow trace</p>
         <h3>{mainNodes.length} node transitions · {toolSpans.length} tool spans</h3>
         <ol className="trace-list">
@@ -57,6 +74,7 @@ export function TrustPanelView({ trust, traceUrl }: Props) {
               <span className="node">{t.node.toLowerCase()}</span>
               <span className="outcome">{t.outcome}</span>
               <span className="ms">{t.durationMs} ms</span>
+              {t.attributes && <details><summary>Decision details</summary><pre>{JSON.stringify(t.attributes, null, 2)}</pre></details>}
             </li>
           ))}
         </ol>
@@ -65,7 +83,9 @@ export function TrustPanelView({ trust, traceUrl }: Props) {
             <summary>Tool spans</summary>
             <ol className="trace-list">
               {toolSpans.map((t, i) => (
-                <li key={`${t.subNode}-${i}`}><span className="node">{t.subNode}</span><span className="outcome">{t.outcome}</span><span className="ms">{t.durationMs} ms</span></li>
+                <li key={`${t.subNode}-${i}`}><span className="node">{t.subNode}</span><span className="outcome">{t.outcome}</span><span className="ms">{t.durationMs} ms</span>
+                  {t.attributes && <details><summary>Evidence and filters</summary><pre>{JSON.stringify(t.attributes, null, 2)}</pre></details>}
+                </li>
               ))}
             </ol>
           </details>

@@ -16,8 +16,8 @@ public record RunContext(
         String dataVersion,
         String question) {
 
-    public static final String WORKFLOW_VERSION = "workflow-v1";
-    public static final String PROMPT_VERSION = "prompts-v1";
+    public static final String WORKFLOW_VERSION = "langgraph4j-v1";
+    public static final String PROMPT_VERSION = "prompts-v1.1";
 
     public enum Persona { TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER }
 

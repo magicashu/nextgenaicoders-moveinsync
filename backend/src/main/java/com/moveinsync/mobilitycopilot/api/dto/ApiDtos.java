@@ -38,7 +38,10 @@ public final class ApiDtos {
                              List<String> capabilityGaps, List<String> dataQualityNotes, Map<String, String> branchStatus, List<TransitionView> transitions) {
     }
 
-    public record TransitionView(String node, String subNode, String outcome, long durationMs, Instant startedAt) {
+    public record TransitionView(String node, String subNode, String outcome, long durationMs, Instant startedAt, Map<String, String> attributes) {
+        public TransitionView(String node, String subNode, String outcome, long durationMs, Instant startedAt) {
+            this(node, subNode, outcome, durationMs, startedAt, Map.of());
+        }
     }
 
     public record OperationsSection(String headline, String status, Kpi headlineKpi, List<Kpi> supportingKpis, List<Finding> findings, List<Finding> caveats,

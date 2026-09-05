@@ -39,7 +39,7 @@ curl -H 'X-Business-Unit: pinnacle-Slc' \
   'http://localhost:8080/api/v1/briefs/morning?asOf=2026-06-08'
 ```
 
-The default runtime uses governed DuckDB analytics, the deterministic 18-node Java workflow,
+The default runtime uses governed DuckDB analytics, the 18-node LangGraph4j workflow,
 registry-backed tenant/RBAC checks, the in-memory local control plane and an in-memory trace
 exporter. No external secret is required for the local demo.
 
@@ -47,7 +47,8 @@ exporter. No external secret is required for the local demo.
 
 - `-Pai-openai`: adds the Spring AI OpenAI model starter. Set `OPENAI_API_KEY` before activating it.
 - `-Ppostgres`: adds PostgreSQL/Flyway dependencies. Run with Spring profile `postgres`.
-- LangGraph4j is not included until the D-028 spike passes; the sample uses the project-owned deterministic workflow engine.
+- LangGraph4j 1.8.25 now owns graph execution and approval interruption (D-046), replacing the custom state-machine engine.
+- Set `LANGUAGE_MODEL=sarvam` and `SARVAM_API_KEY` in the backend terminal to enable Sarvam. Automatic mode also detects a nonempty key. See [current setup and tracing guide](docs/try1-setup.md).
 - Langfuse export is optional. Set `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`; without them tracing remains available locally and does not block the product.
 
 ## Release verification

@@ -1,5 +1,20 @@
 # Codex CLI Session Handoff
 
+## Latest publication direction (2026-09-05)
+
+The user authorized replacing main's implementation with the current try1 tree: native LangGraph4j orchestration, Sarvam adapter, Langfuse tracing and the integrated dashboard design from main commit 1ea1fb8. D-048 records the publication approach. Preserve the ignored local provider environment files; do not restore the incompatible main runtime. See docs/frontend-integration-1ea1fb8.md for build and local UI verification, and docs/try1-setup.md for startup commands.
+
+## Current try1 implementation (D-046, 2026-09-05)
+
+The user explicitly superseded the framework deferral: `LangGraphWorkflowEngine`
+now uses LangGraph4j 1.8.25 for the 18 main nodes, native approval interruption and
+resume. The old Java state-machine engine was removed. Investigator branches use
+four-node LangGraph4j loops. Sarvam is wired through LanguageModelPort; automatic
+mode enables it when SARVAM_API_KEY is present. Node decisions and model usage are
+visible in the Trust view, the execution endpoint, OTLP/Langfuse and the business
+audit ledger. See `docs/try1-setup.md`. Earlier notes below are historical where
+they conflict with D-046. The user requested skipping test-case work in this change.
+
 ## Mission
 
 Continue the MoveInSync AI hackathon project and produce a judge-ready working prototype for **Agentic Intelligence & Reporting Layer for Enterprise Mobility**. The event is on 2026-09-05. The official dataset arrived on 2026-09-04 and has been profiled.

@@ -44,7 +44,7 @@ public final class BriefingActionAgent {
 
     public BriefingActionAgent(WorkflowProperties properties, LanguageModelPort model) {
         this.properties = properties;
-        this.assist = new ModelAssist(model, properties.toolTimeout(), 900);
+        this.assist = new ModelAssist(model, properties.modelTimeout(), 900);
     }
 
     public BriefingOutput compose(WorkflowRun run, List<WorkerEvidenceDto.Ranking> vendorRankings) {
@@ -84,14 +84,13 @@ public final class BriefingActionAgent {
                 "verifiedClaims", verified.stream().map(c -> Map.of("id", c.claimId(), "text", c.text(), "kind", c.kind().name())).toList(),
                 "anomaly", Map.of("metric", metric.metricName(), "current", String.valueOf(metric.value()), "baseline", String.valueOf(metric.baselineValue()),
                         "impact", excess, "confidence", String.valueOf(issue.confidence())),
-                "allowedActions", List.of(ActionType.values())), run::addModelUsage);
+                "allowedActions", List.of(ActionType.values())), run);
         if (prose.isPresent()) {
             List<String> modelLeadership = new ArrayList<>();
-            for (JsonNode line : prose.get().path("leadershipNarrative")) {
-                String text = line.asText();
-                if (restatesVerifiedClaim(text, verified)) {
-                    modelLeadership.add(text);
-                }
+            java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+            for (JsonNode id : prose.get().path("leadershipClaimIds")) {
+                verified.stream().filter(c -> c.claimId().equals(id.asText()) && seen.add(c.claimId()))
+                        .findFirst().ifPresent(c -> modelLeadership.add(c.text() + " [" + String.join(", ", c.evidenceIds()) + "]"));
             }
             if (!modelLeadership.isEmpty()) {
                 modelLeadership.addFirst(headline + ".");
@@ -193,13 +192,7 @@ public final class BriefingActionAgent {
     }
 
     static boolean restatesVerifiedClaim(String text, List<Claim> verified) {
-        java.util.regex.Matcher numbers = java.util.regex.Pattern.compile("\\d+(?:[.,]\\d+)?").matcher(text);
-        List<String> found = new ArrayList<>();
-        while (numbers.find()) {
-            found.add(numbers.group().replace(",", ""));
-        }
-        String all = verified.stream().map(Claim::text).reduce("", (a, b) -> a + " " + b).replace(",", "");
-        return found.stream().allMatch(all::contains);
+        return text != null && verified.stream().anyMatch(c -> c.text().equals(text));
     }
 
     private static String fmt(BigDecimal value) {

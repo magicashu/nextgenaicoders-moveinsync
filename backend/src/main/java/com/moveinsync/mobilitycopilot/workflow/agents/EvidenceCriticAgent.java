@@ -32,7 +32,7 @@ public final class EvidenceCriticAgent {
 
     public EvidenceCriticAgent(EvidenceVerifier verifier, LanguageModelPort model, WorkflowProperties properties) {
         this.verifier = verifier;
-        this.assist = new ModelAssist(model, properties.toolTimeout(), 600);
+        this.assist = new ModelAssist(model, properties.modelTimeout(), 600);
     }
 
     public Critique critique(WorkflowRun run, List<WorkerEvidenceDto.Ranking> vendorRankings) {
@@ -56,7 +56,7 @@ public final class EvidenceCriticAgent {
                         "baseline", String.valueOf(i.baselineValue()), "delta", String.valueOf(i.delta()), "numerator", String.valueOf(i.numerator()),
                         "denominator", String.valueOf(i.denominator()))).toList(),
                 "vendorRanking", vendorRankings.stream().map(r -> Map.of("allQualifiedIncreased", r.allQualifiedIncreased(), "qualified", r.qualifiedRows().size())).toList(),
-                "capabilityGaps", evidence.capabilityGaps()), run::addModelUsage);
+                "capabilityGaps", evidence.capabilityGaps()), run);
         if (review.isPresent()) {
             modelAssisted = true;
             Set<String> knownClaims = new LinkedHashSet<>(evidence.claims().stream().map(Claim::claimId).toList());

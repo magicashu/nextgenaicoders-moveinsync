@@ -16,14 +16,24 @@ public class TelemetryBeans {
 
     @Bean(destroyMethod = "close")
     public TraceExporter traceExporter(
-            @Value("${LANGFUSE_HOST:}") String host,
+            @Value("${LANGFUSE_HOST:}") String legacyHost,
+            @Value("${LANGFUSE_BASE_URL:}") String baseUrl,
             @Value("${LANGFUSE_PUBLIC_KEY:}") String publicKey,
             @Value("${LANGFUSE_SECRET_KEY:}") String secretKey,
-            @Value("${MOBILITY_ENVIRONMENT:local}") String environment) {
-        if (host == null || host.isBlank() || publicKey.isBlank() || secretKey.isBlank()) {
-            return new InMemoryTraceExporterHolder();
+            @Value("${MOBILITY_ENVIRONMENT:local}") String environment,
+            @Value("${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:}") String collectorEndpoint) {
+        String host = baseUrl.isBlank() ? legacyHost : baseUrl;
+        var exporters = new java.util.ArrayList<TraceExporter>();
+        if (!host.isBlank() || !publicKey.isBlank() || !secretKey.isBlank()) {
+            if (host.isBlank() || publicKey.isBlank() || secretKey.isBlank()) {
+                throw new IllegalArgumentException("Set LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY together");
+            }
+            exporters.add(new LangfuseOtlpExporter(host, publicKey, secretKey, "mobility-decision-copilot", environment, 256, Duration.ofSeconds(3)));
         }
-        return new LangfuseOtlpExporter(host, publicKey, secretKey, "mobility-decision-copilot", environment, 256, Duration.ofSeconds(3));
+        if (!collectorEndpoint.isBlank()) exporters.add(new LangfuseOtlpExporter(java.net.URI.create(collectorEndpoint), "",
+                "mobility-decision-copilot", environment, 256, Duration.ofSeconds(3)));
+        if (exporters.isEmpty()) return new InMemoryTraceExporterHolder();
+        return new CompositeTraceExporter(exporters);
     }
 
     @Bean

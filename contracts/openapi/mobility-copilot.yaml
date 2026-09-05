@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Mobility Decision Copilot API
-  version: 0.2.0
+  version: 0.3.0
   description: Tenant-scoped proactive briefs, contextual investigation, approval, and audit API.
 components:
   parameters:
@@ -21,6 +21,17 @@ components:
       required: false
       schema: { type: string }
   schemas:
+    TransitionView:
+      type: object
+      properties:
+        node: { type: string }
+        subNode: { type: [string, 'null'] }
+        outcome: { type: string }
+        durationMs: { type: integer }
+        startedAt: { type: string, format: date-time }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
     MorningBrief:
       type: object
       required: [runId, workflowId, businessUnit, asOfDate, persona, status, operations, leadership, evidence, trust]
@@ -117,6 +128,67 @@ components:
     NotFound: { description: Resource is missing or outside the actor's tenant }
     Conflict: { description: Approval is stale or already decided }
 paths:
+  /api/v1/dashboard:
+    get:
+      summary: Read governed weekly dashboard charts without starting an agent run
+      description: M01 delayed-trip and M04 on-time-pickup metrics, vendor/site contribution rankings, and daily M01 snapshots. Windows and provenance are returned by the existing governed services. Prior-four-week baseline; null means unavailable.
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: query
+          name: asOf
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Governed metric, onTime, vendors, sites and trend results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [metric, onTime, vendors, sites, trend]
+                properties:
+                  metric: { type: object }
+                  onTime: { type: object }
+                  vendors: { type: object }
+                  sites: { type: object }
+                  trend: { type: object }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/workflows/graph:
+    get:
+      summary: Inspect the compiled LangGraph4j graph topology
+      responses:
+        '200':
+          description: Engine name, version and Mermaid graph source
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  engine: { type: string }
+                  version: { type: string }
+                  mermaid: { type: string }
+  /api/v1/workflows/{runId}/execution:
+    get:
+      summary: Inspect tenant-scoped node decisions, model usage and OTLP spans
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: runId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Run transitions, model usage, exporter status and local OTLP trace
+          content:
+            application/json:
+              schema: { type: object }
+        '403': { description: Actor cannot access this tenant }
+        '404': { description: Run not found in the authorized tenant }
   /api/v1/briefs/morning:
     get:
       summary: Generate the proactive evidence-backed morning brief

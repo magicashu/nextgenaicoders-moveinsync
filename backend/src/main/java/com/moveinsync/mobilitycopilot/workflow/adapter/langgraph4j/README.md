@@ -1,4 +1,17 @@
-# LangGraph4j adapter gate (D-028) — spike result 2026-09-05
+# LangGraph4j runtime (D-046)
+
+`LangGraphWorkflowEngine` is now the active and only orchestration engine.
+It registers the 18 business nodes with LangGraph4j 1.8.25, conditional edges,
+a MemorySaver and an interrupt after APPROVAL_INTERRUPT. Resume invokes the
+checkpointed graph; after restart, durable business approval state re-enters
+at revalidation. Investigator workers run four-node compiled LangGraph4j loops
+with isolated invocation state and a shared deterministic tool budget.
+
+`GET /api/v1/workflows/graph` returns the actual compiled Mermaid diagram.
+Node/model/tool transitions feed the Trust UI, business audit and OTLP traces.
+See `docs/try1-setup.md` for Sarvam and Langfuse configuration and persistence limits.
+
+## Historical spike decision — superseded by explicit user instruction D-046
 
 Spike executed in isolation against `org.bsc.langgraph4j:langgraph4j-core:1.8.26` (latest 1.8.x on Maven
 Central; 1.9.0-beta4 exists and is excluded by D-028). Five gates, one JUnit test each, all passing:

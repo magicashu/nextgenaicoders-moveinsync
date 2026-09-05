@@ -1,5 +1,7 @@
 package com.moveinsync.mobilitycopilot.workflow.adapter.statemachine;
 
+import com.moveinsync.mobilitycopilot.workflow.adapter.langgraph4j.LangGraphWorkflowEngine;
+
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
 import com.moveinsync.mobilitycopilot.action.domain.ActionProposal;
 import com.moveinsync.mobilitycopilot.action.domain.ActionStatus;
@@ -162,13 +164,13 @@ class ApprovalResumeTest {
 
     /** Builds a second engine over the ORIGINAL durable stores and the same analytics, with an empty in-process registry. */
     static final class DeterministicWorkflowEngineRestart {
-        private final DeterministicWorkflowEngine engine;
+        private final LangGraphWorkflowEngine engine;
 
         DeterministicWorkflowEngineRestart(EngineHarness durable, G1Fixtures analytics) {
             var verifier = new com.moveinsync.mobilitycopilot.evidence.application.EvidenceVerifier();
             var model = new LanguageModelPort.Unavailable();
             var registry = new com.moveinsync.mobilitycopilot.workflow.investigation.workers.WorkerToolRegistry(analytics);
-            this.engine = new DeterministicWorkflowEngine(analytics, new com.moveinsync.mobilitycopilot.workflow.agents.SupervisorAgent(model, durable.properties),
+            this.engine = new LangGraphWorkflowEngine(analytics, new com.moveinsync.mobilitycopilot.workflow.agents.SupervisorAgent(model, durable.properties),
                     new com.moveinsync.mobilitycopilot.workflow.agents.InvestigationAgent(registry, model, durable.properties),
                     new com.moveinsync.mobilitycopilot.workflow.agents.EvidenceCriticAgent(verifier, model, durable.properties),
                     new com.moveinsync.mobilitycopilot.workflow.agents.BriefingActionAgent(durable.properties, model), verifier, durable.authorizer, durable.checkpoints,

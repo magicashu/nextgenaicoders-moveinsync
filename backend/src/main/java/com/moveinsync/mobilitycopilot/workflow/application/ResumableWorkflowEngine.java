@@ -19,4 +19,6 @@ public interface ResumableWorkflowEngine extends WorkflowEngine {
 
     /** In-process view of a run for the API; rebuilt deterministically after a restart on resume. */
     Optional<WorkflowRun> find(UUID runId);
+
+    default String graphDiagram() { return ""; }
 }

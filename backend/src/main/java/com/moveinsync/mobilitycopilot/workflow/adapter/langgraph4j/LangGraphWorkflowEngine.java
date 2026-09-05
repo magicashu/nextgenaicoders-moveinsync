@@ -1,4 +1,4 @@
-package com.moveinsync.mobilitycopilot.workflow.adapter.statemachine;
+package com.moveinsync.mobilitycopilot.workflow.adapter.langgraph4j;
 
 import com.moveinsync.mobilitycopilot.access.application.AccessAuthorizer;
 import com.moveinsync.mobilitycopilot.access.domain.ActorContext;
@@ -70,16 +70,25 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.CompiledGraph;
+import org.bsc.langgraph4j.CompileConfig;
+import org.bsc.langgraph4j.RunnableConfig;
+import org.bsc.langgraph4j.checkpoint.MemorySaver;
+import org.bsc.langgraph4j.state.AgentState;
+import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+import static org.bsc.langgraph4j.StateGraph.START;
+import static org.bsc.langgraph4j.StateGraph.END;
 
 /**
- * The guaranteed orchestration path: an explicit 18-node state machine with typed routing, one
- * correction cycle, bounded fan-out, a checkpointed approval interrupt and post-approval
- * revalidation. It depends only on project-owned ports, never on a graph framework.
+ * LangGraph4j owns execution, conditional edges, checkpoints and approval interruption.
+ * Business nodes retain deterministic policy and governed analytics behind project-owned ports.
  */
 @Service
-public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
+public class LangGraphWorkflowEngine implements ResumableWorkflowEngine {
 
-    private static final Logger log = LoggerFactory.getLogger(DeterministicWorkflowEngine.class);
+    private static final Logger log = LoggerFactory.getLogger(LangGraphWorkflowEngine.class);
 
     private final AnalyticsGateway analytics;
     private final SupervisorAgent supervisor;
@@ -98,9 +107,19 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
     private final TransitionListener listener;
     private final Map<UUID, WorkflowRun> registry = new ConcurrentHashMap<>();
     private final Map<UUID, Long> checkpointVersions = new ConcurrentHashMap<>();
+    private final Map<UUID, List<AuditEvent>> activeEvents = new ConcurrentHashMap<>();
+    private final MemorySaver graphCheckpoints = new MemorySaver();
+    private final CompiledGraph<GraphState> graph;
+
+    /** Serializable graph control state; business evidence stays in governed repositories/run storage. */
+    public static final class GraphState extends AgentState {
+        public GraphState(Map<String, Object> data) { super(data); }
+        String route() { return this.<String>value("next").orElse(END); }
+        UUID runId() { return UUID.fromString(this.<String>value("runId").orElseThrow()); }
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
-    public DeterministicWorkflowEngine(AnalyticsGateway analytics, SupervisorAgent supervisor, InvestigationAgent investigator,
+    public LangGraphWorkflowEngine(AnalyticsGateway analytics, SupervisorAgent supervisor, InvestigationAgent investigator,
                                        EvidenceCriticAgent critic, BriefingActionAgent briefing, EvidenceVerifier verifier,
                                        AccessAuthorizer authorizer, WorkflowCheckpointStore checkpoints, ApprovalStore approvals,
                                        ActionRevalidator revalidator, ActionExecutor executor, AuditSink audit,
@@ -109,7 +128,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
                 properties, model, listener.getIfAvailable(() -> TransitionListener.NONE));
     }
 
-    public DeterministicWorkflowEngine(AnalyticsGateway analytics, SupervisorAgent supervisor, InvestigationAgent investigator,
+    public LangGraphWorkflowEngine(AnalyticsGateway analytics, SupervisorAgent supervisor, InvestigationAgent investigator,
                                        EvidenceCriticAgent critic, BriefingActionAgent briefing, EvidenceVerifier verifier,
                                        AccessAuthorizer authorizer, WorkflowCheckpointStore checkpoints, ApprovalStore approvals,
                                        ActionRevalidator revalidator, ActionExecutor executor, AuditSink audit,
@@ -129,6 +148,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         this.properties = properties;
         this.model = model;
         this.listener = listener;
+        this.graph = compileGraph();
     }
 
     @Override
@@ -145,11 +165,8 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
                 : context);
         registry.put(initialState.runId(), run);
         List<AuditEvent> events = new ArrayList<>();
-        WorkflowNode node = WorkflowNode.INITIALIZE_RUN;
         try {
-            while (node != null) {
-                node = execute(node, run, events);
-            }
+            invokeGraph(run, events, false);
         } catch (RuntimeException unexpected) {
             // Unexpected exceptions surface: record, audit and fail closed without any side effect.
             run.addError(new WorkflowError(run.currentNode(), "UNEXPECTED", unexpected.getMessage() == null ? unexpected.getClass().getSimpleName() : unexpected.getMessage(), false, Instant.now()));
@@ -188,10 +205,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         run.approvalDecision(decision);
         List<AuditEvent> events = new ArrayList<>();
         try {
-            WorkflowNode node = WorkflowNode.REVALIDATE_AND_EXECUTE;
-            while (node != null) {
-                node = execute(node, run, events);
-            }
+            invokeGraph(run, events, true);
         } catch (RuntimeException unexpected) {
             run.addError(new WorkflowError(run.currentNode(), "UNEXPECTED", String.valueOf(unexpected.getMessage()), false, Instant.now()));
             run.step(WorkflowStep.APPROVED_NOT_EXECUTED);
@@ -206,38 +220,106 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         return Optional.ofNullable(registry.get(runId));
     }
 
-    // ---------------------------------------------------------------- routing
+    // ---------------------------------------------------------------- compiled graph
 
-    private WorkflowNode execute(WorkflowNode node, WorkflowRun run, List<AuditEvent> events) {
+    @FunctionalInterface
+    private interface BusinessNode {
+        Routing apply(WorkflowRun run, List<AuditEvent> events, Map<String, String> attributes);
+    }
+
+    private CompiledGraph<GraphState> compileGraph() {
+        try {
+            StateGraph<GraphState> builder = new StateGraph<>(GraphState::new);
+            add(builder, WorkflowNode.INITIALIZE_RUN, (r,e,a) -> initialize(r,a), WorkflowNode.AUTHORIZE_SCOPE);
+            add(builder, WorkflowNode.AUTHORIZE_SCOPE, this::authorize, WorkflowNode.PROFILE_DATASET);
+            add(builder, WorkflowNode.PROFILE_DATASET, (r,e,a) -> profile(r,a), WorkflowNode.BUILD_CAPABILITY_MATRIX);
+            add(builder, WorkflowNode.BUILD_CAPABILITY_MATRIX, (r,e,a) -> capabilities(r,a), WorkflowNode.COMPUTE_METRIC_SNAPSHOT);
+            add(builder, WorkflowNode.COMPUTE_METRIC_SNAPSHOT, (r,e,a) -> snapshot(r,a), WorkflowNode.DETECT_ANOMALIES);
+            add(builder, WorkflowNode.DETECT_ANOMALIES, this::detect, WorkflowNode.PRIORITIZE_ISSUE, WorkflowNode.APPEND_AUDIT_EVENT);
+            add(builder, WorkflowNode.PRIORITIZE_ISSUE, (r,e,a) -> prioritize(r,a), WorkflowNode.SUPERVISOR_PLAN, WorkflowNode.APPEND_AUDIT_EVENT);
+            add(builder, WorkflowNode.SUPERVISOR_PLAN, (r,e,a) -> plan(r,a), WorkflowNode.VALIDATE_PLAN);
+            add(builder, WorkflowNode.VALIDATE_PLAN, (r,e,a) -> validatePlan(r,a), WorkflowNode.RUN_INVESTIGATIONS, WorkflowNode.APPEND_AUDIT_EVENT);
+            add(builder, WorkflowNode.RUN_INVESTIGATIONS, (r,e,a) -> investigate(r,a), WorkflowNode.MERGE_EVIDENCE);
+            add(builder, WorkflowNode.MERGE_EVIDENCE, (r,e,a) -> merge(r,a), WorkflowNode.EVIDENCE_CRITIC);
+            add(builder, WorkflowNode.EVIDENCE_CRITIC, (r,e,a) -> critique(r,a), WorkflowNode.VERIFY_EVIDENCE);
+            add(builder, WorkflowNode.VERIFY_EVIDENCE, (r,e,a) -> verify(r,a), WorkflowNode.COMPOSE_DECISION_BRIEF);
+            add(builder, WorkflowNode.COMPOSE_DECISION_BRIEF, this::compose, WorkflowNode.ACTION_POLICY_GATE);
+            add(builder, WorkflowNode.ACTION_POLICY_GATE, this::policyGate, WorkflowNode.APPROVAL_INTERRUPT, WorkflowNode.APPEND_AUDIT_EVENT);
+            add(builder, WorkflowNode.APPROVAL_INTERRUPT, this::approvalInterrupt, WorkflowNode.REVALIDATE_AND_EXECUTE);
+            add(builder, WorkflowNode.REVALIDATE_AND_EXECUTE, this::revalidateAndExecute, WorkflowNode.APPEND_AUDIT_EVENT);
+            add(builder, WorkflowNode.APPEND_AUDIT_EVENT, this::appendAudit);
+            builder.addConditionalEdges(START, edge_async(GraphState::route), Map.of(
+                    WorkflowNode.INITIALIZE_RUN.name(), WorkflowNode.INITIALIZE_RUN.name(),
+                    WorkflowNode.REVALIDATE_AND_EXECUTE.name(), WorkflowNode.REVALIDATE_AND_EXECUTE.name()));
+            return builder.compile(CompileConfig.builder().checkpointSaver(graphCheckpoints)
+                    .interruptAfter(WorkflowNode.APPROVAL_INTERRUPT.name()).releaseThread(true).recursionLimit(64).build());
+        } catch (org.bsc.langgraph4j.GraphStateException e) {
+            throw new IllegalStateException("Cannot compile mobility LangGraph4j graph", e);
+        }
+    }
+
+    private void add(StateGraph<GraphState> builder, WorkflowNode node, BusinessNode action, WorkflowNode... targets)
+            throws org.bsc.langgraph4j.GraphStateException {
+        builder.addNode(node.name(), node_async(state -> executeNode(node, action, registry.get(state.runId()), activeEvents.get(state.runId()))));
+        Map<String, String> routes = new LinkedHashMap<>();
+        routes.put(END, END);
+        for (WorkflowNode target : targets) routes.put(target.name(), target.name());
+        builder.addConditionalEdges(node.name(), edge_async(GraphState::route), routes);
+    }
+
+    private void invokeGraph(WorkflowRun run, List<AuditEvent> events, boolean resume) {
+        UUID id = run.state().runId();
+        if (activeEvents.putIfAbsent(id, events) != null) throw new IllegalStateException("Run already executing");
+        run.transitionListener(listener);
+        RunnableConfig config = RunnableConfig.builder().threadId(run.state().tenant().businessUnit() + ":" + id).build();
+        try {
+            if (resume && graphCheckpoints.get(config).isPresent()) {
+                graph.invoke((Map<String, Object>) null, config);
+            } else {
+                // A process restart resumes from the durable business approval checkpoint at revalidation.
+                graph.invoke(Map.of("runId", id.toString(), "next", (resume
+                        ? WorkflowNode.REVALIDATE_AND_EXECUTE : WorkflowNode.INITIALIZE_RUN).name()), config);
+            }
+        } finally {
+            activeEvents.remove(id);
+        }
+    }
+
+    public String graphDiagram() {
+        return graph.getGraph(org.bsc.langgraph4j.GraphRepresentation.Type.MERMAID).content();
+    }
+
+    private Map<String, Object> executeNode(WorkflowNode node, BusinessNode action, WorkflowRun run, List<AuditEvent> events) {
         run.currentNode(node);
         Instant started = Instant.now();
         WorkflowStep before = run.state().step();
+        int firstModelObservation = run.modelUsage().size();
         Map<String, String> attributes = new LinkedHashMap<>();
-        Routing routing = switch (node) {
-            case INITIALIZE_RUN -> initialize(run, attributes);
-            case AUTHORIZE_SCOPE -> authorize(run, events, attributes);
-            case PROFILE_DATASET -> profile(run, attributes);
-            case BUILD_CAPABILITY_MATRIX -> capabilities(run, attributes);
-            case COMPUTE_METRIC_SNAPSHOT -> snapshot(run, attributes);
-            case DETECT_ANOMALIES -> detect(run, events, attributes);
-            case PRIORITIZE_ISSUE -> prioritize(run, attributes);
-            case SUPERVISOR_PLAN -> plan(run, attributes);
-            case VALIDATE_PLAN -> validatePlan(run, attributes);
-            case RUN_INVESTIGATIONS -> investigate(run, attributes);
-            case MERGE_EVIDENCE -> merge(run, attributes);
-            case EVIDENCE_CRITIC -> critique(run, attributes);
-            case VERIFY_EVIDENCE -> verify(run, attributes);
-            case COMPOSE_DECISION_BRIEF -> compose(run, events, attributes);
-            case ACTION_POLICY_GATE -> policyGate(run, events, attributes);
-            case APPROVAL_INTERRUPT -> approvalInterrupt(run, events, attributes);
-            case REVALIDATE_AND_EXECUTE -> revalidateAndExecute(run, events, attributes);
-            case APPEND_AUDIT_EVENT -> appendAudit(run, events, attributes);
-        };
+        attributes.put("businessUnit", run.state().tenant().businessUnit());
+        attributes.put("orchestrator", "langgraph4j");
+        Routing routing;
+        try {
+            routing = action.apply(run, events, attributes);
+        } catch (RuntimeException failure) {
+            attributes.put("error.type", failure.getClass().getSimpleName());
+            run.emitTransition(new TransitionEvent(run.state().runId(), run.context().traceId(), node, null, before, WorkflowStep.FAILED,
+                    started, java.time.Duration.between(started, Instant.now()).toMillis(), "failed", attributes));
+            throw failure;
+        }
+        String next = routing.next() == null ? END : routing.next().name();
+        attributes.put("nextNode", next);
+        attributes.put("outcome", routing.outcome());
+        attributes.put("durationMs", String.valueOf(java.time.Duration.between(started, Instant.now()).toMillis()));
+        events.add(auditEvent(run, "WORKFLOW_NODE_COMPLETED", attributes));
+        for (var usage : run.modelUsage().subList(firstModelObservation, run.modelUsage().size())) {
+            events.add(auditEvent(run, "MODEL_CALL_RECORDED", Map.of("role", usage.role(), "model", usage.modelId(),
+                    "inputTokens", String.valueOf(usage.inputTokens()), "outputTokens", String.valueOf(usage.outputTokens()),
+                    "latencyMs", String.valueOf(usage.latencyMs()), "fallback", String.valueOf(usage.fallbackUsed()), "note", usage.note())));
+        }
         TransitionEvent event = new TransitionEvent(run.state().runId(), run.context().traceId(), node, null, before, run.state().step(), started,
                 java.time.Duration.between(started, Instant.now()).toMillis(), routing.outcome(), attributes);
-        run.addTransition(event);
-        listener.onTransition(event);
-        return routing.next();
+        run.emitTransition(event);
+        return Map.of("next", next, "lastNode", node.name(), "outcome", routing.outcome());
     }
 
     private record Routing(WorkflowNode next, String outcome) {
@@ -387,6 +469,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         run.plan(new InvestigationPlan(plan.anomalyId(), valid, plan.requiredMetrics(), plan.allowedDimensions(), plan.stopConditions(), plan.rationale(), plan.modelGenerated(), notes));
         run.tasks(valid);
         attributes.put("validTasks", String.valueOf(valid.size()));
+        attributes.put("validationNotes", String.join("; ", notes));
         return Routing.to(WorkflowNode.RUN_INVESTIGATIONS, "valid");
     }
 
@@ -426,6 +509,8 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         run.critique(critique);
         attributes.put("verdict", critique.verdict().name());
         attributes.put("overclaims", String.valueOf(critique.overclaimClaimIds().size()));
+        attributes.put("overclaimClaimIds", String.join(",", critique.overclaimClaimIds()));
+        attributes.put("modelAssisted", String.valueOf(critique.modelAssisted()));
         return Routing.to(WorkflowNode.VERIFY_EVIDENCE, critique.verdict().name().toLowerCase(Locale.ROOT));
     }
 
@@ -476,6 +561,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
         PolicyDecision decision = ActionPolicyGate.evaluate(run, run.action(), Instant.now());
         run.policy(decision);
         attributes.put("route", decision.route().name());
+        attributes.put("decisionReasons", String.join("; ", decision.reasons()));
         events.add(auditEvent(run, "ACTION_POLICY_" + decision.route().name(), Map.of("actionId", run.action().actionId().toString(), "reasons", String.join("; ", decision.reasons()))));
         return switch (decision.route()) {
             case APPROVAL_REQUIRED -> Routing.to(WorkflowNode.APPROVAL_INTERRUPT, "approval required");
@@ -503,7 +589,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
                 "actionType", proposal.type().name(), "evidenceVersion", proposal.evidenceVersion(), "expiresAt", proposal.expiresAt().toString())));
         attributes.put("approvalId", request.approvalId().toString());
         // The interrupt: return to the caller. resume() re-enters at node 17.
-        return Routing.end("paused");
+        return Routing.to(WorkflowNode.REVALIDATE_AND_EXECUTE, "paused");
     }
 
     private Routing revalidateAndExecute(WorkflowRun run, List<AuditEvent> events, Map<String, String> attributes) {
@@ -689,7 +775,7 @@ public class DeterministicWorkflowEngine implements ResumableWorkflowEngine {
     }
 
     private AuditEvent auditEvent(WorkflowRun run, String type, Map<String, String> payload) {
-        Map<String, String> safe = new LinkedHashMap<>(payload);
+        Map<String, String> safe = new LinkedHashMap<>(com.moveinsync.mobilitycopilot.observability.Redaction.attributes(payload));
         safe.put("actor", run.context().actor().actorId());
         safe.put("workflowStep", run.state().step().name());
         safe.put("node", run.currentNode().name());

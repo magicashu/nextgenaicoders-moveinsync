@@ -5,7 +5,7 @@ import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
 import com.moveinsync.mobilitycopilot.config.WorkflowProperties;
 import com.moveinsync.mobilitycopilot.evidence.application.EvidenceVerifier;
 import com.moveinsync.mobilitycopilot.workflow.adapter.inmemory.InMemoryControlPlane;
-import com.moveinsync.mobilitycopilot.workflow.adapter.statemachine.DeterministicWorkflowEngine;
+import com.moveinsync.mobilitycopilot.workflow.adapter.langgraph4j.LangGraphWorkflowEngine;
 import com.moveinsync.mobilitycopilot.workflow.agents.BriefingActionAgent;
 import com.moveinsync.mobilitycopilot.workflow.agents.EvidenceCriticAgent;
 import com.moveinsync.mobilitycopilot.workflow.agents.InvestigationAgent;
@@ -34,7 +34,7 @@ public final class EngineHarness {
     public final InMemoryControlPlane.Actions actions = new InMemoryControlPlane.Actions();
     public final InMemoryControlPlane.Authorizer authorizer = new InMemoryControlPlane.Authorizer();
     public final List<TransitionEvent> transitions = new java.util.concurrent.CopyOnWriteArrayList<>();
-    public final DeterministicWorkflowEngine engine;
+    public final LangGraphWorkflowEngine engine;
 
     public EngineHarness(AnalyticsGateway analytics, LanguageModelPort model) {
         this(analytics, model, new WorkflowProperties(4, 1, 12, Duration.ofSeconds(10), Duration.ofMinutes(30)));
@@ -45,7 +45,7 @@ public final class EngineHarness {
         WorkerToolRegistry registry = new WorkerToolRegistry(analytics);
         EvidenceVerifier verifier = new EvidenceVerifier();
         TransitionListener listener = transitions::add;
-        this.engine = new DeterministicWorkflowEngine(analytics, new SupervisorAgent(model, properties), new InvestigationAgent(registry, model, properties),
+        this.engine = new LangGraphWorkflowEngine(analytics, new SupervisorAgent(model, properties), new InvestigationAgent(registry, model, properties),
                 new EvidenceCriticAgent(verifier, model, properties), new BriefingActionAgent(properties, model), verifier, authorizer, checkpoints, approvals,
                 actions, actions, audit, properties, model, listener);
     }

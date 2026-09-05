@@ -32,6 +32,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.CompileConfig;
+import org.bsc.langgraph4j.state.AgentState;
+import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
+import static org.bsc.langgraph4j.StateGraph.START;
+import static org.bsc.langgraph4j.StateGraph.END;
 
 /**
  * A2 Investigator: runs the four-node subgraph (choose_analysis, execute_analysis,
@@ -48,7 +55,7 @@ public final class InvestigationAgent {
     public InvestigationAgent(WorkerToolRegistry tools, LanguageModelPort model, WorkflowProperties properties) {
         this.tools = tools;
         this.properties = properties;
-        this.assist = new ModelAssist(model, properties.toolTimeout(), 600);
+        this.assist = new ModelAssist(model, properties.modelTimeout(), 600);
     }
 
     public List<InvestigationResult> investigate(WorkflowRun run, TransitionListener listener) {
@@ -63,7 +70,8 @@ public final class InvestigationAgent {
                 futures.add(pool.submit(() -> runTask(run, task, tenant, current, baseline, listener)));
             }
             List<InvestigationResult> results = new ArrayList<>();
-            long deadline = System.currentTimeMillis() + properties.toolTimeout().toMillis() * Math.max(2, run.state().maxInvestigationSteps());
+            long deadline = System.currentTimeMillis() + (properties.toolTimeout().toMillis() + 2 * properties.modelTimeout().toMillis())
+                    * Math.max(2, run.state().maxInvestigationSteps());
             for (int i = 0; i < futures.size(); i++) {
                 InvestigationTask task = tasks.get(i);
                 try {
@@ -92,91 +100,109 @@ public final class InvestigationAgent {
         if (tool.isEmpty()) {
             return failed(task, "UNKNOWN_WORKER", "Worker is not registered: " + task.worker());
         }
-        List<WorkerEvidenceDto> evidence = new ArrayList<>();
-        List<String> findings = new ArrayList<>();
-        List<String> inferences = new ArrayList<>();
-        List<String> unresolved = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-        Map<String, String> filters = initialFilters(task);
-        int steps = 0;
-        int toolCalls = 0;
-        InvestigationResult.Status status = InvestigationResult.Status.COMPLETE;
-        String failure = null;
-        while (steps < run.state().maxInvestigationSteps()) {
-            steps++;
-            // choose_analysis: deterministic default is the worker's primary analysis; a model may narrow filters once.
-            Decision decision = chooseAnalysis(run, task, evidence, filters, steps);
-            emit(run, listener, task, InvestigationNode.CHOOSE_ANALYSIS, decision.action());
-            if (decision.action().equals("FINISH")) {
-                break;
+        // Invocation-local evidence never leaks across parallel workers. LangGraph4j controls the loop.
+        class Branch {
+            final List<WorkerEvidenceDto> evidence = new ArrayList<>();
+            final List<String> findings = new ArrayList<>(), unresolved = new ArrayList<>(), warnings = new ArrayList<>();
+            Map<String, String> filters = initialFilters(task);
+            Decision decision;
+            WorkerEvidenceDto result;
+            int steps, toolCalls;
+            InvestigationResult.Status status = InvestigationResult.Status.COMPLETE;
+            String failure;
+
+            Map<String, Object> choose() {
+                Instant start = Instant.now();
+                if (Thread.currentThread().isInterrupted() || steps >= run.state().maxInvestigationSteps()) return Map.of("next", END);
+                decision = chooseAnalysis(run, task, evidence, filters, ++steps);
+                emit(run, listener, task, InvestigationNode.CHOOSE_ANALYSIS, decision.action(), start,
+                        Map.of("filters", decision.filters().toString(), "step", String.valueOf(steps)));
+                return Map.of("next", decision.action().equals("FINISH") ? END : "execute_analysis");
             }
-            synchronized (run) {
-                if (!run.tryConsumeToolCall()) {
-                    warnings.add("Tool-call budget exhausted before " + task.worker() + " could run step " + steps);
-                    status = evidence.isEmpty() ? InvestigationResult.Status.SKIPPED : InvestigationResult.Status.PARTIAL;
-                    break;
+
+            Map<String, Object> execute() {
+                Instant start = Instant.now();
+                synchronized (run) {
+                    if (Thread.currentThread().isInterrupted() || !run.tryConsumeToolCall()) {
+                        warnings.add("Tool-call budget exhausted or branch cancelled");
+                        status = evidence.isEmpty() ? InvestigationResult.Status.SKIPPED : InvestigationResult.Status.PARTIAL;
+                        return Map.of("next", END);
+                    }
+                }
+                toolCalls++;
+                try {
+                    result = tool.get().execute(tenant, current, baseline, decision.filters());
+                    emit(run, listener, task, InvestigationNode.EXECUTE_ANALYSIS, "ok", start,
+                            Map.of("filters", decision.filters().toString(), "evidenceIds", result.rankings().stream().map(WorkerEvidenceDto.Ranking::evidenceId).toList().toString()));
+                    return Map.of("next", "validate_tool_result");
+                } catch (RuntimeException e) {
+                    failure = e.getMessage();
+                    status = evidence.isEmpty() ? InvestigationResult.Status.FAILED : InvestigationResult.Status.PARTIAL;
+                    emit(run, listener, task, InvestigationNode.EXECUTE_ANALYSIS, "error", start, Map.of("error.type", e.getClass().getSimpleName()));
+                    return Map.of("next", END);
                 }
             }
-            toolCalls++;
-            // execute_analysis
-            WorkerEvidenceDto result;
-            try {
-                result = tool.get().execute(tenant, current, baseline, decision.filters());
-                emit(run, listener, task, InvestigationNode.EXECUTE_ANALYSIS, "ok");
-            } catch (RuntimeException e) {
-                emit(run, listener, task, InvestigationNode.EXECUTE_ANALYSIS, "error");
-                status = evidence.isEmpty() ? InvestigationResult.Status.FAILED : InvestigationResult.Status.PARTIAL;
-                failure = e.getMessage();
-                break;
+
+            Map<String, Object> verify() {
+                Instant start = Instant.now();
+                List<String> validation = validate(result, tenant);
+                emit(run, listener, task, InvestigationNode.VALIDATE_TOOL_RESULT, validation.isEmpty() ? "valid" : "rejected", start, Map.of("violations", validation.toString()));
+                if (!validation.isEmpty()) {
+                    warnings.addAll(validation);
+                    status = evidence.isEmpty() ? InvestigationResult.Status.FAILED : InvestigationResult.Status.PARTIAL;
+                    failure = String.join("; ", validation);
+                    return Map.of("next", END);
+                }
+                evidence.add(result);
+                findings.addAll(result.directFindings());
+                warnings.addAll(result.caveats());
+                if (!result.supported()) unresolved.add(task.question() + " (analysis unsupported for this tenant)");
+                return Map.of("next", "progress_gate");
             }
-            // validate_tool_result: schema, tenant, provenance, coverage
-            List<String> validation = validate(result, tenant);
-            emit(run, listener, task, InvestigationNode.VALIDATE_TOOL_RESULT, validation.isEmpty() ? "valid" : "rejected");
-            if (!validation.isEmpty()) {
-                warnings.addAll(validation);
-                status = evidence.isEmpty() ? InvestigationResult.Status.FAILED : InvestigationResult.Status.PARTIAL;
-                failure = String.join("; ", validation);
-                break;
-            }
-            evidence.add(result);
-            findings.addAll(result.directFindings());
-            warnings.addAll(result.caveats());
-            if (!result.supported()) {
-                unresolved.add(task.question() + " (analysis unsupported for this tenant)");
-            }
-            // progress_gate: continue only when the deterministic rule says another step adds evidence.
-            boolean more = progressGate(task, result, steps, run);
-            emit(run, listener, task, InvestigationNode.PROGRESS_GATE, more ? "continue" : "complete");
-            if (!more) {
-                break;
-            }
-            filters = narrow(result, filters);
-            if (filters.isEmpty()) {
-                break;
+
+            Map<String, Object> progress() {
+                Instant start = Instant.now();
+                boolean more = progressGate(task, result, steps, run);
+                if (more) filters = narrow(result, filters);
+                more = more && !filters.isEmpty() && steps < run.state().maxInvestigationSteps();
+                emit(run, listener, task, InvestigationNode.PROGRESS_GATE, more ? "continue" : "complete", start,
+                        Map.of("step", String.valueOf(steps), "remainingToolCalls", String.valueOf(run.state().maxToolCalls() - run.state().toolCalls())));
+                return Map.of("next", more ? "choose_analysis" : END);
             }
         }
-        if (steps >= run.state().maxInvestigationSteps() && status == InvestigationResult.Status.COMPLETE && evidence.isEmpty()) {
-            status = InvestigationResult.Status.SKIPPED;
+        Branch branch = new Branch();
+        try {
+            var graph = new StateGraph<AgentState>(AgentState::new)
+                    .addNode("choose_analysis", node_async(state -> branch.choose()))
+                    .addNode("execute_analysis", node_async(state -> branch.execute()))
+                    .addNode("validate_tool_result", node_async(state -> branch.verify()))
+                    .addNode("progress_gate", node_async(state -> branch.progress()))
+                    .addEdge(START, "choose_analysis");
+            Map<String, String> targets = Map.of("choose_analysis", "choose_analysis", "execute_analysis", "execute_analysis",
+                    "validate_tool_result", "validate_tool_result", "progress_gate", "progress_gate", END, END);
+            for (String name : List.of("choose_analysis", "execute_analysis", "validate_tool_result", "progress_gate")) {
+                graph.addConditionalEdges(name, edge_async(state -> state.<String>value("next").orElse(END)), targets);
+            }
+            graph.compile(CompileConfig.builder().recursionLimit(4 * run.state().maxInvestigationSteps() + 4).build()).invoke(Map.of());
+        } catch (org.bsc.langgraph4j.GraphStateException e) {
+            throw new IllegalStateException("Cannot compile investigator graph", e);
         }
         synchronized (run) {
-            run.recordInvestigationDepth(steps);
+            run.recordInvestigationDepth(branch.steps);
         }
-        return new InvestigationResult(task.worker(), status, evidence, findings, inferences, unresolved, warnings, steps, toolCalls,
-                System.currentTimeMillis() - started, failure);
+        return new InvestigationResult(task.worker(), branch.status, branch.evidence, branch.findings, List.of(), branch.unresolved,
+                branch.warnings, branch.steps, branch.toolCalls, System.currentTimeMillis() - started, branch.failure);
     }
 
     private Decision chooseAnalysis(WorkflowRun run, InvestigationTask task, List<WorkerEvidenceDto> evidence, Map<String, String> filters, int step) {
-        if (step == 1) {
-            return new Decision("CALL_TOOL", filters);
-        }
         Optional<JsonNode> choice = assist.ask("investigator", Map.of(
                 "task", Map.of("worker", task.worker(), "question", task.question(), "filters", filters),
                 "evidenceSoFar", summarise(evidence),
                 "budget", Map.of("remainingSteps", run.state().maxInvestigationSteps() - step + 1,
-                        "remainingToolCalls", run.state().maxToolCalls() - run.state().toolCalls())), run::addModelUsage);
+                        "remainingToolCalls", run.state().maxToolCalls() - run.state().toolCalls())), run);
         if (choice.isEmpty()) {
             // deterministic drill-down: the progress gate already narrowed the filters, so run one more bounded call
-            return filters.isEmpty() ? new Decision("FINISH", Map.of()) : new Decision("CALL_TOOL", filters);
+            return step == 1 || !filters.isEmpty() ? new Decision("CALL_TOOL", filters) : new Decision("FINISH", Map.of());
         }
         if (!"CALL_TOOL".equals(choice.get().path("action").asText(""))) {
             return new Decision("FINISH", Map.of());
@@ -185,7 +211,7 @@ public final class InvestigationAgent {
         for (var entry : choice.get().path("filters").properties()) {
             AllowedDimensions.normalise(entry.getKey()).ifPresent(key -> proposed.put(key, entry.getValue().asText()));
         }
-        return proposed.isEmpty() ? new Decision("FINISH", Map.of()) : new Decision("CALL_TOOL", proposed);
+        return new Decision("CALL_TOOL", proposed.isEmpty() ? filters : proposed);
     }
 
     static Map<String, String> initialFilters(InvestigationTask task) {
@@ -257,14 +283,20 @@ public final class InvestigationAgent {
         return summary;
     }
 
-    private static void emit(WorkflowRun run, TransitionListener listener, InvestigationTask task, InvestigationNode node, String outcome) {
+    private static void emit(WorkflowRun run, TransitionListener listener, InvestigationTask task, InvestigationNode node, String outcome,
+                             Instant started, Map<String, String> details) {
+        Map<String, String> attributes = new LinkedHashMap<>(details);
+        attributes.put("worker", task.worker());
+        attributes.put("businessUnit", run.state().tenant().businessUnit());
         TransitionEvent event = new TransitionEvent(run.state().runId(), run.context().traceId(), WorkflowNode.RUN_INVESTIGATIONS,
                 "investigation." + task.worker() + "." + node.name().toLowerCase(java.util.Locale.ROOT), run.state().step(), run.state().step(),
-                Instant.now(), 0, outcome, Map.of("worker", task.worker()));
+                started, java.time.Duration.between(started, Instant.now()).toMillis(), outcome,
+                com.moveinsync.mobilitycopilot.observability.Redaction.attributes(attributes));
         synchronized (run) {
             run.addTransition(event);
         }
-        listener.onTransition(event);
+        try { listener.onTransition(event); }
+        catch (RuntimeException ignored) { /* Observability must not fail the analysis. */ }
     }
 
     private static InvestigationResult failed(InvestigationTask task, String code, String message) {

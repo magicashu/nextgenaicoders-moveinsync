@@ -29,6 +29,10 @@ public final class TraceRecorder {
     }
 
     public Trace start(UUID runId, String businessUnit, Map<String, ?> attributes) {
+        return start(runId, businessUnit, attributes, Instant.now());
+    }
+
+    public Trace start(UUID runId, String businessUnit, Map<String, ?> attributes, Instant startedAt) {
         String traceId = traceIdFor(runId);
         Map<String, String> safe = Redaction.attributes(attributes);
         safe.put(TraceAttributes.RUN_ID, runId.toString());
@@ -36,9 +40,8 @@ public final class TraceRecorder {
         safe.put(TraceAttributes.TRACE_ID, traceId);
         safe.put(TraceAttributes.LANGFUSE_TRACE_NAME, TRACE_NAME);
         safe.put(TraceAttributes.LANGFUSE_SESSION, runId.toString());
-        Trace trace = new Trace(traceId, runId, businessUnit, new Span(null, TRACE_NAME, Span.Kind.REQUEST, safe));
-        traces.put(traceId, trace);
-        return trace;
+        return traces.computeIfAbsent(traceId, ignored -> new Trace(traceId, runId, businessUnit,
+                new Span(null, TRACE_NAME, Span.Kind.REQUEST, safe, startedAt)));
     }
 
     public Optional<Trace> find(String traceId) {
@@ -78,6 +81,17 @@ public final class TraceRecorder {
         public String businessUnit() { return businessUnit; }
         public Span root() { return root; }
         public CostAndLatencyLedger ledger() { return ledger; }
+
+        /** Record a completed operation with its real wall-clock interval and explicit parallel parent. */
+        public synchronized Span recordUnder(Span parent, String name, Span.Kind kind, Instant startedAt,
+                                             long durationMs, String status, Map<String, ?> attributes) {
+            Map<String, String> safe = Redaction.attributes(attributes);
+            safe.put(TraceAttributes.LANGFUSE_OBSERVATION_TYPE, observationType(kind));
+            Span span = new Span(parent.spanId(), name, kind, safe, startedAt);
+            span.endAt(status, Map.of(), startedAt.plusMillis(Math.max(0, durationMs)));
+            parent.addChild(span);
+            return span;
+        }
 
         /** Opens a child of the innermost open span. */
         public synchronized Span begin(String name, Span.Kind kind, Map<String, ?> attributes) {

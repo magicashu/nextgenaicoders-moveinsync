@@ -22,7 +22,14 @@ public final class OtlpJson {
     public static Map<String, Object> request(TraceRecorder.Trace trace, String serviceName, String environment) {
         List<Map<String, Object>> spans = new ArrayList<>();
         for (Span span : trace.spans()) {
-            spans.add(span(trace.traceId(), span));
+            var encoded = span(trace.traceId(), span);
+            @SuppressWarnings("unchecked") var attributes = (List<Map<String, Object>>) encoded.get("attributes");
+            attributes.add(attribute("langfuse.trace.name", TraceRecorder.TRACE_NAME));
+            attributes.add(attribute("langfuse.session.id", trace.runId().toString()));
+            attributes.add(attribute("langfuse.trace.metadata.runId", trace.runId().toString()));
+            attributes.add(attribute("langfuse.trace.metadata.businessUnit", trace.businessUnit()));
+            attributes.add(attribute("langfuse.version", "langgraph4j-v1"));
+            spans.add(encoded);
         }
         Map<String, Object> scopeSpans = new LinkedHashMap<>();
         scopeSpans.put("scope", Map.of("name", "mobility-decision-copilot", "version", "workflow-v1"));
@@ -56,6 +63,9 @@ public final class OtlpJson {
     }
 
     static Map<String, Object> attribute(String key, String value) {
+        if (key.equals("gen_ai.usage.input_tokens") || key.equals("gen_ai.usage.output_tokens")) {
+            return Map.of("key", key, "value", Map.of("intValue", value));
+        }
         return Map.of("key", key, "value", Map.of("stringValue", value == null ? "" : value));
     }
 

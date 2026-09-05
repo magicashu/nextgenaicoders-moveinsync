@@ -33,7 +33,7 @@ public final class SupervisorAgent {
     private final ModelAssist assist;
 
     public SupervisorAgent(LanguageModelPort model, WorkflowProperties properties) {
-        this.assist = new ModelAssist(model, properties.toolTimeout(), 800);
+        this.assist = new ModelAssist(model, properties.modelTimeout(), 800);
     }
 
     /** Backwards-compatible scaffold entry point: plan for the headline delayed-trip issue. */
@@ -57,12 +57,13 @@ public final class SupervisorAgent {
             notes.add("Correction cycle: " + String.join("; ", run.planFeedback().notes()));
         }
         Optional<JsonNode> proposal = assist.ask("supervisor", Map.of(
+                "question", run.context().question() == null ? "Investigate the selected anomaly" : run.context().question(),
                 "anomaly", Map.of("metricId", issue.metricId().name(), "value", issue.metric().value(), "baseline", issue.metric().baselineValue(),
                         "deltaPoints", issue.deltaPoints(), "severity", issue.severity(), "reasons", issue.reasons()),
                 "capabilities", run.capabilities(),
                 "workers", WorkerType.allowlist(),
                 "budget", Map.of("maxTasks", WorkerType.values().length, "maxToolCalls", run.state().maxToolCalls() - run.state().toolCalls()),
-                "feedback", run.planFeedback() == null ? List.of() : run.planFeedback().notes()), run::addModelUsage);
+                "feedback", run.planFeedback() == null ? List.of() : run.planFeedback().notes()), run);
         if (proposal.isPresent()) {
             List<InvestigationTask> proposed = parseTasks(proposal.get(), scope, disabled, notes);
             if (!proposed.isEmpty()) {

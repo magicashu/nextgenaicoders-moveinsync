@@ -6,16 +6,22 @@ server:
   port: ${SERVER_PORT:8080}
 
 mobility:
+  sarvam:
+    api-key: ${SARVAM_API_KEY:}
+    endpoint: ${SARVAM_ENDPOINT:https://api.sarvam.ai/v1/chat/completions}
+    model: ${SARVAM_MODEL:sarvam-105b}
+    timeout: ${SARVAM_TIMEOUT:30s}
   data:
     directory: ${MOBILITY_DATA_DIR:data/fixtures}
   workflow:
     analytics-gateway: ${ANALYTICS_GATEWAY:governed}
     control-plane: ${CONTROL_PLANE:in-memory}
-    language-model: ${LANGUAGE_MODEL:none}
+    language-model: ${LANGUAGE_MODEL:auto}
     max-investigation-steps: ${MAX_INVESTIGATION_STEPS:4}
     max-correction-cycles: ${MAX_CORRECTION_CYCLES:1}
     max-tool-calls: ${MAX_TOOL_CALLS:12}
     tool-timeout: ${TOOL_TIMEOUT:10s}
+    model-timeout: ${SARVAM_TIMEOUT:30s}
     approval-ttl: ${APPROVAL_TTL:30m}
   api:
     gateway: ${DECISION_RUN_GATEWAY:workflow}

@@ -479,6 +479,14 @@ When the hackathon begins:
 - **Consequences:** Unfinished local main UI/API work is preserved in the named `try1: preserve unfinished main UI/API work before adopting Java-branch-2` stash, not reapplied. Main-only Sarvam wiring is retained in main history but is not compatible with the incoming model port; this adopted runtime defaults to its explicit unavailable-model fallback until a separate adapter integration. Official integration tests now also honor the existing `MOBILITY_OFFICIAL_DATA_DIR` helper so the unchanged official files at this checkout's location are tested rather than skipped. No production PostgreSQL database is modified.
 - **Supersedes:** The narrower main reporting implementation as the active implementation on try1 only.
 
+## D-046: LangGraph4j, Sarvam and observable node execution on try1
+
+- **Status:** Accepted by explicit user instruction on 2026-09-05.
+- **Decision:** Replace the custom Java state-machine orchestrator with LangGraph4j core and its compiled graph routing. Preserve the 18 business nodes, deterministic authorization/metrics/approval checks, bounded specialist execution and existing control-plane repositories. Wire the current Sarvam chat API behind LanguageModelPort for all four roles, with bounded transport and safe fallback. Export actual node timings, structured decisions and model usage to Langfuse/OTLP, linked by run ID to the separate business audit ledger.
+- **Reason:** The user explicitly requested LangGraph, removal of the Java state machine, live Sarvam calls and inspectable node/LLM execution. This is the reconsideration trigger for the earlier framework deferral.
+- **Consequences:** Use LangGraph4j for the existing Java backend (not the Python LangGraph package). Provider keys remain server-side. Model-generated prose cannot introduce facts: briefing selects verified claim IDs rendered by code. Default provider is automatic when a key is available; explicit Sarvam mode fails startup without a key. Skip test-case work in this change per user instruction; validate compilation/build and available runtime checks, and disclose unverified live integrations.
+- **Supersedes:** D-028 framework deferral and D-045's unavailable-model/custom-engine runtime choice on try1.
+
 Append entries using this template:
 
 ```markdown
@@ -492,3 +500,18 @@ Append entries using this template:
 - **Reconsider if:**
 - **Supersedes:** None
 ```
+
+## D-047: Integrate the main dashboard design with the try1 runtime
+
+- **Status:** Accepted by explicit user instruction on 2026-09-05.
+- **Decision:** Adopt the frontend visuals from commit `1ea1fb8de5e46ab84196ebada960a5b3a1e41467` on `try1`, preserving the dashboard palette, typography, cards, charts, navigation, date picker, decision brief and 3D graph. Keep the current LangGraph4j, Sarvam and Langfuse implementation and its API contracts.
+- **Integration:** All pages share the backend run ID and tenant. Replace simulated approval actions, generated run IDs, hardcoded timings and claimed eval passes with real API results or explicit unavailable/not-evaluated states. Expose contextual questions and the existing LLM/trust record in matching navigation. Changing tenant clears run state and rejects late responses from previous tenant selections.
+- **Analytics:** Add a read-only, tenant-scoped `GET /api/v1/dashboard?asOf=YYYY-MM-DD` backed by existing governed metric, contribution and daily snapshot services. No chart performs a new agent investigation. Limit the UI to the runtime's seven-day window with prior-four-week baseline; preserve the date-picker design and validate incompatible selections. M04 supplies on-time pickup KPI; backend evidence confidence replaces the unsupported fleet-health formula; actual findings supply alerts.
+- **Validation scope:** Build and local runtime/UI verification; do not execute the test suites, per the user's instruction. Do not assert fresh acceptance scores or live Sarvam success without a provider call.
+
+## D-048: Publish the integrated try1 implementation to main
+
+- **Status:** Accepted by explicit user instruction on 2026-09-05.
+- **Decision:** Publish the current try1 implementation, including D-046 and D-047, as the authoritative main-branch tree. Preserve existing main ancestry using an ours-strategy merge after committing the completed work; do not reintroduce the incompatible main backend or replace the integrated frontend.
+- **Validation:** Reuse the successful backend/frontend builds and local dataset/UI verification recorded in the frontend integration notes. No source changes after verification require additional test execution.
+- **Configuration:** Publish the provider adapters, environment-variable template and launcher. API key values are handled separately from the implementation release; ignored local environment files are not part of the code commit.

@@ -11,8 +11,14 @@ public record WorkflowProperties(
         int maxCorrectionCycles,
         int maxToolCalls,
         Duration toolTimeout,
-        Duration approvalTtl) {
+        Duration approvalTtl,
+        Duration modelTimeout) {
 
+    public WorkflowProperties(int maxInvestigationSteps, int maxCorrectionCycles, int maxToolCalls, Duration toolTimeout, Duration approvalTtl) {
+        this(maxInvestigationSteps, maxCorrectionCycles, maxToolCalls, toolTimeout, approvalTtl, toolTimeout);
+    }
+
+    @org.springframework.boot.context.properties.bind.ConstructorBinding
     public WorkflowProperties {
         if (maxInvestigationSteps < 1) {
             throw new IllegalArgumentException("maxInvestigationSteps must be positive");
@@ -25,6 +31,10 @@ public record WorkflowProperties(
         }
         Objects.requireNonNull(toolTimeout, "toolTimeout is required");
         Objects.requireNonNull(approvalTtl, "approvalTtl is required");
+        Objects.requireNonNull(modelTimeout, "modelTimeout is required");
+        if (modelTimeout.isZero() || modelTimeout.isNegative() || modelTimeout.compareTo(Duration.ofMinutes(2)) > 0) {
+            throw new IllegalArgumentException("modelTimeout must be positive and at most 2 minutes");
+        }
         if (toolTimeout.isZero() || toolTimeout.isNegative()) {
             throw new IllegalArgumentException("toolTimeout must be positive");
         }

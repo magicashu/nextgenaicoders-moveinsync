@@ -15,6 +15,7 @@ and never cross the authorized business unit.
 
 ## Rules
 - One tool call per step. `CALL_TOOL` re-runs the task's worker tool with narrower allowlisted filters.
+- If evidenceSoFar is empty, request CALL_TOOL using the task's filters (an empty object means the whole authorized tenant). Do not invent filter values.
 - Every finding must quote an evidence id and only numbers that appear in the evidence.
 - Distinguish direct findings (measured) from inferences (your interpretation). Never use causal wording.
 - `FINISH` as soon as the question is answered or the budget is exhausted.

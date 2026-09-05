@@ -72,7 +72,8 @@ public class BriefRenderer {
 
     public ApiDtos.TrustPanel trust(RunView run) {
         List<ApiDtos.TransitionView> transitions = run.transitions().stream()
-                .map(t -> new ApiDtos.TransitionView(t.node(), t.subNode(), t.outcome(), t.durationMs(), t.startedAt())).toList();
+                .map(t -> new ApiDtos.TransitionView(t.node(), t.subNode(), t.outcome(), t.durationMs(), t.startedAt(),
+                        com.moveinsync.mobilitycopilot.observability.Redaction.attributes(t.attributes()))).toList();
         RunView.ModelUsageSummary usage = run.modelUsage() == null ? new RunView.ModelUsageSummary(0, 0, 0, 0, 0, "none") : run.modelUsage();
         RunView.Versions versions = run.versions() == null ? new RunView.Versions("workflow-v1", "prompts-v1", "metrics-v1.1", run.brief().metric().dataVersion(), "anomaly-rules-v1", "targets-v1") : run.versions();
         int toolCalls = (int) run.transitions().stream().filter(t -> t.subNode() != null && t.subNode().endsWith("execute_analysis") && "ok".equals(t.outcome())).count();
