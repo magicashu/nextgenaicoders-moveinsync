@@ -130,6 +130,10 @@ code, pre { font-family: var(--font-mono); }
   50% { opacity: 0.45; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Refresh button ───────────────────────────────────────────── */
 .refresh-btn {
   display: flex;
