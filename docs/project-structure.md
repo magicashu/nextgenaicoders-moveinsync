@@ -1,248 +1,103 @@
 # Mobility Decision Copilot — Project Structure
 
-## 1. Decision
+> Branch scope: implementation descriptions refer to Java-branch-2. This Java-branch copy transfers documentation only; see [branch scope](architecture-branch-scope.md).
 
-Use a Java-first monorepo with:
+Updated 2026-09-05 under D-048. This is the implemented repository map, not a scaffold checklist. Runtime architecture: [HLD](high-level-design.md) and [detailed node design](detailed-solution-architecture-plan.md).
 
-- one Spring Boot backend;
-- one React and TypeScript frontend;
-- DuckDB as the read-only analytical plane over the organizer CSVs;
-- PostgreSQL for workflow checkpoints, approvals, idempotency and audit;
-- four logical LLM roles inside one controlled workflow;
-- versioned prompts, governed SQL, API contracts and evaluation fixtures;
-- OpenTelemetry traces exported to Langfuse.
+## Runtime
 
-The four agents are application components, not independently deployed services. This keeps the hackathon implementation simple while preserving clear boundaries that can later be separated if scale requires it.
+One Java 21/Spring Boot application, one React/TypeScript frontend, process-local DuckDB analytics and selectable in-memory/PostgreSQL control repositories. The deterministic Java state machine is active. Sarvam is a direct LanguageModelPort adapter; Spring AI and LangGraph4j are not prerequisites for that integration.
 
-## 2. Recommended repository tree
+## Backend ownership map
 
-```text
-mobility-decision-copilot/
-├── README.md
-├── AGENTS.md
-├── SESSION_CONTEXT.md
-├── pom.xml                         # parent Maven build
-├── mvnw
-├── mvnw.cmd
-├── .mvn/
-├── package.json                    # optional root shortcuts only
-├── compose.yaml                    # app + PostgreSQL + telemetry dependencies
-├── .env.example                    # names only; never secrets
-├── .gitignore
-│
-├── backend/
-│   ├── pom.xml
-│   └── src/
-│       ├── main/
-│       │   ├── java/com/moveinsync/mobilitycopilot/
-│       │   │   ├── MobilityCopilotApplication.java
-│       │   │   ├── config/         # Spring wiring and typed configuration
-│       │   │   ├── access/         # tenant identity, roles and authorization
-│       │   │   ├── ingestion/      # CSV discovery, validation and normalization
-│       │   │   ├── metrics/        # M01-M18 registry and governed metric service
-│       │   │   ├── anomaly/        # baselines, thresholds and regime-change rules
-│       │   │   ├── workflow/
-│       │   │   │   ├── domain/
-│       │   │   │   │   ├── WorkflowState.java
-│       │   │   │   │   ├── WorkflowStep.java
-│       │   │   │   │   ├── WorkflowOutcome.java
-│       │   │   │   │   └── InvestigationTask.java
-│       │   │   │   ├── application/
-│       │   │   │   │   ├── WorkflowEngine.java
-│       │   │   │   │   └── WorkflowCoordinator.java
-│       │   │   │   ├── agents/
-│       │   │   │   │   ├── SupervisorAgent.java
-│       │   │   │   │   ├── InvestigationAgent.java
-│       │   │   │   │   ├── EvidenceCriticAgent.java
-│       │   │   │   │   └── BriefingActionAgent.java
-│       │   │   │   ├── nodes/
-│       │   │   │   │   ├── deterministic/  # auth, metrics, policy, approval, audit
-│       │   │   │   │   └── generative/     # plan, investigate, critique, explain
-│       │   │   │   ├── investigation/
-│       │   │   │   │   ├── InvestigationTool.java
-│       │   │   │   │   └── workers/
-│       │   │   │   │       ├── VendorWorker.java
-│       │   │   │   │       ├── SiteShiftDirectionWorker.java
-│       │   │   │   │       ├── DelayReasonWorker.java
-│       │   │   │   │       ├── CostBillingWorker.java
-│       │   │   │   │       ├── FeedbackWorker.java
-│       │   │   │   │       ├── TrackingSafetyWorker.java
-│       │   │   │   │       └── NoShowRosterWorker.java
-│       │   │   │   └── adapter/
-│       │   │   │       ├── langgraph4j/     # used only if the spike passes
-│       │   │   │       └── statemachine/    # deterministic fallback
-│       │   │   ├── evidence/       # evidence bundles, citations and verification
-│       │   │   ├── reporting/      # morning brief and leadership report
-│       │   │   ├── action/         # action proposals and mocked executors
-│       │   │   ├── approval/       # pause/resume, revalidation and decisions
-│       │   │   ├── audit/          # append-only business audit events
-│       │   │   ├── conversation/   # contextual “Ask about this” use case
-│       │   │   ├── observability/  # OTel attributes, redaction and trace helpers
-│       │   │   └── shared/         # only small, genuinely shared primitives
-│       │   └── resources/
-│       │       ├── application.yml
-│       │       ├── prompts/v1/
-│       │       │   ├── supervisor.md
-│       │       │   ├── investigator.md
-│       │       │   ├── evidence-critic.md
-│       │       │   └── briefing-action.md
-│       │       ├── sql/
-│       │       │   ├── schema/      # DuckDB staging definitions
-│       │       │   ├── views/       # normalized tenant-keyed views
-│       │       │   └── metrics/     # one reviewed SQL file per metric
-│       │       └── db/migration/    # PostgreSQL Flyway migrations
-│       └── test/
-│           ├── java/com/moveinsync/mobilitycopilot/
-│           │   ├── unit/
-│           │   ├── integration/
-│           │   ├── contract/
-│           │   ├── golden/
-│           │   ├── security/
-│           │   └── architecture/   # ArchUnit dependency rules
-│           └── resources/fixtures/
-│
-├── frontend/
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   └── src/
-│       ├── main.tsx
-│       ├── app/                     # providers, router and application shell
-│       ├── core/                    # auth, typed API client and shared state
-│       ├── shared/                  # reusable UI primitives only
-│       └── features/
-│           ├── morning-brief/
-│           ├── anomaly-investigation/
-│           ├── conversation/
-│           ├── approval-inbox/
-│           ├── audit-trail/
-│           └── trust-panel/
-│
-├── contracts/
-│   ├── openapi/mobility-copilot.yaml
-│   └── schemas/
-│       ├── evidence-bundle.schema.json
-│       ├── decision-brief.schema.json
-│       ├── action-proposal.schema.json
-│       └── approval-decision.schema.json
-│
-├── data/
-│   ├── README.md                    # documents MOBILITY_DATA_DIR
-│   ├── fixtures/                    # tiny deterministic test inputs
-│   └── corrupted/                   # generated V1-V5 copies, never originals
-│
-├── evals/
-│   ├── golden/                      # G1, G2 and G3 expected trajectories
-│   ├── adversarial/                 # tenant, tool and prompt-abuse cases
-│   └── expected/                    # machine-checkable expected outcomes
-│
-├── infra/
-│   ├── docker/
-│   └── aws/                         # only the deployment assets actually used
-│
-├── scripts/
-│   ├── data/                        # offline profiling and fixture generation
-│   ├── dev/
-│   └── demo/
-│
-├── docs/                            # source-of-truth plans and decisions
-├── outputs/
-│   └── official dataset/            # existing immutable organizer input
-└── .github/workflows/
-    ├── build.yml
-    └── evaluation.yml
-```
+Paths below are relative to backend/src/main/java/com/moveinsync/mobilitycopilot/.
 
-Use the actual package namespace agreed with the team; the tree uses `com.moveinsync.mobilitycopilot` as an illustrative namespace.
+| Path | Implemented responsibility |
+|---|---|
+| api/ | Thin brief-job, brief, workflow, question, approval, audit and demo controllers; DTOs, request context and errors |
+| access/ | Registry identities, tenant roles and deterministic authorization |
+| config/ | WorkflowCompositionConfiguration, governed adapter wiring, SchedulingConfiguration, WorkflowProperties, capability health |
+| ingestion/application/AnalyticsStore.java | Analytical catalog and data-version boundary |
+| ingestion/adapter/duckdb/ | CSV discovery/loading/normalization and DuckDbAnalyticsStore |
+| metrics/domain/ | M01–M18 registry, query/result contracts and allowed dimensions |
+| metrics/application/BoundedMetricCache.java | Bounded TTL/LRU and single-flight metric work |
+| metrics/adapter/duckdb/ | DuckDbMetricService, DuckDbCapabilityMatrixService and governed SQL access |
+| anomaly/ | Deterministic materiality, baseline, quality/regime rules and contributions |
+| workflow/application/ | WorkflowEngine, ResumableWorkflowEngine, coordinator and checkpoint/snapshot ports |
+| workflow/application/ports/ | AnalyticsGateway, LanguageModelPort, DetectionSnapshot, WorkerEvidenceDto and TransitionListener |
+| workflow/domain/ | WorkflowState, WorkflowRun/Snapshot, RunContext, plan/results, node/transition/usage records |
+| workflow/adapter/statemachine/ | Active DeterministicWorkflowEngine |
+| workflow/adapter/sarvam/ | Server-side SarvamLanguageModel |
+| workflow/agents/ | SupervisorAgent, InvestigationAgent, EvidenceCriticAgent, BriefingActionAgent, ModelAssist and PromptLibrary |
+| workflow/nodes/ | EvidenceMerger and ActionPolicyGate; remaining node methods live in the state-machine adapter |
+| workflow/investigation/workers/ | WorkerType and WorkerToolRegistry: seven typed gateway worker adapters |
+| evidence/ | Claim/evidence records and deterministic EvidenceVerifier |
+| reporting/application/ | AsyncBriefService, BriefJobStore, DecisionRunGateway, RunView and BriefRenderer |
+| reporting/adapter/ | WorkflowDecisionRunGateway and InMemoryBriefJobStore |
+| approval/ | Approval lifecycle, checkpoint repositories and ControlPlaneBeans |
+| approval/adapter/postgres/ | JDBC approvals/checkpoints plus JdbcBriefJobStore and JdbcWorkflowSnapshotStore |
+| action/ | Proposal/type/status contracts, revalidation, idempotent execution repositories and mock adapters |
+| audit/ | Append-only audit ledger and in-memory/PostgreSQL adapters |
+| conversation/ | Constrained question intent and scoped evidence reuse/investigation |
+| observability/ | TraceRecorder, redaction, timing and optional export |
 
-## 3. How the image maps to this project
+No seven-class worker hierarchy or nodes/deterministic/nodes/generative tree is required: the current registry and typed node methods implement those responsibilities.
 
-| Generic image folder | Project-specific replacement | Reason |
-|---|---|---|
-| `requirements.txt` | Maven `pom.xml` files and `frontend/package.json` | The runtime is Java plus React/TypeScript, not Python. |
-| `src/agent/` | `backend/.../workflow/agents/` | Contains the four logical roles. |
-| `agent/state.py` | `workflow/domain/WorkflowState.java` | One typed, serializable state contract. |
-| `agent/executor.py` | `WorkflowEngine` plus graph/state-machine adapters | Keeps the framework replaceable. |
-| `agent/memory.py` | PostgreSQL checkpoint and conversation repositories | Memory is durable application state, not an agent singleton. |
-| `src/tools/` | `workflow/investigation/` plus domain application ports | Every tool has tenant scope, typed input/output and bounded result size. |
-| `src/models/` | Records beside their owning feature | Avoids an unbounded “models” dumping ground. |
-| `models/embeddings.py` | Omitted | The official data is structured CSV; no embedding pipeline is required. |
-| `src/prompts/` | `backend/src/main/resources/prompts/v1/` | Prompts are versioned runtime resources. |
-| `src/utils/` | Narrow `shared/` primitives only | Business behavior remains in named capabilities. |
-| `src/api/` | Thin controllers in the owning feature | API transport does not contain business logic. |
-| `data/knowledge_base/` | Omitted | No document corpus, RAG, vector DB, reranker or OpenKB is in scope. |
-| `logs/` | Structured stdout and OpenTelemetry | Runtime logs and traces must not be committed. |
-| `main.py` | `MobilityCopilotApplication.java` | Spring Boot entry point. |
+## Resources and contracts
 
-## 4. Boundary rules
+| Path from repository root | Purpose |
+|---|---|
+| backend/src/main/resources/application.yml | Workflow, queue, Sarvam, cache namespace and cost settings |
+| backend/src/main/resources/application-postgres.yml | PostgreSQL runtime profile |
+| backend/src/main/resources/prompts/v1/ | Runtime prompts; metadata revision prompts-v1.1 |
+| backend/src/main/resources/sql/ | Reviewed schema/view/metric/contribution SQL |
+| backend/src/main/resources/db/migration/ | V1–V3 control schema, including async jobs and rich snapshots |
+| contracts/openapi/mobility-copilot.yaml | API 0.3.0 including async brief jobs |
+| contracts/schemas/ | Evidence, metric, brief, action, approval, receipt and audit schemas |
+| contracts/data/official-checksums.sha256 | Immutable organizer-file integrity gate |
+| outputs/official dataset/ | Official CSVs and dictionary; never edited or moved |
+| data/fixtures/ | Tiny and seven-file test inputs |
+| evals/ | Golden, adversarial, recovery, corrupted-input and scorecard artifacts |
 
-1. Controllers authenticate, validate and call application services; they do not query DuckDB or invoke an LLM directly.
-2. The workflow invokes typed application ports. It never constructs SQL from model-generated text.
-3. Metric formulas live in the governed metric registry and reviewed SQL, not in prompts.
-4. Every analytical key and evidence item carries `business_unit`; trip joins use `(business_unit, trip_id)`.
-5. DuckDB is read-only analytics. PostgreSQL holds configuration, checkpoints, approvals, idempotency keys and audit events; it is not the metric engine.
-6. Authorization, anomaly thresholds, evidence verification, action policy, approval transitions and audit writes are deterministic.
-7. Only the Investigator can iterate, and its tool loop has a configured maximum step count.
-8. Agents return typed records validated before the next node runs.
-9. `WorkflowEngine` is project-owned. LangGraph4j and the fallback state machine implement that interface, so the application does not depend on graph-framework types.
-10. Prompts, model IDs, metric versions, data version and trace ID are captured with every decision run.
+## Frontend map
 
-## 5. Persistence ownership
+| Path under frontend/src/ | Responsibility |
+|---|---|
+| App.tsx | Identity/date/view state, request cancellation and stale-response protection |
+| app/AppShell.tsx | Responsive workspace shell and controls |
+| app/ApiContext.tsx | Typed API provider |
+| core/api.ts / contracts.ts | Async polling, transport and backend DTO mirror |
+| features/morning-brief/ | MorningBriefPage and memoized EvidenceCharts |
+| features/anomaly-investigation/ | Branch findings, capability gaps and evidence table |
+| features/conversation/ | AskDrawer |
+| features/approval-inbox/ | Approval preview/decisions and receipt |
+| features/audit-trail/ | Audit history |
+| features/trust-panel/ | Versions, traces, provider/fallback/token/cost readings |
+| shared/ | Metric cards, evidence drawers/chips, icons, formatting and useDialogFocus |
+| styles.css | Responsive layout, keyboard focus, reduced motion and print rules |
+| mocks/ / test/ | Typed fixtures and test setup |
 
-| Store | Owns | Must not own |
-|---|---|---|
-| Organizer CSVs | Immutable source data | Workflow or audit state |
-| DuckDB | Normalized views, governed metric queries, cached analytical snapshots | Approvals, action state or source-of-truth audit |
-| PostgreSQL | Tenant configuration, workflow checkpoints, approval decisions, action idempotency and append-only audit | Ad-hoc analytical fact processing |
-| Langfuse/OTel backend | Traces, latency, token/cost and redacted diagnostic metadata | Business audit truth or secrets |
+The browser displays governed readings. It does not calculate operational metrics, issue SQL or approve actions without backend validation.
 
-The runtime receives the organizer data location through `MOBILITY_DATA_DIR`. Do not move or rewrite files under `outputs/official dataset/`.
+## Storage and boundaries
 
-## 6. Test placement
+- DuckDB is owned by the application process for analytical loading/querying; the model's tool surface is read-only.
+- PostgreSQL owns shared jobs, checkpoints, rich decision snapshots, approvals, action idempotency/receipts and audit. Current identity/target configuration remains registry/configuration-driven.
+- In-memory control adapters support one local demo process. Metric/capability caches remain process-local even in PostgreSQL mode.
+- Use (business_unit, trip_id) for trip-level joins and aggregates. Every query/cache/evidence/action carries tenant scope.
+- Agents return typed records; metrics, verification, policy and state transitions remain deterministic.
+- A run snapshot is not a published dataset; an execution receipt is not incident resolution.
+- Authorization precedes retrieval/reuse. No external communications or arbitrary SQL tools are present.
+- Framework alternatives and unimplemented incident/publication services are proposals, not directories to scaffold automatically.
 
-- **Unit:** formulas, anomaly rules, state transitions and serializers.
-- **Integration:** DuckDB CSV/view loading, PostgreSQL repositories, Spring AI structured outputs and trace propagation.
-- **Contract:** OpenAPI and JSON-schema compatibility between React and Spring Boot.
-- **Golden:** G1, G2 and G3 end-to-end outcomes and M01-M18 fixtures.
-- **Security:** tenant isolation, unauthorized tool requests, prompt injection and excessive-agency attempts.
-- **Architecture:** ArchUnit rules that keep API, workflow, domain and adapters within their boundaries.
-- **Evaluation:** narrative faithfulness and usefulness, using deterministic gates first and an LLM judge only for subjective explanation quality.
+## Build and verification entry points
 
-## 7. What not to create
+- Root/backend Maven builds and frontend/package.json own dependencies; .env.example documents configuration names.
+- scripts/verify.sh: default Java/React, contract and fixture checks.
+- scripts/release/verify-release.sh: official-file integrity, governed reconciliation, fixture/official HTTP and evaluation gates.
+- scripts/performance/benchmark.py: explicitly separate fresh computation from completed-run reuse.
+- Backend tests follow owning capability packages plus integration, contract, security, quality and architecture suites.
+- PostgreSQL adapter integration uses the postgres Maven profile and an isolated test database; full application PostgreSQL execution also needs the Spring postgres profile.
+- Frontend tests cover briefs, evidence, approval, questions, trust and keyboard interaction.
 
-- separate microservices for each agent;
-- a vector database, embeddings package, RAG pipeline or reranker without a document corpus;
-- a general-purpose `utils` or `models` dumping ground;
-- model-generated SQL execution;
-- a committed `.env`, database file, trace dump or runtime `logs/` directory;
-- a second Python runtime service;
-- AWS resources that are not needed for the demonstrated deployment.
-
-## 8. Scaffolding order
-
-1. Create the root build, backend, frontend, contracts and test skeleton.
-2. Define typed state/output contracts and the `WorkflowEngine` port.
-3. Implement CSV ingestion and reproduce the deterministic metric fixtures in DuckDB.
-4. Add anomaly detection and evidence bundles.
-5. Implement the deterministic state-machine golden path, then run the LangGraph4j spike against the same contract.
-6. Add PostgreSQL checkpoints, approvals, revalidation, idempotency and audit.
-7. Add OpenTelemetry/Langfuse spans around the workflow, agent and tool boundaries.
-8. Build the React morning brief, investigation, approval and trust views.
-9. Add G2/G3, corrupted-data, adversarial and conversational flows only after G1 is stable.
-
-This sequence delivers one vertical, judge-visible path before optional breadth.
-
-## 9. Scaffold status (2026-09-05)
-
-The tree is now instantiated. The executable sample includes:
-
-- a Java 21/Spring Boot service with typed workflow state and four logical role classes;
-- a project-owned deterministic `WorkflowEngine` implementation and an empty gated LangGraph4j adapter location;
-- M01 executed through DuckDB against `data/fixtures/Ride_data _trip-sample.csv`;
-- deterministic anomaly and evidence checks ending in `AWAITING_APPROVAL`;
-- a React/TypeScript morning-brief screen and typed API client;
-- PostgreSQL/Flyway migration samples, public JSON schemas, golden/adversarial cases, Docker assets and CI;
-- `scripts/verify.sh` and `scripts/demo/verify-api.sh` as repeatable verification gates.
-
-The scaffold is an implementation seam, not the finished challenge solution. Full official-data ingestion, M01-M18, the eighteen-node workflow, persistence, approval execution, Langfuse traces and the remaining React features are still to be implemented in the recorded order.
+The integrated features and recorded verification are detailed in [component/node review](component-node-review-2026-09-05.md). Publication rollback, incident lifecycle and persistent DQ drill-down remain proposed extensions in the HLD.

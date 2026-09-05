@@ -1,439 +1,167 @@
 # Mobility Decision Copilot: Detailed Solution Architecture
 
-Date: 2026-09-04  
-Status: Frozen; bound to the official dataset on 2026-09-04 (see `dataset-profile-and-capability-matrix.md` and D-029 through D-033)
+> Branch scope: implementation descriptions refer to Java-branch-2. This Java-branch copy transfers documentation only; see [branch scope](architecture-branch-scope.md).
 
-## 1. Architecture decision
+Updated 2026-09-05 under D-048. This describes the implemented Java runtime and separately identifies proposed extensions. [HLD](high-level-design.md) owns the deployment, API and operational-limit overview; [dataset contracts](dataset-profile-and-capability-matrix.md) own analytical semantics.
 
-Build a **controlled multi-agent analytical workflow**, not an autonomous swarm and not a document chatbot:
+## 1. Runtime and boundaries
 
-- Four LLM specialists with separate prompts, inputs, outputs, and permissions.
-- Two components make dynamic agentic decisions: Supervisor and Investigator. Only the Investigator runs a bounded tool-selection loop.
-- Eighteen top-level workflow nodes plus one reusable four-node investigation subgraph, executed through a LangGraph4j adapter or the deterministic Java state-machine fallback.
-- DuckDB and governed metric contracts calculate operational facts.
-- Langfuse observes and evaluates the workflow; it is not the audit ledger.
-- No document RAG or neural reranker in the mandatory path while the only resource is structured trip logs.
-- A conditional fifth Knowledge Agent and seven-node retrieval subgraph only if policies, SLAs, contracts, SOPs, or historical reports arrive.
-- Dataset bindings: tenant is `business_unit`, the trip key is `(business_unit, trip_id)`, and the supported analyses per tenant come from the capability matrix in `dataset-profile-and-capability-matrix.md`. There are no GPS, driver, route, SLA or budget fields; see Section 4a.
+Java 21/Spring Boot composes a DeterministicWorkflowEngine behind WorkflowEngine/ResumableWorkflowEngine. Four logical roles share typed ports, not independently deployed agent services. LangGraph4j is gated and not the active execution adapter. Spring AI remains optional; SarvamLanguageModel implements LanguageModelPort directly.
 
-The design distinguishes predetermined workflows from agents that dynamically choose tools. This system deliberately combines them instead of making every step agentic. The orchestration pattern is framework-neutral; the live implementation uses Java interfaces with either the validated LangGraph4j adapter or a deterministic state-machine fallback. See the conceptual [LangGraph workflows and agents](https://docs.langchain.com/oss/python/langgraph/workflows-agents) reference.
+The browser's morning brief enters AsyncBriefService through POST /api/v1/brief-jobs. The dispatcher invokes WorkflowDecisionRunGateway on a bounded background worker. Synchronous workflows/questions still enter the same governed engine. A job's COMPLETE state means its workflow result is available, including when that workflow is AWAITING_APPROVAL.
 
-## 2. Vocabulary
+Deterministic code owns authorization, tenant scope, metric calculations, anomaly selection, verification, policy and state transitions. Only registered analytical worker tools are available to investigation. No model-generated SQL, raw operational rows, shell tools or external action tools enter the agent surface.
 
-| Concept | Meaning here | Example |
+## 2. Four agent roles
+
+| Role | Input/output and bounded authority | Implemented hardening |
 |---|---|---|
-| Agent | LLM component making a bounded semantic decision or tool selection | Investigator chooses the next approved analysis |
-| Node | One graph state transition with one responsibility | `verify_evidence` |
-| Tool | Typed deterministic function exposed to an agent | `rank_contributors(...)` |
-| Service | Non-LLM application component | DuckDB metric engine or audit repository |
-| Worker task | Isolated invocation of a reusable subgraph | Vendor-contribution investigation |
+| SupervisorAgent | Issue, persona, capabilities and budget → InvestigationPlan | Essential full-scope comparisons survive incomplete model plans; filters are allowlisted, typed and bounded |
+| InvestigationAgent | One scoped task and typed WorkerEvidenceDto tools → InvestigationResult | Shared bounded execution; deadlines, interruption, task/window/version validation; follow-up narrowing stays evidence-derived |
+| EvidenceCriticAgent | Existing claims, bundle and deterministic verifier findings → Critique | Model overclaim/caveat suggestions may reference existing material only; no new facts or tools |
+| BriefingActionAgent | Verified claims and deterministic action rules → BriefingOutput / ActionProposal | Model can select/order verified claim IDs; exact claim text and mandatory caveats are rendered deterministically |
 
-Multi-agent quality comes from meaningful context, tool, and policy boundaries—not agent count.
+All roles have deterministic fallback. ModelAssist records attempts/usage and allows one parse retry. Successful JSON parsing alone is not evidence validation; each role still constrains semantic output.
 
-## 3. Four LLM specialists
+Sarvam receives typed aggregate payloads and versioned prompts. The key is server-side. Missing configuration, timeout, provider failure, cooldown or exhausted concurrency falls back. Input/output token accounting and configured cost estimates are exposed; no live-key result or hard financial spending cap is claimed.
 
-### A1. Supervisor and Planning Agent
+## 3. Eighteen top-level nodes
 
-- **Purpose:** Turn the selected issue or question into a small investigation plan.
-- **Input:** Persona, request mode, capability matrix, anomaly/question, available tools, and remaining budget.
-- **Output:** Typed `InvestigationPlan` containing required metrics, comparisons, tasks, dependencies, allowed dimensions, and stop conditions.
-- **Permissions:** No raw SQL, retrieval, calculation, or action execution. It selects only registered tasks.
-- **Boundary:** Broad planning context, zero authority to create facts.
+Node names below match WorkflowNode. START/END and the four reusable investigation stages are not counted as top-level nodes.
 
-### A2. Investigation Agent
+| # | Node | Owner / responsibility | Route or invariant |
+|---:|---|---|---|
+| 1 | INITIALIZE_RUN | Deterministic run/request/version/budget setup | Typed identity and unique run/trace refs |
+| 2 | AUTHORIZE_SCOPE | Deterministic tenant and permission checks | Denied requests fail before analytics |
+| 3 | PROFILE_DATASET | Load analytics capabilities/profile | Quality and unavailable sources remain visible |
+| 4 | BUILD_CAPABILITY_MATRIX | Determine supported analyses | Disabled capabilities cannot become tasks |
+| 5 | COMPUTE_METRIC_SNAPSHOT | Governed detection snapshot and data version | Cached metrics retain full tenant/window/filter semantics |
+| 6 | DETECT_ANOMALIES | Material candidates and data-regime notes | Healthy brief or no-metrics failure; otherwise prioritize |
+| 7 | PRIORITIZE_ISSUE | Deterministic selected issue | No model-generated severity/threshold |
+| 8 | SUPERVISOR_PLAN | A1 bounded plan | Deterministic fallback and mandatory comparisons |
+| 9 | VALIDATE_PLAN | Registered workers, tenant, capabilities and budget | Remove invalid tasks; empty valid plan fails |
+| 10 | RUN_INVESTIGATIONS | A2 task fan-out / typed merge inputs | Shared executor; preserve successful/partial branches |
+| 11 | MERGE_EVIDENCE | Deduplicate, link and version evidence | Registry units, provenance and partial/quality caveats retained |
+| 12 | EVIDENCE_CRITIC | A3 structured review | Existing claim/caveat references only |
+| 13 | VERIFY_EVIDENCE | Deterministic cited-evidence and claim checks | At most one claim-removal/reverification correction; no new investigation loop |
+| 14 | COMPOSE_DECISION_BRIEF | A4 dual output and deterministic action proposal | Verified-ID narrative selection; fixed text fallback |
+| 15 | ACTION_POLICY_GATE | Action type, scope, evidence, confidence and expiry | Missing/failed verification → report-only; eligible → approval |
+| 16 | APPROVAL_INTERRUPT | Create pending approval and checkpoint | Return to caller; trace closes; rich snapshot persisted at outcome |
+| 17 | REVALIDATE_AND_EXECUTE | Resume with approval/edit/rejection | Fresh evidence, authority, expiry and full proposal match before idempotent mock effect |
+| 18 | APPEND_AUDIT_EVENT | Audit summary, checkpoint and terminal outcome | Business audit remains separate from diagnostic telemetry |
 
-- **Purpose:** Resolve one bounded task with governed read-only analytical tools.
-- **Input:** One task, compatible tools, existing evidence summaries, and budget.
-- **Output:** Evidence IDs, measured contributors, coverage, quality warnings, direct findings, inferences, and unresolved questions.
-- **Permissions:** No arbitrary SQL, writes, cross-tenant access, or unrestricted APIs.
-- **Limits:** Configured tool-call, row, time, token, and cost limits.
-
-### A3. Evidence Critic
-
-- **Purpose:** Challenge draft findings before they reach the user.
-- **Input:** Evidence package, claims, metric definitions, and claim rules.
-- **Output:** Supported claims, overclaims, missing caveats, contradictions, and pass/revise/abstain.
-- **Permissions:** No tools, database, retrieval, or actions.
-- **Limit:** One review and at most one correction cycle.
-
-### A4. Briefing and Action-Drafting Agent
-
-- **Purpose:** Create the operations brief, leadership narrative, and bounded action proposal from verified evidence.
-- **Input:** Verified findings, persona templates, confidence/caveats, and allowed action types.
-- **Output:** Typed `DecisionBrief` and `ActionProposal`.
-- **Permissions:** No database, retrieval, or execution. It cannot introduce a factual claim without an evidence ID.
-
-### Conditional A5. Knowledge Agent
-
-Add only if documents contain decision-relevant knowledge absent from structured fields. It returns cited `DocumentEvidence` and has no metric or action permissions.
-
-## 4. Why data domains are workers, not agents
-
-Vendor, site-shift-direction, delay-reason, cost and billing, feedback, tracking and safety alerts, and no-show and roster analyses use the same tenant, governed engine, policy boundary, and result schema. They are parallel worker tasks executed through the same Investigation Agent subgraph.
-
-Separate permanent agents would add prompts, state, model calls, latency, and merging failures without creating a real boundary. The Java orchestrator dispatches isolated, typed investigation tasks when the validated plan calls for them and merges them with explicit provenance. See the conceptual [orchestrator-worker guidance](https://docs.langchain.com/oss/python/langgraph/workflows-agents#orchestrator-worker).
-
-### 4a. Worker tasks bound to the official dataset
-
-| Worker task | Source tables | Governed metrics | Availability |
-|---|---|---|---|
-| `vendor` | rides, bills, feedback, alerts | M01-M03, M09-M14 by `vendor_id` | all tenants; peer ranking needs 500 trips |
-| `site_shift_direction` | rides, legs | M01, M04, M05 by `office × shift_type × trip_direction` | all tenants; single-office tenants get a caveat |
-| `delay_reason` | rides | M03 | all tenants |
-| `cost_billing` | bills | M09, M10 | M10 unsupported for `vanta-Aus` and `vanta-Sea` |
-| `feedback` | feedback | M11, M12 | low coverage for `vanta-Aus`, `vanta-Sea`, `catalyst-Sac` |
-| `tracking_safety_alerts` | alerts | M13-M16, M18 | event types vary by tenant; sign-off violations excluded |
-| `noshow_roster` | legs | M06, M07 | all tenants |
-
-There is no GPS worker. Location, speed and geofence analysis beyond the alert counts is marked unsupported in the capability matrix.
-
-## 5. Main graph: 18 nodes
-
-`START` and `END` are not counted.
-
-| # | Node | Type | Responsibility | Failure/degraded route |
-|---:|---|---|---|---|
-| 1 | `initialize_run` | Deterministic | Create run, trace, data version, request mode, budget, and tenant-safe IDs | Reject malformed request |
-| 2 | `authorize_scope` | Deterministic | Enforce tenant, persona, metrics, dimensions, and tools | Fail closed |
-| 3 | `profile_dataset` | Deterministic | Load the versioned schema/data-quality profile; calculate it only when the data version changes | Continue with supported capabilities |
-| 4 | `build_capability_matrix` | Deterministic | Load/build the per-data-version matrix of supported, derivable, and unavailable analyses | Disable unsupported branches |
-| 5 | `compute_metric_snapshot` | Deterministic | Load/compute cached versioned metrics, baselines, population, and freshness for the requested window | Quality-qualified snapshot |
-| 6 | `detect_anomalies` | Deterministic | Compare against available SLA, history, or peers | Healthy-brief route |
-| 7 | `prioritize_issue` | Deterministic | Select the highest-value issue with configurable materiality/confidence rules | Low-confidence investigation only |
-| 8 | `supervisor_plan` | LLM A1 | Create bounded typed plan | Parse retry once, then fallback |
-| 9 | `validate_plan` | Deterministic | Check tools, dimensions, capabilities, budget, and dependencies | Remove invalid tasks or stop |
-| 10 | `run_investigations` | Subgraph A2 | Dispatch isolated tasks through the reusable investigator | Preserve successful branches |
-| 11 | `merge_evidence` | Deterministic | Deduplicate and link evidence to data/metric versions and claims | Flag contradictions/gaps |
-| 12 | `evidence_critic` | LLM A3 | Detect unsupported language and missing caveats | Revise once or abstain |
-| 13 | `verify_evidence` | Deterministic | Enforce arithmetic, provenance, freshness, policy, and confidence | Safe partial answer |
-| 14 | `compose_decision_brief` | LLM A4 | Produce dual brief and action draft | Deterministic template fallback |
-| 15 | `action_policy_gate` | Deterministic | Validate action, parameters, evidence, expiry, and authorization | Report-only/reject route |
-| 16 | `approval_interrupt` | Human | Pause for approve, reject, or edit with serializable payload | Rejection/expiry to audit |
-| 17 | `revalidate_and_execute_mock_action` | Deterministic | After approval, recheck authorization, evidence version, expiry, parameters, and preconditions; then idempotently create the mock escalation/ticket/watchlist/draft | Bounded retry, never duplicate |
-| 18 | `append_audit_event` | Deterministic | Persist run, evidence, decision, approval, and receipt refs | Surface ledger failure |
-
-```mermaid
+~~~mermaid
 flowchart TD
-    S([START / schedule / load / question]) --> N1[1 initialize_run]
-    N1 --> N2[2 authorize_scope]
-    N2 --> N3[3 profile_dataset]
-    N3 --> N4[4 build_capability_matrix]
-    N4 --> N5[5 compute_metric_snapshot]
-    N5 --> N6[6 detect_anomalies]
-    N6 -->|healthy schedule| H[healthy brief]
-    N6 -->|issue or question| N7[7 prioritize_issue]
-    N7 --> N8[8 supervisor_plan - A1]
-    N8 --> N9[9 validate_plan]
-    N9 --> N10[[10 investigation subgraph - A2]]
-    N10 --> N11[11 merge_evidence]
-    N11 --> N12[12 evidence_critic - A3]
-    N12 --> N13[13 verify_evidence]
-    N13 -->|one revision allowed| N8
-    N13 -->|pass or qualified| N14[14 compose_decision_brief - A4]
-    N14 --> N15[15 action_policy_gate]
-    N15 -->|report only / reject| N18[18 append_audit_event]
-    N15 -->|eligible| N16{{16 approval_interrupt}}
-    N16 -->|reject / expire| N18
-    N16 -->|approve| N17[17 revalidate and execute mock action]
-    N17 --> N18
-    H --> N18
-    N18 --> E([END])
-```
+    START["Request / claimed brief job"] --> INIT["1 Initialize"]
+    INIT --> AUTH["2 Authorize"]
+    AUTH --> PROF["3 Profile"]
+    PROF --> CAP["4 Capabilities"]
+    CAP --> SNAP["5 Metric snapshot"]
+    SNAP --> DET["6 Detect"]
+    DET -->|"healthy"| HEALTHY["Healthy brief"]
+    DET -->|"no metrics"| FAIL["Failed result"]
+    DET -->|"material"| PRI["7 Prioritize"]
+    PRI --> PLAN["8 Supervisor"]
+    PLAN --> VALID["9 Validate plan"]
+    VALID --> INV["10 Investigations"]
+    INV --> MERGE["11 Merge"]
+    MERGE --> CRITIC["12 Critic"]
+    CRITIC --> VERIFY["13 Verify"]
+    VERIFY -->|"one correction"| CORRECT["Drop unsupported claims and reverify"]
+    VERIFY --> COMPOSE["14 Compose"]
+    CORRECT --> COMPOSE
+    COMPOSE --> POLICY["15 Policy gate"]
+    POLICY -->|"eligible"| PAUSE["16 Approval pause"]
+    POLICY -->|"report only"| AUDIT["18 Audit / terminal outcome"]
+    PAUSE -->|"human decision / resume"| RESUME["17 Revalidate and execute"]
+    RESUME --> AUDIT
+    HEALTHY --> AUDIT
+    FAIL --> AUDIT
+~~~
 
-The revision edge requires `revision_count <= 1`. Every loop has hard tool-call, time, token, and cost limits.
+The correction branch does not return to the supervisor or consume fresh analytical tool calls. Rejection is handled on resume without executing a mock action. Edits must pass validation; they do not bypass node 17.
 
-## 6. Investigation subgraph: four nodes
+## 4. Reusable investigation loop
 
-`run_investigations` invokes this subgraph per validated task. Independent calls may run in parallel.
-
-| Node | Type | Responsibility |
-|---|---|---|
-| `choose_analysis` | LLM A2 | Select one next governed tool or finish |
-| `execute_analysis` | Deterministic | Run a registered parameterized query/computation |
-| `validate_tool_result` | Deterministic | Check schema, provenance, coverage, row limits, and errors |
-| `progress_gate` | Deterministic | Continue, stop, qualify, or return partial evidence |
-
-```mermaid
+~~~mermaid
 flowchart LR
-    I([task]) --> C[choose_analysis - A2]
-    C --> X[execute_analysis]
-    X --> V[validate_tool_result]
-    V --> G{progress_gate}
-    G -->|more evidence and budget| C
-    G -->|complete / partial / exhausted| O([InvestigationResult])
-```
+    TASK["Isolated task"] --> CHOOSE["choose_analysis"]
+    CHOOSE --> EXEC["execute_analysis"]
+    EXEC --> CHECK["validate_tool_result"]
+    CHECK --> PROGRESS{"progress_gate"}
+    PROGRESS -->|"evidence needed and budget available"| CHOOSE
+    PROGRESS -->|"complete / partial / exhausted"| RESULT["InvestigationResult"]
+~~~
 
-Give every parallel investigation task an isolated run-scoped state object and merge only typed evidence envelopes into the parent state. The checkpoint repository persists the parent workflow and completed task results by run ID; this contract must behave identically under LangGraph4j and the fallback state machine.
+InvestigationAgent uses four shared threads and a queue of 64 tasks. Rejection and deadline exhaustion return qualified failure/partial results. Work is cancelled on exhaustion; interruption checks prevent late task results from silently becoming completed evidence. Tasks share run-level counters for tool use, while task evidence remains isolated until merge.
 
-## 7. Governed analytical tools
+WorkerToolRegistry supplies seven typed GatewayWorkerTool adapters; the implementation does not require seven separate agent classes.
 
-The LLM selects registered metric IDs, dimensions, filters, and comparison modes; it never writes arbitrary SQL.
-
-```text
-get_metric(metric_id, window, filters, grain)
-compare_metric(metric_id, current_window, reference_mode, filters)
-rank_contributors(metric_id, dimension, window, filters, min_volume)
-get_distribution(metric_id, dimension, window, filters)
-estimate_impact(issue_id, impact_model_id)
-get_quality_report(fields_or_metric_ids)
-get_bounded_examples(evidence_id, limit, redaction_policy)
-simulate_action(action_type, target_ids, parameters)
-```
-
-Every tool result includes evidence/query ID, metric contract/version, data version, window, filters, grain, numerator, denominator, value/unit, comparison, population, coverage, warnings, and tenant-safe provenance.
-
-The metric registry owns definition, formula implementation, owner, allowed dimensions, exclusions, unit, grain, freshness, authorization, and edge-case behavior. Incompatible groupings are rejected, not approximated. The v1 registry is M01-M18 in `dataset-profile-and-capability-matrix.md` Section 8, with allowed dimensions `vendor_id`, `site_id`, `shift_id`, `direction`, `mode`, `fuel_type`, `vehicle_id` and comparison modes historical (prior four complete weeks), in-tenant peer, cross-tenant peer (facilities-head persona only) and configured target.
-
-## 8. RAG decision
-
-### Mandatory path: no document RAG
-
-The live statement names structured trip logs, not a document corpus. Therefore:
-
-- SQL retrieves operational facts.
-- The metric catalog retrieves approved definitions by ID/alias.
-- Evidence IDs retrieve computed results for synthesis.
-- The LLM generates only from verified evidence objects.
-
-This is retrieval-grounded generation over structured evidence, but it should not be advertised as vector RAG. Embeddings and cross-encoders do not calculate on-time arrival, cost, occupancy, or affected employees.
-
-### Conditional activation gate
-
-Activate document RAG only when all are true:
-
-1. Documents contain decision-relevant knowledge absent from structured fields.
-2. At least five golden questions require policy/SLA/contract/SOP evidence.
-3. Tenant, role, version, effective date, page/section, and citations are preservable.
-4. Retrieval evaluation beats a lexical-only baseline inside the latency budget.
-
-If any gate fails, RAG stays disabled.
-
-## 9. Conditional hybrid RAG and reranking: seven nodes
-
-If the gate passes, add A5 and a subgraph parallel to analytical investigation:
-
-| Node | Responsibility |
+| Worker ID | Governed domain |
 |---|---|
-| `classify_knowledge_need` | Form the policy query and required authority/effective date |
-| `authorize_and_filter` | Apply tenant, role, document type, entity, version, and effective-date filters before search |
-| `parallel_retrieve` | Run BM25/lexical and embedding retrieval for recall |
-| `fuse_candidates` | Reciprocal-rank fusion while retaining component ranks/provenance |
-| `rerank_candidates` | Second-stage cross-encoder or evaluated constrained-model ordering against the original question |
-| `dedupe_and_pack` | Remove overlap and preserve authority/diversity within context budget |
-| `verify_citations` | Validate passage, version, authorization, and claim support |
+| vendor | Vendor dispersion and qualified comparison |
+| site_shift_direction | Site, shift and direction concentration |
+| delay_reason | Delay-reason distributions |
+| cost_billing | M09/M10 cost evidence and unsupported-km caveats |
+| feedback | Ratings and coverage warnings |
+| tracking_safety_alerts | Alert/tracking metrics, including G3 regime-change exclusion |
+| noshow_roster | Employee-leg no-show and roster-derived measures |
 
-Evaluation starting point, not a fixed configuration:
+Source names map to the governed dimensions: product_type → mode, office → site_id, shift_type → shift_id, trip_direction → direction. Use (business_unit, trip_id) for all trip joins and aggregates. Qualification and formulas come from M01–M18 v1.1; the prior-four-complete-week baseline is not replaced with an equal-length week.
 
-- Retrieve about 15-25 candidates from each first-stage retriever.
-- Fuse and rerank roughly 15-25 unique candidates.
-- Pass about 4-6 authoritative, non-duplicative passages.
-- Treat scores as ranking diagnostics, not confidence probabilities.
+## 5. Evidence and state
 
-Tune with evidence recall, MRR/nDCG, citation precision, duplicate rate, latency, cost, and ACL violations. Reranking is a second-stage ordering mechanism over a high-recall candidate set; see [Cohere Rerank](https://docs.cohere.com/v2/docs/rerank).
+| Type / port | Purpose |
+|---|---|
+| RunContext | Actor/persona/mode, trace, model and data/workflow/prompt versions |
+| WorkflowState | Run/tenant/date, current step, tasks and bounded execution counters |
+| WorkflowRun | Context, state, detection, plan, investigation results, evidence, critique, verification, briefing, policy, approval, receipt, transitions and usage |
+| WorkflowRun.Snapshot | Serializable rich completed/paused run without raw CSV rows, connections or executors |
+| WorkflowCheckpointStore | Versioned workflow state with optimistic checks |
+| WorkflowSnapshotStore | Rich snapshot save/find; PostgreSQL guards against older checkpoint-version overwrites |
+| EvidencePackage / EvidenceBundle | Typed items, claims, gaps, caveats and evidence version |
+| ModelUsage | Role/model/prompt metadata, provider attempts, tokens, latency and fallback information |
+| TransitionEvent | Node/subnode outcome, duration and diagnostic attributes |
 
-Do not initially add HyDE, multi-query expansion, knowledge graphs, OpenKB/PageIndex, LLM-only reranking, whole-document prompting, or post-generation access filtering. Add a strategy only to fix a measured failure.
+Numeric claims are checked against evidence IDs cited by that claim. Ranking values use metric-registry units; numerator-share evidence is distinct from metric values. Partial branch warnings and capability gaps survive final rendering. Peer access remains permission-controlled.
 
-## 10. Two ranking problems
+Workflow/prompt metadata are workflow-v1.1 and prompts-v1.1. Runtime prompt files remain in the prompts/v1 resource family. A deploy changing answer/policy-affecting settings must use a new BRIEF_CACHE_NAMESPACE; replicas sharing a namespace require consistent data and configuration.
 
-### Operational prioritization
+## 6. Caching, jobs and recovery
 
-Rank anomalies using deterministic configurable features: safety override, configured-target/trend gap, affected trips/rider legs, cost impact, persistence, coverage/confidence, and minimum volume. Initial thresholds from profiling: a material issue needs at least 300 trips in the window, an absolute gap of 3 percentage points and a relative rise of 25% against the prior four complete weeks for rate metrics, or any Sev-1/2 alert-rate doubling. A step change confined to one alert type that falls to near zero (the sign-off-violation case, G3) is classified as a data-regime change and routed to a data-quality note, not an issue. Expose score components in the UI.
+DuckDbMetricService uses BoundedMetricCache with 2,048 entries and ten-minute TTL; capability caching uses 128 entries. Complete query scope and data/metric versions participate in metric keys. Identical in-flight misses share computation; failed results do not enter the cache.
 
-### Document reranking
+AsyncBriefService authorizes before reuse and uses a digest of actor, roles, tenant, persona, date, data/metric/workflow/prompt/model versions and namespace. Job TTL is ten minutes; two brief workers are the default, configurable from 1 to 16. Queue capacity is bounded at 256. Optional precomputation uses a configured historical date, tenant list and demo transport-manager identity; it is off by default.
 
-Order policy/document passages after ACL-filtered hybrid retrieval. It is conditional and never alters an operational metric.
+In-memory mode is a local fallback. PostgreSQL shares jobs and rich run snapshots with the existing approval/checkpoint/action/audit repositories through migration V3. Atomic job claims prevent two replicas from claiming the same queued job. An abandoned running job fails visibly; it is not replayed blindly because a pending approval may already exist.
 
-## 11. Shared typed state
+Completed/paused snapshots support run retrieval after restart and supply evidence for approval resume. Arbitrary-node continuation is not implemented. Snapshot, checkpoint, approval and audit operations do not form one all-or-nothing transaction. A missing/mismatched prerequisite must fail closed. A job's successful completion is not approval or action completion.
 
-```python
-class MobilityState(TypedDict):
-    run: RunContext
-    request: RequestContext
-    budget: ExecutionBudget
-    data_profile: DataProfile
-    capabilities: CapabilityMatrix
-    metric_snapshot: list[MetricEvidence]
-    anomaly_candidates: list[Anomaly]
-    selected_issue: Anomaly | None
-    investigation_plan: InvestigationPlan | None
-    investigation_results: Annotated[list[InvestigationResult], operator.add]
-    document_evidence: Annotated[list[DocumentEvidence], operator.add]
-    evidence_package: EvidencePackage | None
-    critique: Critique | None
-    verification: VerificationResult | None
-    decision_brief: DecisionBrief | None
-    action: ActionProposal | None
-    approval: ApprovalDecision | None
-    execution_receipt: ExecutionReceipt | None
-    errors: Annotated[list[WorkflowError], operator.add]
-    audit_event_ids: Annotated[list[str], operator.add]
-```
+## 7. Approval and outcomes
 
-All models are JSON-serializable and versioned. Use explicit reducers for parallel lists; keep large data outside graph state behind evidence IDs.
+Policy requires evidence and passing verification. Approval UI displays the proposal's consequence, scope and evidence version. On approve/edit, deterministic revalidation checks fresh analytical evidence and the entire approved proposal. Idempotency and audit protect mock effects. Rejection, expiry and stale evidence produce explicit states.
 
-## 12. Approval, recovery, and audit
+Action adapters remain mocks: watchlist, investigation ticket, vendor escalation draft or communication draft. No vendor message is sent. EXECUTED describes the adapter effect; it does not mean a transport incident was resolved.
 
-Run the workflow with a checkpoint repository and tenant-safe run/conversation ID. A local relational adapter is acceptable for the demo; PostgreSQL is the production story. Persist workflow checkpoints separately from cross-run memory and business audit events.
+A proposed incident extension will maintain stable incident identity across run observations and separate acknowledgement/reopen/resolution from action state. It needs follow-up evidence or explicit human closure and is not part of today's implemented state model.
 
-Approval payload:
+## 8. UI and telemetry
 
-```json
-{
-  "action_id": "...",
-  "action_type": "create_vendor_investigation",
-  "targets": ["vendor-token"],
-  "reason": "...",
-  "evidence_ids": ["..."],
-  "expected_effect": "...",
-  "risk": "low",
-  "expires_at": "...",
-  "idempotency_key": "..."
-}
-```
+The React shell provides Morning brief, Investigation, Approval, Audit and Trust views plus Ask and evidence drawers. Comparison charts use governed current/baseline evidence on a shared zero-based scale; rate comparisons exclude numerator-share items. Tenant/date changes cancel polling and invalidate stale UI responses. Dialogs support focus containment, Escape and focus return; reduced motion and responsive layouts are included. Clipboard/text download includes provenance.
 
-Rules:
+Tracing attaches parallel tool spans to the correct parent, records actual tool durations and closes roots at pause/terminal outcomes. Provider attempts, fallback evaluations, tokens and configured cost estimates are distinct. Langfuse export is optional; the business ledger remains authoritative. Cache-hit response latency is not fresh investigation latency; resumed run lifetime may include human approval wait.
 
-- Put `interrupt()` in a dedicated approval node.
-- Never perform a non-idempotent write before it; either orchestration adapter may re-enter the approval node during resume or retry.
-- Recheck authorization, parameters, evidence version, expiry, and preconditions after approval.
-- Enforce idempotency at the action repository boundary.
-- Append an immutable audit event at proposal, approval/rejection/edit, execution attempt, receipt, and final status; node 18 also writes the terminal run summary.
+## 9. Proposed extensions and activation gates
 
-The original [LangGraph interrupt rules](https://docs.langchain.com/oss/python/langgraph/interrupts#rules-of-interrupts) remain useful design guidance, but the Java spike must prove the actual LangGraph4j resume semantics before relying on them.
+- Analytical publication: stage/validate/finalize immutable datasets, pin request versions, retain a last-good publication and test failed refresh rollback. A data checksum or decision-run snapshot is not this protocol.
+- Source-row DQ provenance: extend current ingestion/evidence with bounded, tenant-filtered and redacted drill-down.
+- Incident lifecycle: link repeat observations across runs and measure follow-up outcomes.
+- Separate ingestion/Parquet: consider only with representative cold-load/concurrency evidence. PostgreSQL owns shared mutable control state; native DuckDB files are process-local or immutable published read models.
+- LangGraph4j: requires a routing/fan-out/serialization/pause-resume/trace spike before replacing the active state-machine adapter.
+- Knowledge/RAG: disabled without decision-relevant documents, at least five document-dependent golden questions, enforceable tenant/version/citation metadata and retrieval evaluation within budget.
 
-## 13. Verification and confidence
+## 10. Verification and ownership
 
-The deterministic verifier ensures:
+Keep G1–G3, official checksums, M01–M18 fixtures, corrupted inputs, tenant/security checks, approval/idempotency tests and trajectory tests as the regression baseline. Add provider wire/failure tests, cache isolation, async identity reuse, PostgreSQL claims/snapshot guards, application restart recovery and UI focus/cancellation coverage.
 
-- Every displayed number exists in evidence.
-- Units, filters, populations, and periods are compatible.
-- Current/reference windows are valid.
-- Claim evidence is present and authorized.
-- Missing feedback coverage, unsupported cost-per-km, single-office tenants, capped delays and excluded billing adjustments appear in caveats.
-- “Caused” is rejected without causal evidence; use “contributed,” “associated,” or “coincided.”
-- Sparse groups are suppressed or qualified.
-- Action type and parameters are allowlisted.
-
-Confidence is computed from data coverage/quality, statistical/material support, agreement across signals, freshness, and investigation completeness—not the LLM's self-rating.
-
-## 14. Langfuse trace
-
-One graph run is one root trace:
-
-```text
-mobility_run
-  authorize_scope
-  profile_dataset
-  compute_metric_snapshot
-  detect_anomalies
-  supervisor_plan
-  investigation.vendor
-    choose_analysis
-    tool.rank_contributors
-  investigation.tracking_safety_alerts
-    choose_analysis
-    tool.get_quality_report
-  merge_evidence
-  evidence_critic
-  verify_evidence
-  compose_decision_brief
-  approval_interrupt
-  revalidate_and_execute_mock_action
-  append_audit_event
-```
-
-Record safe tenant, run/thread ID, workflow/prompt/model/metric/data versions, task/tool, evidence count, latency, usage/cost, retries, outcome, approval, and audit ID. Redact PII and secrets.
-
-Langfuse accepts language-neutral OpenTelemetry spans, so the Java runtime can instrument Spring AI, graph nodes, tools, approval transitions and DuckDB queries without allowing observability to dictate orchestration. See [Langfuse tracing](https://langfuse.com/docs/observability/get-started).
-
-## 15. Evaluation
-
-### Deterministic tests
-
-- Hand-calculated metric fixtures for nulls, duplicates, cancellations, zero denominators, capped delays, negative bills and cross-tenant `trip_id` collisions (the ten fixtures in `dataset-profile-and-capability-matrix.md` Section 11).
-- Capability behavior without legs, bills, severity, feedback coverage or billed km (variants V1-V5).
-- Plan validator blocks arbitrary SQL, unsupported dimensions, excess tasks, and cross-tenant scope.
-- Verifier catches changed numbers, missing evidence, incompatible periods, and unsupported causal claims.
-- Approval reject/edit/expiry, crash/resume, and duplicate execution.
-
-### Trajectory tests
-
-- Correct tool category and maximum calls.
-- Stops when evidence is sufficient.
-- Returns partial evidence when one branch fails.
-- Abstains when evidence is inadequate.
-- Uses at most one correction cycle.
-
-### Narrative tests
-
-- Operations and leadership outputs contain identical facts.
-- Every factual claim resolves to evidence.
-- Missing-data caveats are visible.
-- LLM judges assess only clarity, relevance, and explanation groundedness—not arithmetic, security, or authorization.
-
-Golden cases G1, G2 and G3, the ten fixtures and the five corrupted variants are defined in `dataset-profile-and-capability-matrix.md` Section 11; extend to 20-30 cases during the build. No cross-tenant leak, wrong governed metric, unsupported citation, or unauthorized action may pass, and G3 must never escalate.
-
-## 16. Security boundaries
-
-- Authorize before retrieving metrics or documents.
-- Use read-only, template-based analytical queries.
-- Tokenize/redact employee and driver IDs in prompts, traces, and UI.
-- Treat user text, dataset text, documents, peer-agent output, and tool output as untrusted.
-- Validate structured output before state updates.
-- Expose no shell, generic SQL/HTTP/URL/filesystem, or real vendor-system tool.
-- Propose, validate, approve, revalidate, idempotently execute, and audit every write.
-- Fail closed for access/actions with a useful non-sensitive explanation.
-
-## 17. Judge-proof UI
-
-One screen should expose:
-
-1. Proactive morning brief and top issue.
-2. Metric, SLA/history/peer comparison, population, and freshness.
-3. Vendor, site-shift, delay-reason, cost, feedback and safety-alert evidence drawer, with unsupported analyses shown greyed with the reason.
-4. Direct versus inferred claims, confidence components, and caveats.
-5. Action, expected effect, risk, and approve/reject/edit.
-6. Forwardable leadership narrative from the same evidence.
-7. Trace ID, audit ID, versions, latency/cost, and evaluation status.
-
-The dashboard is not the product; the proactive decision and controlled intervention are.
-
-## 18. Implementation order
-
-### Dataset intake (completed 2026-09-04)
-
-Preserved and checksummed the seven files, profiled every table, mapped fields, built the per-tenant capability matrix, hand-reconciled M01-M18, selected G1/G2/G3 and recorded D-029 through D-033. Evidence: `dataset-profile-and-capability-matrix.md`.
-
-### Build sequence
-
-1. Java record/sealed-type state and output contracts with Jackson schemas.
-2. DuckDB adapter: load seven CSVs, normalise keys and formats, build tenant-keyed views, reproduce the ten fixtures.
-3. Metric registry with M01, M04 and M09 end to end for `pinnacle-Slc`; then the rest of M01-M18.
-4. Daily snapshot cache, anomaly detection with the profiled thresholds, and G3 regime-change classification.
-5. Graph skeleton with the seven workers on real tools; G1 as-of 2026-06-08 through investigation and verified dual brief.
-6. Approval, revalidation, idempotency, audit and trace skeleton.
-7. React/TypeScript brief, evidence drawer with capability greying, approval inbox and trust panel.
-8. G2 as-of 2026-08-01 with caveats; corrupted variants V1-V5; regression gate.
-9. Conversational drawer (D-027) and peer-comparison questions.
-10. Optional RAG only if its gate passes.
-
-## 19. Team split
-
-| Owner | Responsibility | Contract |
-|---|---|---|
-| Data/metrics | Adapter, DuckDB, registry, anomaly/contribution tools | Typed evidence objects |
-| Agent/backend | Spring Boot/Spring AI, LangGraph4j adapter or Java state machine, checkpoint/recovery | Java records, sealed types and Jackson schemas |
-| Product/frontend | Brief, investigation, approval, leadership/trust views | Stable API fixtures from hour one |
-| Quality/demo | Langfuse, tests, audit proof, deck, demo script | Requirement-to-proof matrix |
-
-With three people, combine quality/demo with agent/backend. Split by engineering boundary, not one person per agent.
-
-## 20. Cuts and final pitch
-
-Cut in order: document RAG/A5, extra investigation dimensions, general chat, rich export, PostgreSQL/deployment polish.
-
-Never cut: one correct governed metric, contextual benchmark, proactive trigger, evidence-backed investigation, verified dual output, approval/audit, deterministic fallback, and the composite tenant key.
-
-Judge-facing wording:
-
-> We use four specialized LLM roles, but only where semantic judgment helps. A typed Java orchestrator controls an 18-node workflow; a bounded investigator subgraph runs supported domain analyses in parallel. LangGraph4j is an adapter, not a business-logic dependency, and a deterministic Java state machine is the fallback. All metrics, thresholds, authorization, evidence checks, approvals, and actions remain deterministic. Because the supplied resource is structured trip data, SQL is operational truth. Hybrid RAG and reranking are activated only if decision-relevant documents arrive. Every conclusion is versioned, traceable, approval-gated, and auditable.
+Recorded validation and benchmark limits are in [component/node review](component-node-review-2026-09-05.md). Current source paths are in [project structure](project-structure.md); active endpoints and operational configuration are in the [HLD](high-level-design.md). Changes still follow the Integration Owner and worktree rules in D-037/D-040; no new parallel implementation is implied by this document.

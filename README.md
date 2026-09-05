@@ -1,5 +1,7 @@
 # Mobility Decision Copilot
 
+> Branch scope: Java-branch carries the updated architecture documents while retaining its existing scaffold code. The integrated implementation and new code stay on Java-branch-2. See [architecture branch scope](docs/architecture-branch-scope.md) and the [current HLD](docs/high-level-design.md). Feature/test claims in those documents refer to Java-branch-2; the setup below describes this branch's unchanged scaffold.
+
 Java 21/Spring Boot and React/TypeScript starter for the MoveInSync agentic intelligence and reporting challenge.
 
 The checked-in sample is a deterministic vertical slice:

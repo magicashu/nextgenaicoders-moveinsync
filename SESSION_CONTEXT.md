@@ -1,5 +1,11 @@
 # Codex CLI Session Handoff
 
+## Branch scope override — 2026-09-05, D-049
+
+This is Java-branch, the architecture-reference branch. Updated decisions and supporting documentation were carried from Java-branch-2 without application code. Keep the integrated implementation on Java-branch-2. Do not follow the historical build sequence below as an instruction to merge or reimplement it on this branch.
+
+Read [architecture branch scope](docs/architecture-branch-scope.md), the decision register through D-049 and the updated HLD/node design first. Their implemented-feature and test statements describe Java-branch-2. The remainder of this handoff preserves historical scaffold context; current source/contract files here were not upgraded by the documentation transfer.
+
 ## Mission
 
 Continue the MoveInSync AI hackathon project and produce a judge-ready working prototype for **Agentic Intelligence & Reporting Layer for Enterprise Mobility**. The event is on 2026-09-05. The official dataset arrived on 2026-09-04 and has been profiled.

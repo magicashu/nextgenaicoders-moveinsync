@@ -362,7 +362,113 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Reconsider if:** Only one coding agent is available; in that case execute the same series sequentially before absorbing component work.
 - **Supersedes:** Any interpretation of D-037 in which the Integration Owner performs coordination only.
 
-## Live problem statement intake checklist
+## D-039: Governed metric contracts v1.1 resolve implementation ambiguities
+
+- **Status:** Accepted
+- **Decision:** Freeze metric-contract v1.1 with these clarifications: M04/M05 use boarded, non-placeholder employee legs with both corresponding planned and actual epochs; M06 divides no-shows by all valid non-placeholder employee legs after exact deduplication; M09 is the median of per-trip positive billed cost after retained lines are summed by composite trip key; M11 is low driver-rating rate; M15 is the acknowledgement P90 for Sev-1/2 eligible alerts only; M18 is renamed escort-present rate and makes no compliance claim without an external rule. “Every vendor rose” applies only to vendors with at least 500 trips in both comparison windows.
+- **Reason:** Direct profiling showed that `signintype IS NOT NULL OR boarded` excludes all 118,032 no-show rows from the M06 denominator. The documented vanta-Aus 2.7% → 4.1% → 4.2% series exactly matches driver-only low ratings, not “any low rating.” Sev-1/2 acknowledgement P90 is 2 minutes while all-severity P90 is 19 minutes, so the configured severe-alert target requires the severe population. Existing M09 golden examples and G1 analysis consistently use medians.
+- **Evidence or rubric link:** Official file dictionaries; deterministic read-only reconciliation on 2026-09-05; D-031 and G1/G2 fixtures in the dataset profile.
+- **Consequences:** SQL, Java/JSON metric contracts, frontend fixtures and deterministic tests use generic value/unit fields rather than percent-only names. M06, M11 and M15 implementations that use the earlier ambiguous wording must be rejected. M18 is descriptive until a real policy or SLA defines compliance.
+- **Reconsider if:** The organizer supplies an authoritative formula, SLA/compliance rule or corrected fixture.
+- **Supersedes:** The conflicting portions of D-031 and metric-contract v1; all unaffected D-031 exclusions and comparison rules remain active.
+
+## D-040: Active implementation moves to Java-branch-2
+
+- **Status:** Accepted and implemented
+- **Decision:** Preserve `Java-branch` at the last pushed planning/scaffold state and perform all new implementation and integration on the Git-safe branch `Java-branch-2` (the user's “Java branch 2”). New Codex foundation work is committed and pushed only to `Java-branch-2`. Claude component branches must be based on or rebased onto the frozen `Java-branch-2` baseline and must not merge directly into it.
+- **Reason:** The user requested a clean second branch for the parallel implementation while retaining the existing Java branch as a stable reference.
+- **Evidence or rubric link:** Repository delivery safety and D-037/D-038 parallel ownership model.
+- **Consequences:** Every active plan, packet and session instruction targets `Java-branch-2`; `Java-branch` receives no further implementation changes unless the user explicitly requests it.
+- **Reconsider if:** The user asks to merge the finished release back into `Java-branch` or selects another release branch.
+- **Supersedes:** The `Java-branch` integration-target portions of D-037/D-038; workstream ownership is unchanged.
+
+## D-041: Shared control-plane ports and bounded workflow configuration are frozen
+
+- **Status:** Accepted and implemented
+- **Decision:** Freeze project-owned Java ports for tenant authorization, optimistic-version workflow checkpoints, approval persistence, action revalidation, idempotent execution and append-only audit. Action proposals carry run ID, allowlisted type, bounded scope, evidence version, creation/expiry times and typed status. Approval decisions carry approval/action/run IDs and typed approve/reject/edit semantics. Execution requires a trusted actor/tenant match and an evidence-version match before revalidation; executors receive the revalidation result and return a terminal receipt. Workflow limits are typed configuration with defaults of four investigation steps, one correction cycle, twelve tool calls, ten-second tool timeout and thirty-minute approval TTL.
+- **Reason:** Claude component implementations need stable interfaces that prevent database/framework coupling and make the safety boundary enforceable in tests. Configured bounds and explicit evidence/expiry/idempotency data prevent unbounded or stale action execution.
+- **Evidence or rubric link:** Governed action, auditability, agentic cost/scale and architecture/code-quality criteria; D-024, D-037 and D-038.
+- **Consequences:** WS2/WS3/WS4 implement against these ports and may not change them without an Integration Owner contract update. PostgreSQL and mock adapters remain replaceable. Control contract tests reject cross-tenant commands, invalid edit decisions, unqualified revalidation failures and incomplete execution receipts.
+- **Reconsider if:** Integration reveals a missing field; update Java records, schemas, consumer/provider tests and the decision register atomically.
+- **Supersedes:** The underspecified scaffold-only action/approval/audit records in D-036.
+
+## D-042: Official-data reconciliation is a mandatory integration gate
+
+- **Status:** Accepted and implemented for G1 M01
+- **Decision:** Add dedicated integration and HTTP tests that read the immutable organizer trip files and reproduce G1 M01 exactly: 4,357 / 19,913 = 21.88%, with a 12.28% prior-four-week baseline and 9.60 percentage-point delta. The DuckDB CSV boundary reads drift-prone trip files as strings before explicit normalization and accepts both ISO fixture dates and the organizer's free-text month format. Pin the seven organizer-file checksums and make them, the full Java/React suite, the fixture API and official-data API part of one release command. Fixture tests remain fast, but a release cannot pass on fixtures alone.
+- **Reason:** The first official-data run exposed two defects hidden by the synthetic fixture: direct date casting rejected values such as `July 14, 2026`, and CSV auto-inference treated `delay_minutes` as integer before encountering comma-formatted values such as `1,318`.
+- **Evidence or rubric link:** G1 in D-032 and official dataset dictionary; functionality and architecture/code-quality criteria.
+- **Consequences:** `scripts/release/verify-release.sh` is the authoritative aggregate gate; `scripts/integration/verify-official-data.sh` is required after data/metric merges. WS1 may replace the temporary normalized view with its full seven-file ingestion layer only if the integration and HTTP regressions remain green.
+- **Reconsider if:** The organizer files change checksum; re-profile and version expected results instead of silently updating assertions.
+- **Supersedes:** Any implication that the tiny scaffold fixture alone verifies official-data compatibility.
+
+## D-043: Runtime capability reporting is fail-visible and release-aware
+
+- **Status:** Accepted; first C3 slice implemented
+- **Decision:** Report the presence and concrete implementation of authorization, governed metrics, workflow engine, checkpoint, approval, revalidation, execution and business-audit ports through an Actuator health contributor. Process liveness remains healthy while `releaseReady`, `investigationReady`, `governedActionsReady` and `operatingMode` expose missing capabilities. Missing optional/delivered-later adapters must never be silently represented as active.
+- **Reason:** Parallel work can produce an application that starts while critical security or action components are absent. A visible capability matrix lets integration tests and operators distinguish process health from feature/release readiness without making the deterministic read path depend on LangGraph4j, PostgreSQL or telemetry.
+- **Evidence or rubric link:** Architecture/code quality, functionality and the failure fallbacks in the delivery plan.
+- **Consequences:** The current scaffold honestly reports `SCAFFOLD`: metric and deterministic engine beans exist, while authorization and governed-action ports are unavailable. C3 will update to `READ_ONLY` or `FULL` automatically as implementations are composed; integration tests must assert this progression.
+- **Reconsider if:** A secured dedicated capability endpoint replaces Actuator details; retain the same semantics and test coverage.
+- **Supersedes:** None.
+
+## D-044: Integrated runtime uses governed adapters with deterministic orchestration
+
+- **Status:** Accepted and implemented
+- **Decision:** Compose the six completed workstreams on `Java-branch-2` through project-owned ports. DuckDB-backed governed analytics is the default `AnalyticsGateway`; the 18-node deterministic Java workflow is the default engine; the registry identity resolver and role authorizer guard every tenant boundary; the in-memory control plane is the local-demo fallback while PostgreSQL remains the production profile; the product API delegates to the resumable workflow; and `TransitionListener` emits nested, redacted `TraceRecorder` spans with optional Langfuse export. Scaffold adapters are not active in the default runtime.
+- **Approval transaction:** The approval lifecycle validates identity, tenant, role, state, expiry and edits without changing state; the workflow resume node then owns the atomic persisted decision, fresh-evidence revalidation, idempotent effect and audit events. Cross-tenant approval IDs are hidden as not found.
+- **Verification:** The composed official-data integration test must reproduce G1 M01, reach `AWAITING_APPROVAL`, approve, revalidate and finish `EXECUTED` with one receipt and a matching trace. The official HTTP gate must also run tenant-isolation, prompt/SQL-injection, role-bypass, G2/G3, audit and zero-tolerance scorecard checks.
+- **Reason:** Each worker packet was correct in isolation but shipped temporary seams. A single explicit composition decision prevents demo scaffolds, duplicate beans and double approval transitions from surviving integration.
+- **Evidence or rubric link:** Functionality, architecture/code quality, auditability, action approval, observability and multi-tenant security.
+- **Consequences:** LangGraph4j remains unnecessary for the submitted deterministic path; Langfuse remains optional and failure-safe. The local demo is complete without external secrets, while production can select PostgreSQL and Langfuse through configuration.
+- **Reconsider if:** The organizer mandates a graph library, a real side-effect system replaces the mock executor, or production deployment requires a distributed control plane.
+- **Supersedes:** D-043's temporary `SCAFFOLD` runtime state and any worker-local scaffold binding.
+
+## D-045: Bounded Sarvam assistance, reusable analytics and asynchronous briefs
+
+- **Status:** Accepted for implementation at the user's request (2026-09-05).
+- **Decision:** Add a server-side Sarvam chat adapter behind `LanguageModelPort`, with configured model, concurrency and time limits, structured JSON, measured usage, and deterministic fallback. Preserve Java workflow and governed SQL. Add bounded data-version/tenant/query-scoped metric caching, an asynchronous brief queue with identity-scoped reuse, scheduled precomputation, and a PostgreSQL queue adapter alongside the existing durable control plane. Keep local in-memory mode explicit.
+- **Security and recovery:** Authorize before lookup and work; reuse keys include actor, roles, persona, tenant, date and configuration/data versions. A failed or abandoned workflow job is not silently replayed because it may already have created an approval. Approval, revalidation, idempotency and audit remain mandatory for actions. Keys remain server-side; no raw rider records go to the model.
+- **Performance evidence:** Add a repeatable concurrency benchmark with cold/warm separation, p50/p95, throughput and errors. Report provider completions separately from fallback evaluations; estimated cost is unknown until rates are configured, rather than hardcoded zero. Cache/queue sizes, TTLs and polling intervals are operational settings, not new anomaly thresholds.
+- **UI decision:** Evolve the existing React app into a responsive slate-and-teal operations workspace with accessible comparison charts, readable metric names, explicit units/populations, current-versus-baseline readings, reduced-motion support, and shareable leadership output. Charts use existing governed evidence only; no fabricated time series.
+- **Evidence:** User request to implement scalability/latency suggestions, improve the dashboard and integrate Sarvam; rubric business experience and agentic cost at scale. Sarvam contract: https://docs.sarvam.ai/api-reference/chat/chat-completions (reviewed 2026-09-05).
+- **Deployment boundary:** Preserve the local Java/React application and official-data directory. No public deployment or vendor communications are part of this change.
+
+## D-046: Component and node hardening before expanded model use
+
+- **Status:** Accepted for implementation at the user's request (2026-09-05).
+- **Decision:** Review the four agents, all 18 workflow nodes, four investigation nodes, analytical workers, evidence, control plane, API and UI individually. Preserve deterministic policy and metric contracts. Restrict model narrative output to selection/order of verified claim IDs; require essential investigation coverage; validate evidence versions/windows; retain partial-result caveats; use bounded shared investigation execution; record actual tool durations and reject action requests without verification.
+- **Corrections:** Use metric-registry units for ranking evidence, distinguish numerator share from metric values in charts, validate numbers against the evidence actually cited, and describe decreases correctly. Persist completed run snapshots; do not call a stale in-memory view durable recovery.
+- **Versioning:** Workflow/prompt metadata advance to `workflow-v1.1` / `prompts-v1.1`; the existing `prompts/v1` resource family contains the revised bounded output contract. OpenAPI advances additively to 0.3.0. `BRIEF_CACHE_NAMESPACE` must change with deployment settings that affect answers or policy; replicas serving one namespace must share configuration.
+- **Evidence:** User explicitly requested component/agent/node review. Inspection found these issues before enabling a real provider. No new operational anomaly formula, confidence threshold or data capability is introduced.
+
+## D-047: Alignment boundary for `plan.md`
+
+- **Status:** Review recommendation (2026-09-05); no replacement architecture or migration authorized.
+- **Decision:** Treat `plan.md` as a useful target-state design for governance, immutable publication and a worker/API split, but do not replace the accepted Java 21/Spring Boot, React/TypeScript, DuckDB and optional PostgreSQL implementation with its Python/FastAPI/Polars/Parquet stack. Adopt compatible controls incrementally through existing ports and contracts.
+- **Keep:** truth boundary, tenant-scoped typed tools, deterministic metric/evidence rendering, abstention, human approval, idempotency, audit, readiness/health checks, atomic publication concepts, source/metric registries and the proposed acceptance tests.
+- **Adapt:** Reuse existing jobs, workflow snapshots and action contracts where their scope fits. They are not complete substitutes for general commands, analytical publication or an incident lifecycle. `AnalyticsStore.dataVersion()` identifies content but does not publish or roll back it. Incident follow-up is an additive product opportunity.
+- **Reject or defer:** Python runtime migration, FastAPI replacement, raw-input mount split, canonical Parquet rewrite, `current.json` publication protocol, plan action names, and undefined metrics/dimensions. The official dataset is already ingested and governed; its M01-M18 contracts, capability matrix and composite `(business_unit, trip_id)` key supersede the plan's examples.
+- **Reconsider if:** sustained multi-replica ingestion, a materially larger data volume, or concurrent analytical writes make the current DuckDB read plane a measured bottleneck. A migration then requires a benchmark and a new ADR.
+- **Review corrections:** Fix global trip uniqueness, mutable DuckDB cross-process access and dispatch-to-resolution semantics. `product_type` and `shift_type` exist and map to `mode` and `shift_id`. See `docs/plan-alignment-review-2026-09-05.md` for evidence and recommendations.
+
+## D-048: Reconcile architecture documentation with the integrated runtime
+
+- **Status:** Accepted (2026-09-05), documentation update authorized by the user.
+- **Decision:** Update the HLD, detailed node architecture, repository map, shareable diagram and session handoff to reflect D-044 through D-046: Java state-machine orchestration, async brief jobs, bounded analytical caches/execution, PostgreSQL rich snapshots, Sarvam assistance, verified-claim rendering and the current React experience.
+- **Aligned extensions:** Analytical publication with last-good rollback, persistent DQ provenance and an incident lifecycle are proposed additions from D-047. They are not described as implemented. Preserve tenant-qualified keys, M01–M18 and G1–G3; use PostgreSQL for mutable shared control state. Action execution does not imply incident resolution.
+- **Scope:** Architecture and documentation only. No Python migration, new runtime service, API replacement, source-data rewrite or external action is authorized by this update. LangGraph4j, document RAG and enterprise infrastructure remain conditional.
+- **Evidence:** Current Java/React sources, OpenAPI 0.3.0, application configuration, V3 migrations, component review and corrected plan-alignment review.
+
+## D-049: Carry architecture documents to Java-branch without implementation
+
+- **Status:** Accepted (2026-09-05), explicitly requested by the user.
+- **Decision:** Keep implementation and current code changes on `Java-branch-2`. Transfer only the architecture decision register, HLD/node design, source-ownership map, documentation diagrams, dataset contracts and relevant review reports to `Java-branch` through a separate worktree and a documentation-only commit.
+- **Branch semantics:** Implemented-feature descriptions and recorded test/latency evidence in the transferred documents refer to the `Java-branch-2` working baseline. They do not claim those features exist in the older `Java-branch` code. Preserve its existing setup instructions and add explicit branch-scope guidance.
+- **Exclusions:** No application source, executable scripts, tests, dependencies, runtime configuration, migrations, API/schema contract files or official data are transferred. HTML/SVG architecture illustrations are documentation assets only. No branch merge or code cherry-pick is involved.
+- **Supersedes:** D-040's preserved-scaffold-only boundary for `Java-branch` solely to permit this documentation transfer. Implementation ownership and integration rules otherwise remain unchanged.
+
+## Live problem statement intake checklist (historical reference)
 
 When the hackathon begins:
 
@@ -393,6 +499,12 @@ When the hackathon begins:
 | 2026-09-05 | D-036 | Created and verified a runnable Java/React monorepo scaffold around one deterministic evidence-to-approval slice | Establish working boundaries and a regression baseline before expanding the full graph |
 | 2026-09-05 | D-037 | Adopted six exclusive parallel workstreams plus one Integration Owner, contract freeze, integration waves and release gates | Let multiple Claude sessions work concurrently without diverging on metrics, contracts, controls or demo outcomes |
 | 2026-09-05 | D-038 | Assigned Codex the C0-C7 foundation and integration coding series alongside six Claude component workstreams | Ensure both Codex and Claude write production/test code while preserving exclusive ownership |
+| 2026-09-05 | D-039 | Reconciled M04/M05/M06/M09/M11/M15/M18 and vendor qualification into metric-contract v1.1 | Prevent parallel workers from encoding contradictory denominators, aggregations or claims |
+| 2026-09-05 | D-040 | Moved new Codex and Claude integration work to `Java-branch-2` while preserving `Java-branch` | Maintain a clean implementation line from the accepted scaffold/plan baseline |
+| 2026-09-05 | D-041 | Froze shared authorization, checkpoint, approval, revalidation, execution and audit ports plus bounded workflow configuration | Give parallel component workers safe, framework-neutral contracts and deterministic control gates |
+| 2026-09-05 | D-042 | Added mandatory official-data G1 M01 reconciliation and fixed date/type normalization defects found by it | Ensure release correctness is proven on organizer data rather than only on the tiny fixture |
+| 2026-09-05 | D-043 | Added fail-visible runtime capability and release-readiness reporting | Distinguish a live process from a fully governed, releasable application during parallel integration |
+| 2026-09-05 | D-044 | Composed all six workstreams behind governed adapters and verified the approval transaction, official-data workflow, scorecard and trace | Replace every active scaffold seam with the tested, tenant-safe release path |
 | 2026-09-04 | D-027 | Added a contextual conversational investigation drawer that reuses the four-agent graph and remains subordinate to proactive reporting and approval controls | Combine conversational, proactive and reporting outputs without introducing an unsafe fifth agent or unrestricted text-to-SQL |
 | 2026-09-04 | D-028 | Switched the unimplemented application runtime to Java 21, Spring Boot, Spring AI and Angular; gated LangGraph4j behind a focused spike and Java state-machine fallback | Honor the stated Java/Angular/AWS preference without risking end-to-end functionality on a less mature orchestration port |
 | 2026-09-04 | D-029 | Official dataset received and profiled; tenant = business unit; composite trip key; D-022/D-023 superseded | 6,753 `trip_id` collisions across tenants and a real five-tenant structure replace the synthetic assumptions |
