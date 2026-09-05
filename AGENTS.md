@@ -2,17 +2,17 @@
 
 Read the four project documents at the start of a session:
 
-1. requirement.md — official dataset, metric contracts and acceptance gates.
-2. architecture.md — selected design, Java scaffold, ownership and current decisions.
-3. agents-guide.md — the four agent responsibilities and boundaries.
-4. Understanding the problem statement.md — plain-English component/node walkthrough.
+1. docs/requirement.md — official dataset, metric contracts and acceptance gates.
+2. docs/architecture.md — selected design, Java scaffold, ownership and current decisions.
+3. docs/agents-guide.md — the four agent responsibilities and boundaries.
+4. docs/Understanding the problem statement.md — plain-English component/node walkthrough.
 
 Operating rules:
 - Follow the live problem statement and current user request over older proposals.
 - Use the configured GitHub account magicashu for GitHub operations.
 - Work on Java-branch only for this separate-team scaffold unless the user changes scope. Do not copy implementation from another branch.
 - The user requested basic Java structure only. Individual team members implement business logic. Interfaces, DTOs, enums and TODO ownership do not imply working authorization, metrics, agents, providers or persistence.
-- Record material architecture, scope, metric, data, security, evaluation and demo decisions in architecture.md's Current decisions section, with matching requirement changes.
+- Record material architecture, scope, metric, data, security, evaluation and demo decisions in docs/architecture.md's Current decisions section, with matching requirement changes.
 - Preserve the accepted stack and M01–M18 v1.1 contracts. Never invent fields, formulas, thresholds, anomalies, metrics or demo numbers; reproduce the approved official-data results before display.
 - Always scope trip joins and audits by (business_unit, trip_id).
 - Keep files under outputs/official dataset/ immutable. Generate corrupted variants as separate copies.
