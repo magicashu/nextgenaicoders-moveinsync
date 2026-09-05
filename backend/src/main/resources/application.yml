@@ -11,6 +11,14 @@ mobility:
     enabled: false
   data:
     directory: ${MOBILITY_DATA_DIR:outputs/official dataset}
+  ai:
+    # No provider is required for the deterministic fallback. Set to ollama only for local semantic critique.
+    provider: ${MOBILITY_AI_PROVIDER:none}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:gemma3:4b}
+      temperature: ${OLLAMA_TEMPERATURE:0.1}
+      timeout: ${OLLAMA_TIMEOUT:30s}
 
 management:
   endpoints:
