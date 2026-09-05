@@ -55,15 +55,21 @@ class OfficialDuckDbGovernedMetricServiceTest {
     }
 
     private void writeDataset() throws Exception {
-        String header = "business_unit,trip_id,trip_date,delay_minutes,vendor_id,office,shift_type,trip_direction,product_type\n";
+        String header = "business_unit,trip_id,trip_date,delay_minutes,vendor_id,office,shift_type,trip_direction,product_type,actual_cab_registration,actual_cab_fuel_type,delay_reason,actualemployee_cnt,actual_cab_capacity,actual_escort\n";
         Files.writeString(sourceDirectory.resolve("Ride_data _trip-may_2026.csv"), header +
-                "pinnacle-Slc,1,\"June 1, 2026\",10,Vendor A,Site One,09:00,LOGIN,CAB\n");
+                "pinnacle-Slc,1,\"June 1, 2026\",10,Vendor A,Site One,09:00,LOGIN,CAB,C1,Diesel,DRIVER,2,4,false\n");
         Files.writeString(sourceDirectory.resolve("Ride_data _trip-June_2026.csv"), header +
-                "pinnacle-Slc,2,\"June 2, 2026\",0,Vendor A,Site One,09:00,LOGIN,CAB\n");
+                "pinnacle-Slc,2,\"June 2, 2026\",0,Vendor A,Site One,09:00,LOGIN,CAB,C2,Electric,,2,4,true\n");
         Files.writeString(sourceDirectory.resolve("Ride_data _trip-July_2026.csv"), header +
-                "pinnacle-Slc,3,\"June 3, 2026\",5,Vendor B,Site One,09:00,LOGIN,CAB\n");
+                "pinnacle-Slc,3,\"June 3, 2026\",5,Vendor B,Site One,09:00,LOGIN,CAB,C3,Diesel,TRAFFIC,2,4,false\n");
         for (String name : new DatasetFileCatalog().requiredFiles().subList(3, 7)) {
-            Files.writeString(sourceDirectory.resolve(name), "header\n");
+            String columns=switch(name) {
+                case "emp_Data.csv" -> "business_unit,trip_id,stwid,planned_pickup_epoch,actual_pickup_epoch,planned_drop_epoch,actual_drop_epoch,boarding_status,is_no_show,not_boarding_reason";
+                case "bill_data.csv" -> "business_unit,trip_id,cycle_start,cycle_end,trip_cost,total_trip_km";
+                case "trip_feedback.csv" -> "business_unit,trip_id,stwid,driver_rating,safety_rating";
+                default -> "business_unit,trip_id,event_id,event_type,severity,start_time,acknowledge_time";
+            };
+            Files.writeString(sourceDirectory.resolve(name), columns+"\n");
         }
     }
 }

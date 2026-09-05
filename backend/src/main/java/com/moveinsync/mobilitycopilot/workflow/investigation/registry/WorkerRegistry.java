@@ -21,7 +21,7 @@ public final class WorkerRegistry {
 
     public WorkerRegistry(List<RegisterableWorker<?>> workers) {
         for (RegisterableWorker<?> worker : workers) {
-            registry.put(worker.workerType(), worker);
+            if(registry.putIfAbsent(worker.workerType(),worker)!=null) throw new IllegalArgumentException("Duplicate worker registration: "+worker.workerType());
         }
     }
 

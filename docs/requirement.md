@@ -165,6 +165,10 @@ AI controls AI-01–AI-09 remain mandatory: treat retrieved/data content as untr
 
 ## 7. Release acceptance
 
+Implementation increment D-057–D-059: all four runtime roles must use a shared governed analytics authority, enforce current/reference request fidelity and bounded process-wide resources, and preserve canonical claim values and caveats. DS-01–DS-20 are the business acceptance scenarios. Index/aggregate choices must retain exact M01–M18 semantics; scaling evidence must identify row counts, concurrency, hardware, cold/warm state and limitations. Role skills are development guidance, not authorization or extra runtime agents.
+
+Aggregate clarification D-060: M08 group/window values are capacity-weighted ratios of summed eligible capped occupied seats to summed eligible capacity; invalid capacity or occupancy remains a quality exclusion. M03 selects a named reason, and explicit M02/M12 variants identify statistic/rating dimension. Billing-window queries use complete source cycles without invented daily allocation. Oracle tests must assert these definitions.
+
 Use the existing 30–50-case evaluation range with all risk categories represented. Deterministic tests decide numerical correctness, authorization, evidence validity and action behavior. Reviewed semantic rubrics may supplement them; a model judge cannot pass a release alone.
 
 | ID | Gate |
@@ -259,7 +263,7 @@ Feedback coverage by tenant: `orbit-Slc` 95.6%, `pinnacle-Slc` 93.5%, `catalyst-
 | # | Finding | Scale | Handling rule |
 |---:|---|---:|---|
 | Q1 | `trip_id` collides across tenants | 6,753 IDs | Composite key; never join on `trip_id` alone |
-| Q2 | Billed `total_trip_km` is zero | 100% of `vanta-Aus`, 96.7% of `vanta-Sea`, 40% overall | Cost-per-km unsupported for those tenants; cost-per-trip still supported |
+| Q2 | Billed `total_trip_km` has unreliable coverage | Predominantly missing/nonpositive for `vanta-Aus` and `vanta-Sea`; the earlier absolute-zero assertion is superseded by current source review | Cost-per-km remains unsupported for those tenants; cost-per-trip still supported |
 | Q3 | Negative `trip_cost` | 189 lines; `Meera Lebedev Travel` -14.66M across 152 lines in `vanta-Sea` May | Exclude negatives from spend metrics, report them as billing adjustments; use medians for peer comparison |
 | Q4 | Extreme `delay_minutes` | 136 trips > 600 min, max 10,644 min (7.4 days) | Cap at 600 min for averages, quarantine > 1,440 min, always keep the late flag |
 | Q5 | `EMPLOYEE_SIGN_OFF_TIME_VIOLATION` alerts | 7,670 in May (weeks of May 4-17 only), 46 in June, 20 in July, all `pinnacle-Slc` | Alert-configuration change, not an operations signal. Golden false-anomaly case: detector must classify as data-regime change and not escalate |
@@ -310,7 +314,7 @@ Legend: S supported, D derivable with caveat, U unsupported.
 | No-show and dashboard-cancellation rate | S | S | S | S | S | emp legs |
 | Occupancy | S | S | S | S | S | ride files, cap at 100% |
 | Vendor peer comparison | S | S | S (5 vendors) | S | S (3 vendors) | min volume 500 trips |
-| Site × shift × direction contribution | S | S | D (single office) | S | S | office count |
+| Site × shift × direction contribution | S | S | D (office concentration) | S | S | observed office count and group populations |
 | Cost per trip and spend trend | S | S | S | S | S | bill, negatives excluded |
 | Cost per km | S | U | U | S | S | Q2 |
 | Feedback low-rating rate | S | D (3.7% coverage) | D (3.9%) | D (11.6%) | S | Section 4 |
@@ -395,9 +399,9 @@ Expected agent behaviour: the Supervisor plans vendor, site-shift, delay-reason,
 | All five vendors deteriorated | Meera Pavlov and Priya Mikhailov worst on feedback | M01/M11 by vendor |
 | No-show improved | 13.0% → 8.0% | M06 |
 | EV share rose | 27% → 36% | M17 |
-| Cost per km | unsupported (all billed km zero) | capability matrix |
+| Cost per km | unsupported (unreliable billed-km coverage) | capability matrix Q2 |
 
-Expected behaviour: the brief shows a cross-domain trend with explicit caveats (single office, low feedback coverage, cost-per-km unavailable) and moderate confidence. Simulated as-of date: 2026-08-01.
+Expected behaviour: the brief shows a cross-domain trend with explicit caveats (office concentration, low feedback coverage, cost-per-km unavailable). Simulated as-of date: 2026-08-01. Current DuckDB reconciliation finds 69,801 vanta-Aus trips at Cedar Ridge Office and 398 at Santa Clara Office; the earlier single-office assumption is invalid. Do not assign a numerical or qualitative confidence score without an approved calibration rule.
 
 #### G3 (false anomaly, must not escalate): pinnacle-Slc sign-off violation alerts
 
@@ -417,7 +421,7 @@ Deterministic metric fixtures (hand-reconciled against the profile above):
 1. M01 for pinnacle-Slc, 2026-06-01 to 06-07 = 4,357 / 19,913.
 2. M01 baseline pinnacle-Slc, 2026-05-04 to 05-31 = 12.3%.
 3. M04 for vanta-Aus final week = 9.9% late (> 10 min).
-4. M09 for vanta-Sea May cycle excludes 158 negative lines and returns a positive median of 1,390.
+4. M09 for vanta-Sea May cycle excludes negative lines and returns a positive median of 1,390.34 (1,390 at whole-currency display precision), independently reconciled against the source CSV in DuckDB.
 5. M10 returns "unsupported" for vanta-Aus and vanta-Sea.
 6. M13 excludes sign-off violation alerts and does not flag May for pinnacle-Slc.
 7. Join on `trip_id` alone for orbit-Slc versus composite key differs by exactly 6,753 IDs.

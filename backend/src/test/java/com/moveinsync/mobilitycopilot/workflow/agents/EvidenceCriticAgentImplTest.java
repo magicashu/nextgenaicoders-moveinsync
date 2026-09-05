@@ -42,7 +42,7 @@ class EvidenceCriticAgentImplTest {
         EvidenceCriticAgent agent = new EvidenceCriticAgentImpl(new DeterministicEvidenceVerifier(), Optional.of(port),
                 new ObjectMapper().findAndRegisterModules());
 
-        VerificationResult result = agent.review(context(), List.of(new Claim("C001", "Delay increased.",
+        VerificationResult result = agent.review(context(), List.of(new Claim("C001", com.moveinsync.mobilitycopilot.evidence.application.MetricClaimText.direct(investigation().evidence().getFirst()),
                 Set.of("E001"), VerifiedClaim.Kind.DIRECT)), investigation());
 
         assertThat(result.claims()).extracting(VerifiedClaim::claimId).containsExactly("C001");
@@ -56,7 +56,7 @@ class EvidenceCriticAgentImplTest {
                 Optional.of(request -> { throw new IllegalStateException("offline"); }),
                 new ObjectMapper().findAndRegisterModules());
 
-        VerificationResult result = agent.review(context(), List.of(new Claim("C001", "Delay increased.",
+        VerificationResult result = agent.review(context(), List.of(new Claim("C001", com.moveinsync.mobilitycopilot.evidence.application.MetricClaimText.direct(investigation().evidence().getFirst()),
                 Set.of("E001"), VerifiedClaim.Kind.DIRECT)), investigation());
 
         assertThat(result.claims()).hasSize(1);
@@ -67,7 +67,7 @@ class EvidenceCriticAgentImplTest {
         TenantContext tenant = new TenantContext("pinnacle-Slc");
         MetricEvidence evidence = new MetricEvidence("E001", new MetricRequest(tenant, MetricId.M01_DELAYED_TRIP_RATE,
                 MetricRequest.Measure.VALUE, new MetricWindow(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 7)),
-                Map.of(), "data-v1"), MetricStatus.AVAILABLE, new BigDecimal("0.219"), MetricUnit.PERCENT,
+                Map.of(), "data-v1"), MetricStatus.AVAILABLE, new BigDecimal("21.88"), MetricUnit.PERCENT,
                 new BigDecimal("4357"), new BigDecimal("19913"), 19913, "metrics-v1", "M01", List.of());
         return new InvestigationResult(List.of(evidence), List.of(), List.of(), List.of());
     }

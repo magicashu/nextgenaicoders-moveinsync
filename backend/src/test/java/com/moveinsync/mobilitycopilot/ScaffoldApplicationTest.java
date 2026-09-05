@@ -15,12 +15,13 @@ class ScaffoldApplicationTest {
     @Autowired ApplicationContext context;
 
     @Test
-    void bootsWithTheOfficialM01ServiceButWithoutProviderOrLegacyDemoEndpoints() {
+    void bootsWithAllMetricContractsButWithoutProviderOrLegacyDemoEndpoints() {
         assertThat(context.getBeansOfType(DemoBriefController.class)).isEmpty();
         assertThat(context.getBeansOfType(GovernedMetricService.class)).hasSize(1);
         assertThat(context.getBeansOfType(LanguageModelPort.class)).isEmpty();
         var status = context.getBean(ScaffoldStatusController.class).capabilities();
         assertThat(status.governedRuntimeReady()).isFalse();
-        assertThat(status.implementedGovernedCapabilities()).containsExactly("M01_DELAYED_TRIP_RATE");
+        assertThat(status.implementedGovernedCapabilities()).containsExactlyElementsOf(
+                java.util.Arrays.stream(com.moveinsync.mobilitycopilot.metrics.domain.MetricId.values()).map(Enum::name).toList());
     }
 }

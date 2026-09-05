@@ -51,6 +51,8 @@ public final class ActionProposalDraftFactory {
         if (!policy.allowedDimensionKeys().containsAll(target.dimensions().keySet())) {
             throw new IllegalArgumentException("action target contains an unallowlisted dimension");
         }
+        if(target.trips()==null||target.trips().stream().anyMatch(trip->trip==null||!context.tenant().equals(trip.tenant())))
+            throw new IllegalArgumentException("Every target trip must belong to the authorized tenant");
         if (claims.isEmpty()) {
             throw new IllegalArgumentException("at least one verified claim is required");
         }

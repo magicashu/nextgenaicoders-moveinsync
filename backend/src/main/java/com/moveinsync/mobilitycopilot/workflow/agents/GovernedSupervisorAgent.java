@@ -33,7 +33,6 @@ import java.util.Set;
  * deterministic validation still owns scope, capabilities, budget, SQL boundaries, and actions.
  */
 @Service
-@ConditionalOnBean(SupervisorIssueSource.class)
 public final class GovernedSupervisorAgent implements SupervisorAgent {
     private static final int REQUESTS_PER_COMPARISON = 2;
     private final SupervisorIssueSource issueSource;
@@ -41,14 +40,14 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
     private final ObjectMapper objectMapper;
 
     public GovernedSupervisorAgent(SupervisorIssueSource issueSource) {
-        this(issueSource, null, null);
+        this(Optional.ofNullable(issueSource), null, null);
     }
 
     @Autowired
-    public GovernedSupervisorAgent(SupervisorIssueSource issueSource,
+    public GovernedSupervisorAgent(Optional<SupervisorIssueSource> issueSource,
                                         ObjectProvider<LanguageModelPort> languageModels,
                                         ObjectProvider<ObjectMapper> objectMappers) {
-        this.issueSource = Objects.requireNonNull(issueSource, "issueSource is required");
+        this.issueSource = issueSource.orElse(null);
         this.languageModel = languageModels == null ? null : languageModels.getIfAvailable();
         this.objectMapper = objectMappers == null ? null : objectMappers.getIfAvailable();
     }
@@ -56,6 +55,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
     @Override
     public InvestigationPlan plan(RunContext context, String issueId) {
         requireText(issueId, "issueId");
+        if (issueSource == null) throw new IllegalStateException("A scoped selected issue is required; use the typed planning input");
         return issueSource.find(context, issueId)
                 .map(this::plan)
                 .orElseThrow(() -> new IllegalArgumentException("selected issue is unavailable in this run scope"));
@@ -65,6 +65,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
     public InvestigationPlan plan(RunContext context, String question, String issueId) {
         SupervisorQueryRoute route = new SupervisorQuestionRouter().route(question);
         requireText(issueId, "issueId");
+        if (issueSource == null) throw new IllegalStateException("A scoped selected issue is required");
         SupervisorPlanningRequest input = issueSource.find(context, issueId)
                 .orElseThrow(() -> new IllegalArgumentException("selected issue is unavailable in this run scope"));
         MetricEvidence primary = primaryEvidence(input.issue())
@@ -73,7 +74,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
                 && primary.request().metricId() != route.metric()) {
             throw new IllegalArgumentException("question metric does not match selected issue evidence");
         }
-        if (route.status() != SupervisorQueryRoute.Status.SUPPORTED && languageModel == null) {
+        if (route.status() != SupervisorQueryRoute.Status.SUPPORTED) {
             throw new IllegalArgumentException(route.message());
         }
         return plan(input, question);
@@ -106,8 +107,11 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
         }
 
         List<InvestigationTask> tasks = new ArrayList<>();
+        long requiredTasks = rules.stream().filter(rule -> isUsable(capabilities, rule.metric())).count();
+        if (requiredTasks > permittedTasks) {
+            throw new IllegalArgumentException("budget cannot fund all required current-versus-historical comparisons");
+        }
         for (TaskRule rule : rules) {
-            if (tasks.size() == permittedTasks) break;
             if (!isUsable(capabilities, rule.metric())) continue;
             tasks.add(task(context, issue, primary.request().window(), rule));
         }
@@ -166,7 +170,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
                 .map(rule -> rule.worker().name() + ":" + rule.metric().contractId())
                 .toList(), question == null ? "" : question, input.userContext());
         try {
-            LanguageModelPort.ModelResponse response = languageModel.complete(new LanguageModelPort.ModelRequest(
+            LanguageModelPort.ModelResponse response = com.moveinsync.mobilitycopilot.workflow.application.ports.BoundedModelCalls.complete(languageModel,new LanguageModelPort.ModelRequest(
                     input.context(), LanguageModelPort.AgentRole.SUPERVISOR,
                     input.context().versions().prompts(), prompt, input.issue().evidence()));
             return mergeMandatory(parseRules(response, allowedRules), fallback);
@@ -207,7 +211,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
 
     private static List<TaskRule> mergeMandatory(List<TaskRule> selected, List<TaskRule> fallback) {
         List<TaskRule> merged = new ArrayList<>();
-        fallback.stream().limit(Math.min(2, fallback.size())).forEach(merged::add);
+        fallback.forEach(merged::add);
         selected.forEach(rule -> {
             if (!merged.contains(rule)) merged.add(rule);
         });
@@ -221,7 +225,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
 
     /** Previous four complete weeks immediately before selected current period. */
     private static MetricWindow priorFourCompleteWeeks(LocalDate currentStart) {
-        LocalDate end = currentStart.minusDays(1);
+        LocalDate end = currentStart.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).minusDays(1);
         return new MetricWindow(end.minusWeeks(4).plusDays(1), end);
     }
 
@@ -230,7 +234,6 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
                 .filter(Objects::nonNull)
                 .filter(evidence -> evidence.status() != MetricStatus.UNAVAILABLE)
                 .filter(evidence -> evidence.request() != null && evidence.request().metricId() != null)
-                .sorted(Comparator.comparing(evidence -> evidence.request().metricId().ordinal()))
                 .findFirst();
     }
 
@@ -240,6 +243,8 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
     }
 
     private static void validateTrustedInputs(RunContext context, AnomalyIssue issue, CapabilityMatrix capabilities) {
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireAuthorized(context);
+        com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireTime(context);
         if (context == null || issue == null || capabilities == null) {
             throw new IllegalArgumentException("context, issue and capabilities are required");
         }
@@ -266,6 +271,7 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
             throw new IllegalArgumentException("issue and capability data versions must match run data version");
         }
         for (MetricEvidence evidence : issue.evidence()) {
+            com.moveinsync.mobilitycopilot.workflow.domain.RunGuards.requireRequest(context,evidence.request());
             if (evidence == null || evidence.request() == null
                     || !context.tenant().equals(evidence.request().tenant())
                     || !context.versions().data().equals(evidence.request().dataVersion())) {
@@ -294,7 +300,18 @@ public final class GovernedSupervisorAgent implements SupervisorAgent {
         if (value == null || value.isBlank()) throw new IllegalArgumentException(name + " is required");
     }
 
-    private record TaskRule(WorkerType worker, MetricId metric, String question) {}
+    private record TaskRule(WorkerType worker, MetricId metric, String question) {
+        TaskRule {
+            if (!com.moveinsync.mobilitycopilot.workflow.investigation.workers.GovernedWorker.supports(worker,metric)) {
+                metric = switch(worker) {
+                    case NO_SHOW_ROSTER -> MetricId.M06_NO_SHOW_RATE;
+                    case FEEDBACK -> MetricId.M11_LOW_DRIVER_RATING_RATE;
+                    case DELAY_REASON -> MetricId.M03_DELAY_REASON_MIX;
+                    default -> throw new IllegalArgumentException("Invalid planning rule");
+                };
+            }
+        }
+    }
 
     private static final Map<MetricId, List<TaskRule>> RULES = rules();
 
