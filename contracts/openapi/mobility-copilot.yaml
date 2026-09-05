@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: Mobility Decision Copilot API
+  version: 0.1.0
+paths:
+  /api/v1/demo/brief:
+    get:
+      summary: Run the deterministic sample briefing workflow
+      parameters:
+        - in: header
+          name: X-Business-Unit
+          required: true
+          schema:
+            type: string
+          description: Demo stand-in for authenticated tenant context.
+        - in: query
+          name: asOf
+          required: false
+          schema:
+            type: string
+            format: date
+            default: 2026-06-08
+      responses:
+        "200":
+          description: Evidence-backed brief awaiting approval
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/decision-brief.schema.json
+        "400":
+          description: Invalid tenant or date
+        "500":
+          description: Dataset or metric computation failure

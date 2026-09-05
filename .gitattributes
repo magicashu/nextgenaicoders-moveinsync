@@ -1,0 +1,5 @@
+*.cmd text eol=crlf
+*.sh text eol=lf
+*.java text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf

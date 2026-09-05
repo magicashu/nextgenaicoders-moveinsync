@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/mobility}
+    username: ${POSTGRES_USER:mobility}
+    password: ${POSTGRES_PASSWORD:mobility}
+  flyway:
+    enabled: true

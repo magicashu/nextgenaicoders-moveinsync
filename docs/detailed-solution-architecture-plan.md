@@ -1,439 +1,132 @@
-# Mobility Decision Copilot: Detailed Solution Architecture
+# Mobility Decision Copilot — detailed workflow design
 
-Date: 2026-09-04  
-Status: Frozen pending dataset profiling
+This is a behavior contract for a separate team build. It uses responsibility names, not reference source filenames or implementation class names. Read the [complete plain-English handbook](team-handbook/plain-english-build-guide.md) for context and architecture components.
 
-## 1. Architecture decision
+## 4. The four agents
 
-Build a **controlled multi-agent analytical workflow**, not an autonomous swarm and not a document chatbot:
+### Agent 1 — Supervisor and planner
 
-- Four LLM specialists with separate prompts, inputs, outputs, and permissions.
-- Two components make dynamic agentic decisions: Supervisor and Investigator. Only the Investigator runs a bounded tool-selection loop.
-- Eighteen top-level LangGraph nodes plus one reusable four-node investigation subgraph.
-- DuckDB and governed metric contracts calculate operational facts.
-- Langfuse observes and evaluates the workflow; it is not the audit ledger.
-- No document RAG or neural reranker in the mandatory path while the only resource is structured trip logs.
-- A conditional fifth Knowledge Agent and seven-node retrieval subgraph only if policies, SLAs, contracts, SOPs, or historical reports arrive.
+**Job:** Decide which approved investigations can explain the selected issue.
 
-LangGraph distinguishes predetermined workflows from agents that dynamically choose tools. This system deliberately combines them instead of making every step agentic. See [LangGraph workflows and agents](https://docs.langchain.com/oss/python/langgraph/workflows-agents).
+**Receives:** The issue, user role, business unit, available data, allowed analyses and remaining work allowance.
 
-## 2. Vocabulary
+**Does:** Selects relevant investigation tasks. For example, a delay increase may need vendor and site/shift comparisons. Essential broad comparisons must survive even if AI suggests a narrower plan.
 
-| Concept | Meaning here | Example |
+**Produces:** A short plan containing tasks, scope, required evidence and stopping conditions.
+
+**Must not:** Calculate metrics, change tenant, invent thresholds, run SQL or approve actions.
+
+**If AI fails:** Use a fixed plan appropriate to the issue and available data.
+
+**Ready when:** The same input can produce a valid plan without AI, and invalid workers or foreign-tenant filters are rejected.
+
+### Agent 2 — Investigator
+
+**Job:** Gather enough evidence to answer one assigned question.
+
+**Receives:** One approved task, allowed tools, the current and comparison periods, and a work allowance.
+
+**Does:** Chooses a registered analysis, checks its result, and requests a further allowed analysis only when evidence and remaining budget justify it. Several task investigations may run together.
+
+**Produces:** Findings linked to evidence, supporting populations, warnings, uncertainties and a complete/partial/failed status.
+
+**Must not:** Query unrestricted data, calculate new business formulas, take actions or continue indefinitely.
+
+**If a tool fails:** Preserve useful completed evidence, identify what is missing and stop when the allowance expires.
+
+**Ready when:** A slow or failed branch cannot hang the whole run, and evidence from the wrong business unit, date range or data version is rejected.
+
+### Agent 3 — Evidence critic
+
+**Job:** Challenge the conclusions before the user sees them.
+
+**Receives:** Claims, supporting evidence, data limitations and the rules for acceptable claims.
+
+**Does:** Questions unsupported attribution, contradictions and missing caveats. It may point to an existing claim or known limitation for review.
+
+**Produces:** A structured review: acceptable, needs correction, or insufficient evidence.
+
+**Must not:** Invent missing facts, fetch extra data or overrule the final fixed-rule verifier.
+
+**If AI fails:** Use deterministic evidence checks and known caveats.
+
+**Ready when:** An unsupported statement such as blaming one vendor when all qualified vendors worsened cannot pass unchanged.
+
+### Agent 4 — Briefing and action drafting
+
+**Job:** Turn the checked evidence into a useful decision brief.
+
+**Receives:** Verified claims, audience, all material caveats and the allowed action policies.
+
+**Does:** Organizes the same facts into an operations view and a leadership view. AI may select or order verified claim identifiers; fixed templates render their approved wording. Fixed rules choose and scope any action proposal.
+
+**Produces:** Two consistent summaries and, when appropriate, a draft proposal with evidence, scope and expiry.
+
+**Must not:** Add numbers, omit important caveats, silently change meaning, approve an action or contact a vendor.
+
+**If AI fails:** Use the deterministic report template.
+
+**Ready when:** Both audience views remain faithful to the same evidence and every proposed action remains a draft.
+
+## 5. The 18 workflow nodes, one by one
+
+The labels are responsibilities, not required source-file or class names.
+
+| # | Node | Receives | What it does in simple terms | Produces / next step | If it cannot proceed |
+|---:|---|---|---|---|---|
+| 1 | Start the run | Request, identity and settings | Gives this attempt an ID and records its date, versions and work limits | Run record → 2 | Reject invalid input |
+| 2 | Check access | Identity, role and requested business unit | Confirms that this person may request these analyses | Authorized scope → 3 | Deny before data access |
+| 3 | Check the dataset | Authorized scope and data catalog | Reads availability and quality information for the chosen data version | Data profile → 4 | Record missing/invalid sources |
+| 4 | Decide available capabilities | Data profile and metric requirements | Determines which analyses are supported, limited or unavailable | Capability list → 5 | Disable affected analyses; retain safe ones |
+| 5 | Calculate the metric snapshot | Scope, date and approved definitions | Loads or computes current values, baselines, populations and units | Versioned measurements → 6 | Explain unavailable measurements; never substitute guesses |
+| 6 | Detect meaningful changes | Measurements and approved detection rules | Separates material operational changes, healthy results and data-regime changes | Candidates → 7; healthy brief → 18 | No usable metrics means unavailable, not healthy |
+| 7 | Choose the issue to investigate | Valid candidates and priority rules | Picks the highest-priority issue using the approved rules | Selected issue → 8 | Provide a qualified outcome if no eligible issue remains |
+| 8 | Plan the investigation | Issue, capabilities and budget | Runs the supervisor role | Draft investigation plan → 9 | Use a deterministic plan |
+| 9 | Validate the plan | Plan and authorized scope | Checks worker names, filters, data support and budget | Allowed task list → 10 | Remove invalid tasks; stop if none remain |
+| 10 | Run investigations | Valid tasks | Runs the investigator for each task within shared resource limits | Task results → 11 | Preserve complete/partial branches and show failures |
+| 11 | Merge the evidence | Task results and selected-issue evidence | Removes duplicates, links claims and retains quality/coverage warnings | One evidence package → 12 | Mark gaps and inconsistent evidence |
+| 12 | Critique the evidence | Claims and evidence package | Runs the evidence critic | Review result → 13 | Continue with deterministic checks |
+| 13 | Verify the claims | Evidence, claims and critic feedback | Checks cited evidence, numbers, scope, versions and allowed meaning | Verified or qualified claims → 14 | At most one claim-removal/recheck cycle; failed verification cannot authorize an action |
+| 14 | Prepare the decision brief | Checked claims and allowed action policies | Runs the briefing role and fixed templates | Operations brief, leadership brief, optional draft → 15 | Use a safe template and show limitations |
+| 15 | Check action policy | Proposal and verification result | Checks action type, business-unit scope, evidence, confidence and expiry | Eligible proposal → 16; report-only → 18 | Block the proposal while preserving a qualified report |
+| 16 | Wait for human approval | Eligible proposal | Saves the pending decision and lets the user approve, edit or reject | Durable pause; human decision → 17 | Keep pending, or expose persistence/expiry problems |
+| 17 | Recheck and perform the simulated action | Saved proposal and human decision | Handles rejection; for approval/edit, rechecks access, expiry, fresh evidence and full proposal before one simulated effect | Receipt or non-execution reason → 18 | Never execute on stale evidence, invalid edits or failed checks |
+| 18 | Record and finish | Run outcome and relevant events | Records the final business outcome, references and receipt | Readable terminal result | Surface audit/persistence failures; do not silently claim success |
+
+The ordinary path is 1 → 2 → … → 16, then 17 → 18 after a person responds. Healthy and report-only paths end earlier. Access denial stops before analytics.
+
+The correction at node 13 only removes unsupported claims and checks again. It does not restart planning or repeatedly call tools.
+
+## 6. The investigator's four smaller steps
+
+Each task at node 10 uses the same small loop.
+
+| Step | Plain-English responsibility | Stop rule |
 |---|---|---|
-| Agent | LLM component making a bounded semantic decision or tool selection | Investigator chooses the next approved analysis |
-| Node | One graph state transition with one responsibility | `verify_evidence` |
-| Tool | Typed deterministic function exposed to an agent | `rank_contributors(...)` |
-| Service | Non-LLM application component | DuckDB metric engine or audit repository |
-| Worker task | Isolated invocation of a reusable subgraph | Vendor-contribution investigation |
+| Choose an analysis | Select a registered tool relevant to this task and available evidence | Stop when no allowed analysis can help |
+| Run the analysis | Call it with checked tenant, date, dimension and filter values | Respect the call/time allowance |
+| Validate the result | Check business unit, time window, data version, measurement definitions and quality | Reject mismatched or malformed evidence |
+| Check progress | Decide whether enough has been learned or one bounded follow-up is justified | Finish as complete, partial or failed when evidence or budget runs out |
 
-Multi-agent quality comes from meaningful context, tool, and policy boundaries—not agent count.
+Follow-up scope must be justified by the evidence. AI cannot narrow the investigation arbitrarily to manufacture a preferred conclusion.
 
-## 3. Four LLM specialists
+## 7. Seven analysis workers
 
-### A1. Supervisor and Planning Agent
+A worker is an approved analytical job, not another permanent AI agent.
 
-- **Purpose:** Turn the selected issue or question into a small investigation plan.
-- **Input:** Persona, request mode, capability matrix, anomaly/question, available tools, and remaining budget.
-- **Output:** Typed `InvestigationPlan` containing required metrics, comparisons, tasks, dependencies, allowed dimensions, and stop conditions.
-- **Permissions:** No raw SQL, retrieval, calculation, or action execution. It selects only registered tasks.
-- **Boundary:** Broad planning context, zero authority to create facts.
-
-### A2. Investigation Agent
-
-- **Purpose:** Resolve one bounded task with governed read-only analytical tools.
-- **Input:** One task, compatible tools, existing evidence summaries, and budget.
-- **Output:** Evidence IDs, measured contributors, coverage, quality warnings, direct findings, inferences, and unresolved questions.
-- **Permissions:** No arbitrary SQL, writes, cross-tenant access, or unrestricted APIs.
-- **Limits:** Configured tool-call, row, time, token, and cost limits.
-
-### A3. Evidence Critic
-
-- **Purpose:** Challenge draft findings before they reach the user.
-- **Input:** Evidence package, claims, metric definitions, and claim rules.
-- **Output:** Supported claims, overclaims, missing caveats, contradictions, and pass/revise/abstain.
-- **Permissions:** No tools, database, retrieval, or actions.
-- **Limit:** One review and at most one correction cycle.
-
-### A4. Briefing and Action-Drafting Agent
-
-- **Purpose:** Create the operations brief, leadership narrative, and bounded action proposal from verified evidence.
-- **Input:** Verified findings, persona templates, confidence/caveats, and allowed action types.
-- **Output:** Typed `DecisionBrief` and `ActionProposal`.
-- **Permissions:** No database, retrieval, or execution. It cannot introduce a factual claim without an evidence ID.
-
-### Conditional A5. Knowledge Agent
-
-Add only if documents contain decision-relevant knowledge absent from structured fields. It returns cited `DocumentEvidence` and has no metric or action permissions.
-
-## 4. Why data domains are workers, not agents
-
-Vendor, route/shift, GPS, cost, feedback, and safety analyses use the same tenant, governed engine, policy boundary, and result schema. They are parallel worker tasks executed through the same Investigation Agent subgraph.
-
-Separate permanent agents would add prompts, state, model calls, latency, and merging failures without creating a real boundary. LangGraph's orchestrator-worker pattern and `Send` support isolated dynamic workers when the validated plan calls for them. See [orchestrator-worker guidance](https://docs.langchain.com/oss/python/langgraph/workflows-agents#orchestrator-worker).
-
-## 5. Main graph: 18 nodes
-
-`START` and `END` are not counted.
-
-| # | Node | Type | Responsibility | Failure/degraded route |
-|---:|---|---|---|---|
-| 1 | `initialize_run` | Deterministic | Create run, trace, data version, request mode, budget, and tenant-safe IDs | Reject malformed request |
-| 2 | `authorize_scope` | Deterministic | Enforce tenant, persona, metrics, dimensions, and tools | Fail closed |
-| 3 | `profile_dataset` | Deterministic | Read/calculate schema and data-quality facts | Continue with supported capabilities |
-| 4 | `build_capability_matrix` | Deterministic | Mark analyses supported, derivable, or unavailable | Disable unsupported branches |
-| 5 | `compute_metric_snapshot` | Deterministic | Compute versioned metrics, baselines, population, and freshness | Quality-qualified snapshot |
-| 6 | `detect_anomalies` | Deterministic | Compare against available SLA, history, or peers | Healthy-brief route |
-| 7 | `prioritize_issue` | Deterministic | Select the highest-value issue with configurable materiality/confidence rules | Low-confidence investigation only |
-| 8 | `supervisor_plan` | LLM A1 | Create bounded typed plan | Parse retry once, then fallback |
-| 9 | `validate_plan` | Deterministic | Check tools, dimensions, capabilities, budget, and dependencies | Remove invalid tasks or stop |
-| 10 | `run_investigations` | Subgraph A2 | Dispatch isolated tasks through the reusable investigator | Preserve successful branches |
-| 11 | `merge_evidence` | Deterministic | Deduplicate and link evidence to data/metric versions and claims | Flag contradictions/gaps |
-| 12 | `evidence_critic` | LLM A3 | Detect unsupported language and missing caveats | Revise once or abstain |
-| 13 | `verify_evidence` | Deterministic | Enforce arithmetic, provenance, freshness, policy, and confidence | Safe partial answer |
-| 14 | `compose_decision_brief` | LLM A4 | Produce dual brief and action draft | Deterministic template fallback |
-| 15 | `action_policy_gate` | Deterministic | Validate action, parameters, evidence, expiry, and authorization | Report-only/reject route |
-| 16 | `approval_interrupt` | Human | Pause for approve, reject, or edit with serializable payload | Rejection/expiry to audit |
-| 17 | `execute_mock_action` | Deterministic | Idempotently create mock escalation/ticket/watchlist/draft | Bounded retry, never duplicate |
-| 18 | `append_audit_event` | Deterministic | Persist run, evidence, decision, approval, and receipt refs | Surface ledger failure |
-
-```mermaid
-flowchart TD
-    S([START / schedule / load / question]) --> N1[1 initialize_run]
-    N1 --> N2[2 authorize_scope]
-    N2 --> N3[3 profile_dataset]
-    N3 --> N4[4 build_capability_matrix]
-    N4 --> N5[5 compute_metric_snapshot]
-    N5 --> N6[6 detect_anomalies]
-    N6 -->|healthy schedule| H[healthy brief]
-    N6 -->|issue or question| N7[7 prioritize_issue]
-    N7 --> N8[8 supervisor_plan - A1]
-    N8 --> N9[9 validate_plan]
-    N9 --> N10[[10 investigation subgraph - A2]]
-    N10 --> N11[11 merge_evidence]
-    N11 --> N12[12 evidence_critic - A3]
-    N12 --> N13[13 verify_evidence]
-    N13 -->|one revision allowed| N8
-    N13 -->|pass or qualified| N14[14 compose_decision_brief - A4]
-    N14 --> N15[15 action_policy_gate]
-    N15 -->|report only / reject| N18[18 append_audit_event]
-    N15 -->|eligible| N16{{16 approval_interrupt}}
-    N16 -->|reject / expire| N18
-    N16 -->|approve| N17[17 execute_mock_action]
-    N17 --> N18
-    H --> N18
-    N18 --> E([END])
-```
-
-The revision edge requires `revision_count <= 1`. Every loop has hard tool-call, time, token, and cost limits.
-
-## 6. Investigation subgraph: four nodes
-
-`run_investigations` invokes this subgraph per validated task. Independent calls may run in parallel.
-
-| Node | Type | Responsibility |
+| Worker | Question it helps answer | Important limitation |
 |---|---|---|
-| `choose_analysis` | LLM A2 | Select one next governed tool or finish |
-| `execute_analysis` | Deterministic | Run a registered parameterized query/computation |
-| `validate_tool_result` | Deterministic | Check schema, provenance, coverage, row limits, and errors |
-| `progress_gate` | Deterministic | Continue, stop, qualify, or return partial evidence |
+| Vendor | Did one vendor worsen, or did the change affect vendors broadly? | Universal vendor claims require qualification in both periods |
+| Site, shift and direction | Where and when is the change concentrated? | These are analytical groupings; do not invent a route ID |
+| Delay reason | Which recorded reason categories contribute to delays? | A reason category is not proof of root cause |
+| Cost and billing | What do the approved billed-cost measures show? | No budget/savings claim without data; cost-per-km may be unsupported |
+| Feedback | What do ratings show and how much coverage do they have? | Low coverage must remain visible; follow the rating-zero policy |
+| Tracking and safety alerts | Are valid alert/tracking measures changing? | No GPS map; exclude known recording-regime changes from operational escalation |
+| No-show and roster | What do eligible employee-leg records show about no-shows and related measures? | Use the approved leg population, not a guessed trip denominator |
 
-```mermaid
-flowchart LR
-    I([task]) --> C[choose_analysis - A2]
-    C --> X[execute_analysis]
-    X --> V[validate_tool_result]
-    V --> G{progress_gate}
-    G -->|more evidence and budget| C
-    G -->|complete / partial / exhausted| O([InvestigationResult])
-```
 
-Use default per-invocation subgraph persistence so parallel calls remain isolated while inheriting the parent checkpointer. This is the current recommended mode for independent multi-agent calls. See [LangGraph subgraph persistence](https://docs.langchain.com/oss/python/langgraph/use-subgraphs#subgraph-persistence).
+## Shared records and build acceptance
 
-## 7. Governed analytical tools
+Agree the request, job, run, evidence, plan, claim, brief, proposal, decision, receipt and audit records described in the handbook before component development. Each producer and consumer must agree error cases as well as success cases.
 
-The LLM selects registered metric IDs, dimensions, filters, and comparison modes; it never writes arbitrary SQL.
-
-```text
-get_metric(metric_id, window, filters, grain)
-compare_metric(metric_id, current_window, reference_mode, filters)
-rank_contributors(metric_id, dimension, window, filters, min_volume)
-get_distribution(metric_id, dimension, window, filters)
-estimate_impact(issue_id, impact_model_id)
-get_quality_report(fields_or_metric_ids)
-get_bounded_examples(evidence_id, limit, redaction_policy)
-simulate_action(action_type, target_ids, parameters)
-```
-
-Every tool result includes evidence/query ID, metric contract/version, data version, window, filters, grain, numerator, denominator, value/unit, comparison, population, coverage, warnings, and tenant-safe provenance.
-
-The metric registry owns definition, formula implementation, owner, allowed dimensions, exclusions, unit, grain, freshness, authorization, and edge-case behavior. Incompatible groupings are rejected, not approximated.
-
-## 8. RAG decision
-
-### Mandatory path: no document RAG
-
-The live statement names structured trip logs, not a document corpus. Therefore:
-
-- SQL retrieves operational facts.
-- The metric catalog retrieves approved definitions by ID/alias.
-- Evidence IDs retrieve computed results for synthesis.
-- The LLM generates only from verified evidence objects.
-
-This is retrieval-grounded generation over structured evidence, but it should not be advertised as vector RAG. Embeddings and cross-encoders do not calculate on-time arrival, cost, occupancy, or affected employees.
-
-### Conditional activation gate
-
-Activate document RAG only when all are true:
-
-1. Documents contain decision-relevant knowledge absent from structured fields.
-2. At least five golden questions require policy/SLA/contract/SOP evidence.
-3. Tenant, role, version, effective date, page/section, and citations are preservable.
-4. Retrieval evaluation beats a lexical-only baseline inside the latency budget.
-
-If any gate fails, RAG stays disabled.
-
-## 9. Conditional hybrid RAG and reranking: seven nodes
-
-If the gate passes, add A5 and a subgraph parallel to analytical investigation:
-
-| Node | Responsibility |
-|---|---|
-| `classify_knowledge_need` | Form the policy query and required authority/effective date |
-| `authorize_and_filter` | Apply tenant, role, document type, entity, version, and effective-date filters before search |
-| `parallel_retrieve` | Run BM25/lexical and embedding retrieval for recall |
-| `fuse_candidates` | Reciprocal-rank fusion while retaining component ranks/provenance |
-| `rerank_candidates` | Second-stage cross-encoder or evaluated constrained-model ordering against the original question |
-| `dedupe_and_pack` | Remove overlap and preserve authority/diversity within context budget |
-| `verify_citations` | Validate passage, version, authorization, and claim support |
-
-Evaluation starting point, not a fixed configuration:
-
-- Retrieve about 15-25 candidates from each first-stage retriever.
-- Fuse and rerank roughly 15-25 unique candidates.
-- Pass about 4-6 authoritative, non-duplicative passages.
-- Treat scores as ranking diagnostics, not confidence probabilities.
-
-Tune with evidence recall, MRR/nDCG, citation precision, duplicate rate, latency, cost, and ACL violations. Reranking is a second-stage ordering mechanism over a high-recall candidate set; see [Cohere Rerank](https://docs.cohere.com/v2/docs/rerank).
-
-Do not initially add HyDE, multi-query expansion, knowledge graphs, OpenKB/PageIndex, LLM-only reranking, whole-document prompting, or post-generation access filtering. Add a strategy only to fix a measured failure.
-
-## 10. Two ranking problems
-
-### Operational prioritization
-
-Rank anomalies using deterministic configurable features: safety override, SLA/trend gap, affected trips/employees, cost impact, persistence, coverage/confidence, and minimum volume. Do not freeze weights or thresholds before profiling the dataset. Expose score components in the UI.
-
-### Document reranking
-
-Order policy/document passages after ACL-filtered hybrid retrieval. It is conditional and never alters an operational metric.
-
-## 11. Shared typed state
-
-```python
-class MobilityState(TypedDict):
-    run: RunContext
-    request: RequestContext
-    budget: ExecutionBudget
-    data_profile: DataProfile
-    capabilities: CapabilityMatrix
-    metric_snapshot: list[MetricEvidence]
-    anomaly_candidates: list[Anomaly]
-    selected_issue: Anomaly | None
-    investigation_plan: InvestigationPlan | None
-    investigation_results: Annotated[list[InvestigationResult], operator.add]
-    document_evidence: Annotated[list[DocumentEvidence], operator.add]
-    evidence_package: EvidencePackage | None
-    critique: Critique | None
-    verification: VerificationResult | None
-    decision_brief: DecisionBrief | None
-    action: ActionProposal | None
-    approval: ApprovalDecision | None
-    execution_receipt: ExecutionReceipt | None
-    errors: Annotated[list[WorkflowError], operator.add]
-    audit_event_ids: Annotated[list[str], operator.add]
-```
-
-All models are JSON-serializable and versioned. Use explicit reducers for parallel lists; keep large data outside graph state behind evidence IDs.
-
-## 12. Approval, recovery, and audit
-
-Compile the parent graph with a checkpointer and tenant-safe `thread_id`. SQLite is acceptable locally; PostgreSQL is the production story. LangGraph distinguishes thread checkpoints from cross-thread stores and requires thread IDs for persistence. See [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence).
-
-Approval payload:
-
-```json
-{
-  "action_id": "...",
-  "action_type": "create_vendor_investigation",
-  "targets": ["vendor-token"],
-  "reason": "...",
-  "evidence_ids": ["..."],
-  "expected_effect": "...",
-  "risk": "low",
-  "expires_at": "...",
-  "idempotency_key": "..."
-}
-```
-
-Rules:
-
-- Put `interrupt()` in a dedicated approval node.
-- Never perform a non-idempotent write before it; LangGraph restarts the node on resume.
-- Recheck authorization, parameters, evidence version, expiry, and preconditions after approval.
-- Enforce idempotency at the action repository boundary.
-- Audit proposal, approval/rejection/edit, attempts, receipt, and final status.
-
-See current [LangGraph interrupt rules](https://docs.langchain.com/oss/python/langgraph/interrupts#rules-of-interrupts).
-
-## 13. Verification and confidence
-
-The deterministic verifier ensures:
-
-- Every displayed number exists in evidence.
-- Units, filters, populations, and periods are compatible.
-- Current/reference windows are valid.
-- Claim evidence is present and authorized.
-- Missing GPS/roster/join coverage appears in caveats.
-- “Caused” is rejected without causal evidence; use “contributed,” “associated,” or “coincided.”
-- Sparse groups are suppressed or qualified.
-- Action type and parameters are allowlisted.
-
-Confidence is computed from data coverage/quality, statistical/material support, agreement across signals, freshness, and investigation completeness—not the LLM's self-rating.
-
-## 14. Langfuse trace
-
-One graph run is one root trace:
-
-```text
-mobility_run
-  authorize_scope
-  profile_dataset
-  compute_metric_snapshot
-  detect_anomalies
-  supervisor_plan
-  investigation.vendor
-    choose_analysis
-    tool.rank_contributors
-  investigation.gps
-    choose_analysis
-    tool.get_quality_report
-  merge_evidence
-  evidence_critic
-  verify_evidence
-  compose_decision_brief
-  approval_interrupt
-  execute_mock_action
-  append_audit_event
-```
-
-Record safe tenant, run/thread ID, workflow/prompt/model/metric/data versions, task/tool, evidence count, latency, usage/cost, retries, outcome, approval, and audit ID. Redact PII and secrets.
-
-Langfuse supports LangChain callbacks and manual Python/OpenTelemetry instrumentation, so it observes the graph without dictating orchestration. See [Langfuse tracing](https://langfuse.com/docs/observability/get-started).
-
-## 15. Evaluation
-
-### Deterministic tests
-
-- Hand-calculated metric fixtures for nulls, duplicates, cancellations, zero denominators, time zones, and late data.
-- Capability behavior without GPS, cost, roster, feedback, or SLA.
-- Plan validator blocks arbitrary SQL, unsupported dimensions, excess tasks, and cross-tenant scope.
-- Verifier catches changed numbers, missing evidence, incompatible periods, and unsupported causal claims.
-- Approval reject/edit/expiry, crash/resume, and duplicate execution.
-
-### Trajectory tests
-
-- Correct tool category and maximum calls.
-- Stops when evidence is sufficient.
-- Returns partial evidence when one branch fails.
-- Abstains when evidence is inadequate.
-- Uses at most one correction cycle.
-
-### Narrative tests
-
-- Operations and leadership outputs contain identical facts.
-- Every factual claim resolves to evidence.
-- Missing-data caveats are visible.
-- LLM judges assess only clarity, relevance, and explanation groundedness—not arithmetic, security, or authorization.
-
-Once the real schema is known, create 20-30 golden cases and five corrupted-data variants. No cross-tenant leak, wrong governed metric, unsupported citation, or unauthorized action may pass.
-
-## 16. Security boundaries
-
-- Authorize before retrieving metrics or documents.
-- Use read-only, template-based analytical queries.
-- Tokenize/redact employee and driver IDs in prompts, traces, and UI.
-- Treat user text, dataset text, documents, peer-agent output, and tool output as untrusted.
-- Validate structured output before state updates.
-- Expose no shell, generic SQL/HTTP/URL/filesystem, or real vendor-system tool.
-- Propose, validate, approve, revalidate, idempotently execute, and audit every write.
-- Fail closed for access/actions with a useful non-sensitive explanation.
-
-## 17. Judge-proof UI
-
-One screen should expose:
-
-1. Proactive morning brief and top issue.
-2. Metric, SLA/history/peer comparison, population, and freshness.
-3. Vendor/route/GPS/cost/feedback evidence drawer.
-4. Direct versus inferred claims, confidence components, and caveats.
-5. Action, expected effect, risk, and approve/reject/edit.
-6. Forwardable leadership narrative from the same evidence.
-7. Trace ID, audit ID, versions, latency/cost, and evaluation status.
-
-The dashboard is not the product; the proactive decision and controlled intervention are.
-
-## 18. Implementation order
-
-### Before data arrives
-
-1. Pydantic state/output contracts.
-2. Metric registry interface and synthetic fixtures.
-3. Dataset adapter and profiler.
-4. Graph skeleton with mocked deterministic tools.
-5. One synthetic golden path and one degraded path.
-6. Checkpoint, approval, idempotency, audit, and trace skeleton.
-7. Minimal UI on stable sample responses.
-
-### On receipt
-
-1. Preserve and checksum source.
-2. Profile schema, types, nulls, duplicates, categories, timestamps, units, keys, and join coverage.
-3. Map fields and build capability matrix.
-4. Hand-reconcile initial metrics.
-5. Select the strongest real issue and supported comparison.
-6. Enable only supported workers.
-7. Record actual formulas, thresholds, values, and golden cases in the decision register.
-
-### Build sequence
-
-1. One metric end to end.
-2. Proactive trigger/prioritization.
-3. Two strong investigation dimensions.
-4. Verified dual brief.
-5. Approval/audit.
-6. Traces/evaluations.
-7. Messy-data variants.
-8. Additional supported dimensions.
-9. Optional RAG only if its gate passes.
-
-## 19. Team split
-
-| Owner | Responsibility | Contract |
-|---|---|---|
-| Data/metrics | Adapter, DuckDB, registry, anomaly/contribution tools | Typed evidence objects |
-| Agent/backend | LangGraph, API, checkpoint/recovery | Pydantic state/contracts |
-| Product/frontend | Brief, investigation, approval, leadership/trust views | Stable API fixtures from hour one |
-| Quality/demo | Langfuse, tests, audit proof, deck, demo script | Requirement-to-proof matrix |
-
-With three people, combine quality/demo with agent/backend. Split by engineering boundary, not one person per agent.
-
-## 20. Cuts and final pitch
-
-Cut in order: document RAG/A5, extra investigation dimensions, general chat, rich export, PostgreSQL/deployment polish.
-
-Never cut: one correct governed metric, contextual benchmark, proactive trigger, evidence-backed investigation, verified dual output, approval/audit, and deterministic fallback.
-
-Judge-facing wording:
-
-> We use four specialized LLM roles, but only where semantic judgment helps. LangGraph controls an 18-node workflow; a bounded investigator subgraph runs supported domain analyses in parallel. All metrics, thresholds, authorization, evidence checks, approvals, and actions remain deterministic. Because the supplied resource is structured trip data, SQL is operational truth. Hybrid RAG and reranking are a conditional policy-evidence lane, activated only if decision-relevant documents arrive. Every conclusion is versioned, traceable, approval-gated, and auditable.
+Use the [work packages](team-handbook/team-work-packages.md) to assign owners. Use the [data and metric rules](team-handbook/data-and-metric-rules.md) for calculations. A new build must independently demonstrate its golden, security, failure, recovery and UI acceptance checks.
