@@ -60,11 +60,11 @@ export function ScorecardPage() {
               <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: 6 }}>Latency (ms)</div>
               <ResponsiveContainer width="100%" height={110}>
                 <BarChart data={latencyData} margin={{ top: 0, right: 4, left: -30, bottom: 0 }}>
-                  <CartesianGrid stroke="rgba(99,147,220,0.06)" />
-                  <XAxis dataKey="label" tick={{ fill: '#7a97c0', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#7a97c0', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0d1526', border: '1px solid #1e3a5f', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="value" fill="#06b6d4" radius={[3, 3, 0, 0]} />
+                  <CartesianGrid stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="label" tick={{ fill: '#6B7A70', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#6B7A70', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="value" fill="#3FA535" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -72,11 +72,11 @@ export function ScorecardPage() {
               <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: 6 }}>Call counts</div>
               <ResponsiveContainer width="100%" height={110}>
                 <BarChart data={callData} margin={{ top: 0, right: 4, left: -30, bottom: 0 }}>
-                  <CartesianGrid stroke="rgba(99,147,220,0.06)" />
-                  <XAxis dataKey="label" tick={{ fill: '#7a97c0', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#7a97c0', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0d1526', border: '1px solid #1e3a5f', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="value" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                  <CartesianGrid stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="label" tick={{ fill: '#6B7A70', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#6B7A70', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="value" fill="#3C68D0" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

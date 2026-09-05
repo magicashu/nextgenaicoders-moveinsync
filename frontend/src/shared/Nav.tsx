@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { TENANTS } from '../core/mockData'
 import { useAppStore } from '../core/store'
 
@@ -15,7 +16,17 @@ interface Props {
 }
 
 export function TopNav({ page, setPage }: Props) {
-  const { tenant, setTenant } = useAppStore()
+  const { tenant, setTenant, refresh, lastRefresh } = useAppStore()
+  const [spinning, setSpinning] = useState(false)
+
+  function handleRefresh() {
+    setSpinning(true)
+    refresh()
+    setTimeout(() => setSpinning(false), 800)
+  }
+
+  const lastRefreshStr = new Date(lastRefresh).toLocaleTimeString()
+
   return (
     <nav className="topnav">
       <div className="topnav-brand">
@@ -28,7 +39,20 @@ export function TopNav({ page, setPage }: Props) {
       </div>
       <div className="topnav-right">
         <span className="live-dot" />
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Mock mode</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+          Last updated {lastRefreshStr}
+        </span>
+        <button className="refresh-btn" onClick={handleRefresh} title="Refresh data" type="button">
+          <svg
+            width="14" height="14" viewBox="0 0 14 14" fill="none"
+            style={{ transition: 'transform 0.8s ease', transform: spinning ? 'rotate(360deg)' : 'rotate(0deg)' }}
+          >
+            <path d="M13 2v4H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M1 12v-4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2.34 8.5A6 6 0 0 1 12.6 5.5M11.66 5.5A6 6 0 0 1 1.4 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Refresh
+        </button>
         <select
           className="tenant-select"
           value={tenant}

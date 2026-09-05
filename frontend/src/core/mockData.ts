@@ -21,7 +21,7 @@ export const NODE_AGENT: Record<WorkflowNode, string> = {
 }
 
 export const AGENT_COLORS: Record<string, string> = {
-  system: '#6366f1', supervisor: '#06b6d4', investigator: '#10b981', critic: '#f59e0b', briefing: '#ec4899',
+  system: '#3C68D0', supervisor: '#3FA535', investigator: '#27D22E', critic: '#FF9D00', briefing: '#C13D6D',
 }
 
 export const vendorData = [

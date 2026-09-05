@@ -1,4 +1,4 @@
-import { auditEvents, AGENT_COLORS } from '../../core/mockData'
+import { AGENT_COLORS } from '../../core/mockData'
 import { useAppStore } from '../../core/store'
 import { useState } from 'react'
 
@@ -10,11 +10,6 @@ const EVENT_ICONS: Record<string, string> = {
 export function AuditPage() {
   const { tenant } = useAppStore()
   const [filter, setFilter] = useState('')
-
-  const filtered = auditEvents.filter(e =>
-    e.tenant === tenant &&
-    (filter === '' || e.event.toLowerCase().includes(filter.toLowerCase()) || e.agent.toLowerCase().includes(filter.toLowerCase()))
-  )
 
   return (
     <div>
@@ -33,53 +28,12 @@ export function AuditPage() {
       </div>
 
       <div className="card">
-        <div className="card-body" style={{ padding: 0 }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              No events match the filter for <strong style={{ color: 'var(--text-dim)' }}>{tenant}</strong>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Event</th><th>Agent</th><th>Run ID</th><th>Timestamp</th><th>Tenant</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((e) => (
-                  <tr key={e.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '1rem' }}>{EVENT_ICONS[e.event] ?? '·'}</span>
-                        <span style={{ fontWeight: 700 }}>{e.event.replace(/_/g, ' ')}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="agent-badge" style={{
-                        color: AGENT_COLORS[e.agent] ?? 'var(--text-dim)',
-                        borderColor: `${AGENT_COLORS[e.agent] ?? '#1e3a5f'}44`,
-                        background: `${AGENT_COLORS[e.agent] ?? '#1e3a5f'}12`,
-                      }}>
-                        {e.agent}
-                      </span>
-                    </td>
-                    <td className="td-mono">{e.runId}…</td>
-                    <td className="td-mono">{e.ts}</td>
-                    <td>
-                      <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)', fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
-                        {e.tenant}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div className="card-body" style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Audit events appear after running an investigation</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+            Go to Dashboard and click <strong>Apply</strong> to generate a run. Events will be captured here.
+          </div>
         </div>
-      </div>
-
-      <div style={{ marginTop: 12, fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-        {filtered.length} event{filtered.length !== 1 ? 's' : ''} · scoped to {tenant}
       </div>
     </div>
   )
