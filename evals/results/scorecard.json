@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-09-05T01:32:06Z",
+  "target": "http://localhost:8080",
+  "gates": [
+    {
+      "id": "G1",
+      "name": "G1 brief produced with evidence",
+      "status": "PASS",
+      "detail": "HTTP 200 status=AWAITING_APPROVAL in 82 ms"
+    },
+    {
+      "id": "G2",
+      "name": "G2 caveats visible",
+      "status": "PASS",
+      "detail": "HTTP 200; caveats: Meets configured target, editable per tenant of 10.00. 1 site_id members below the minimum volume of 300 in both windows are shown as qualified context only 35 "
+    },
+    {
+      "id": "G3",
+      "name": "G3 sign-off step change not escalated",
+      "status": "PASS",
+      "detail": "HTTP 200; headline=M01_DELAYED_TRIP_RATE; notes=['EMPLOYEE_SIGN_OFF_TIME_VIOLATION alerts fell from about 3788 per week to 0 in the week of 2026-05-18 while other alert types stayed stable. Classified as a data-regime change (alert configuration), not an operational issue. Excluded from alert-rate metrics and never escalated.']"
+    },
+    {
+      "id": "SEC",
+      "name": "adversarial cases refused",
+      "status": "PASS",
+      "detail": "SEC-TENANT-001=404, SEC-TENANT-002=200, SEC-TENANT-003=403, SEC-INJECT-001=200, SEC-INJECT-002=200, SEC-BYPASS-001=400, SEC-BYPASS-002=404, SEC-BYPASS-003=403"
+    },
+    {
+      "id": "AUDIT",
+      "name": "audit trail readable and tenant-scoped",
+      "status": "PASS",
+      "detail": "HTTP 200 events=3"
+    }
+  ],
+  "zeroTolerance": {
+    "crossTenantLeaks": 0,
+    "unsupportedDisplayedNumbers": 0,
+    "unauthorizedActions": 0,
+    "duplicateEffects": 0,
+    "g3Escalations": 0,
+    "unboundedLoops": 0
+  },
+  "measures": {
+    "modelCalls": 0,
+    "fallbackCalls": 3,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "toolCalls": 6,
+    "estimatedCost": 0,
+    "costCurrency": "INR",
+    "costStatus": "NO_PROVIDER_CALLS",
+    "latencyMsP50": 79,
+    "latencyMsMax": 82
+  }
+}

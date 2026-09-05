@@ -1,0 +1,39 @@
+{
+  "SEC-TENANT-001": {
+    "httpStatus": 404,
+    "crossTenantDataReturned": false,
+    "actionExecuted": false
+  },
+  "SEC-TENANT-002": {
+    "httpStatus": 200,
+    "refused": true,
+    "crossTenantDataReturned": false,
+    "actionExecuted": false
+  },
+  "SEC-TENANT-003": {
+    "httpStatus": 403,
+    "actionExecuted": false
+  },
+  "SEC-INJECT-001": {
+    "httpStatus": 200,
+    "refused": true,
+    "actionExecuted": false
+  },
+  "SEC-INJECT-002": {
+    "httpStatus": 200,
+    "refused": true,
+    "actionExecuted": false
+  },
+  "SEC-BYPASS-001": {
+    "httpStatus": 400,
+    "actionExecuted": false
+  },
+  "SEC-BYPASS-002": {
+    "httpStatus": 404,
+    "actionExecuted": false
+  },
+  "SEC-BYPASS-003": {
+    "httpStatus": 403,
+    "actionExecuted": false
+  }
+}
