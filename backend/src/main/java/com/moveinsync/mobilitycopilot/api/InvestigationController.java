@@ -158,12 +158,15 @@ public final class InvestigationController {
         String opSummary  = cleanSummary(brief.operationalSummary(),  primaryEv, metricId, start, end);
         String leadSummary = cleanSummary(brief.leadershipSummary(), primaryEv, metricId, start, end);
 
-        // Collect caveats but exclude internal diagnostic noise
+        // Collect caveats but exclude all internal diagnostic noise
         List<String> caveats = brief.caveats().stream()
                 .filter(c -> c.length() < 300)
                 .filter(c -> !c.contains("claim-ev-"))
+                .filter(c -> !c.contains("comparison-ev-"))
                 .filter(c -> !c.startsWith("Verified evidence was rejected"))
                 .filter(c -> !c.startsWith("Claim claim-"))
+                .filter(c -> !c.startsWith("Claim comparison-"))
+                .filter(c -> !c.contains("has an invalid, unavailable, or scope-mismatched"))
                 .toList();
 
         // Strip internal diagnostic noise from warnings too
@@ -173,6 +176,7 @@ public final class InvestigationController {
                 .filter(w -> !w.startsWith("Office comparison scope"))
                 .filter(w -> !w.startsWith("Below the governed comparison volume"))
                 .filter(w -> !w.startsWith("Claim comparison-"))
+                .filter(w -> !w.contains("has an invalid, unavailable, or scope-mismatched"))
                 .toList();
 
         return new InvestigateResponse(

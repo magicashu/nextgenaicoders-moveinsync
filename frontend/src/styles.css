@@ -1790,3 +1790,38 @@ input[type=range] {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Integration surfaces reuse the imported dashboard palette and card treatment. */
+.panel { background: var(--bg2, white); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.eyebrow { color: var(--accent); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+.kv.grid, .content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.kv dt { color: var(--text-dim); font-size: .75rem; margin-top: 12px; }
+.kv dd { margin: 4px 0; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: .75rem; }
+.model-execution, .trace-list li { padding: 12px; border-bottom: 1px solid var(--border); }
+.trace-list { list-style: none; padding: 0; }
+.trace-list .node { font-weight: 700; }
+.trace-list .outcome, .trace-list .ms { margin-left: 12px; color: var(--text-dim); }
+details summary { cursor: pointer; }
+.node-info-panel { max-height: 360px; overflow: auto; max-width: 420px; }
+textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 12px 0; color: var(--text); font: inherit; resize: vertical; }
+.suggestion-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 900px) { .kv.grid, .content-grid { grid-template-columns: 1fr; } }
+
+/* Match component aliases to the source commit's existing design tokens. */
+.btn { border: 1px solid var(--border); border-radius: 7px; padding: 9px 18px; font: 600 .83rem var(--font-ui); cursor: pointer; }
+.btn-secondary { background: var(--bg2); color: var(--text-dim); }
+.btn-primary { background: var(--mis-green); color: white; }
+.btn:hover { filter: brightness(.97); }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 440px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.modal p { margin: 16px 0 22px; line-height: 1.6; color: var(--text-dim); }
+.modal-buttons, .action-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+.action-card { border: 1px solid var(--border); border-radius: 12px; background: var(--bg2); padding: 20px; }
+.action-card h3, .action-card p { margin-bottom: 12px; }
+.node-transitions { display: flex; flex-wrap: wrap; gap: 7px; }
+.scrubber-track { display: flex; align-items: center; gap: 10px; }
+.scrubber-input { flex: 1; accent-color: var(--mis-green); }
+.timeline-scrubber { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.node-info-panel { position: absolute; left: 12px; top: 12px; z-index: 2; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; width: 360px; }
+.node-info-panel h4 { margin-bottom: 12px; }
+.gate-pill { background: var(--bg3); color: var(--text-dim); border: 1px solid var(--border); }

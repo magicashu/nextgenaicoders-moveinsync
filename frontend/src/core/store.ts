@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import type { Tenant } from './mockData'
-import { TENANTS } from './mockData'
+import type { MorningBriefResponse } from './contracts'
+import { defaultIdentity, TENANTS } from './identity'
+import { httpApi } from './api'
 
 export interface CopilotMessage {
   id: string
@@ -15,12 +16,21 @@ export interface CopilotMessage {
 }
 
 interface AppStore {
+export type Tenant = typeof TENANTS[number]
+type State = {
   tenant: Tenant
-  setTenant: (t: Tenant) => void
+  run: MorningBriefResponse | null
+  epoch: number
+  busy: boolean
+  error: string | null
+  lastRefresh: number
+  setTenant: (tenant: Tenant) => void
+  setRun: (run: MorningBriefResponse, epoch: number) => void
+  refresh: () => Promise<void>
   activeNode: string | null
-  setActiveNode: (n: string | null) => void
+  setActiveNode: (node: string | null) => void
   timelineStep: number
-  setTimelineStep: (s: number) => void
+  setTimelineStep: (step: number) => void
   isLive: boolean
   setLive: (v: boolean) => void
   approvalState: 'pending' | 'approved' | 'rejected'
@@ -89,5 +99,25 @@ export const useAppStore = create<AppStore>((set) => ({
   ],
   addCopilotMessage: (msg) => set((state) => ({ copilotMessages: [...state.copilotMessages, msg] })),
   clearCopilotMessages: () => set({ copilotMessages: [] }),
+  setLive: (live: boolean) => void
+}
+export const identityFor = (businessUnit: string) => ({ ...defaultIdentity, businessUnit })
+export const useAppStore = create<State>((set, get) => ({
+  tenant: TENANTS[0], run: null, epoch: 0, busy: false, error: null, lastRefresh: 0,
+  setTenant: tenant => set(s => ({ tenant, run: null, epoch: s.epoch + 1, error: null, busy: false, lastRefresh: 0, timelineStep: 0, activeNode: null, isLive: false })),
+  setRun: (run, epoch) => {
+    if (get().epoch === epoch && get().tenant === run.businessUnit) set({ run, lastRefresh: Date.now(), error: null })
+  },
+  refresh: async () => {
+    const { tenant, run, epoch, busy } = get()
+    if (!run || busy) return
+    set({ busy: true, error: null })
+    try { get().setRun(await httpApi.getWorkflow(identityFor(tenant), run.runId), epoch) }
+    catch (e) { if (get().epoch === epoch) set({ error: e instanceof Error ? e.message : 'Refresh failed' }) }
+    finally { if (get().epoch === epoch) set({ busy: false }) }
+  },
+  activeNode: null, setActiveNode: activeNode => set({ activeNode }),
+  timelineStep: 0, setTimelineStep: timelineStep => set({ timelineStep }),
+  isLive: false, setLive: isLive => set({ isLive }),
 }))
 

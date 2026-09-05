@@ -1,5 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://moveinsync.example/schemas/decision-brief.schema.json",
-  "$ref": "team-contracts.schema.json#/$defs/brief"
+  "title": "DecisionBrief",
+  "type": "object",
+  "required": ["runId", "businessUnit", "asOfDate", "headline", "metric", "findings", "recommendedAction", "evidence", "status"],
+  "properties": {
+    "runId": { "type": "string", "format": "uuid" },
+    "businessUnit": { "type": "string", "minLength": 1 },
+    "asOfDate": { "type": "string", "format": "date" },
+    "headline": { "type": "string" },
+    "metric": { "$ref": "metric-result.schema.json" },
+    "findings": { "type": "array", "items": { "type": "string" } },
+    "recommendedAction": { "$ref": "action-proposal.schema.json" },
+    "evidence": { "$ref": "evidence-bundle.schema.json" },
+    "status": { "enum": ["AWAITING_APPROVAL", "REPORT_ONLY", "HEALTHY"] }
+  }
 }

@@ -1,5 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://moveinsync.example/schemas/action-proposal.schema.json",
-  "$ref": "team-contracts.schema.json#/$defs/actionProposal"
+  "title": "ActionProposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionId", "runId", "type", "title", "rationale", "scope", "evidenceVersion", "createdAt", "expiresAt", "status"],
+  "properties": {
+    "actionId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "type": {
+      "enum": ["CREATE_SITE_SHIFT_WATCHLIST", "CREATE_INVESTIGATION_TICKET", "DRAFT_VENDOR_ESCALATION", "DRAFT_COMMUNICATION"]
+    },
+    "title": { "type": "string" },
+    "rationale": { "type": "string" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "evidenceVersion": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "status": { "const": "DRAFT_REQUIRES_APPROVAL" }
+  }
 }

@@ -1,5 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://moveinsync.example/schemas/execution-receipt.schema.json",
-  "$ref": "team-contracts.schema.json#/$defs/receipt"
+  "title": "ExecutionReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionId", "runId", "idempotencyKey", "status", "attemptedAt"],
+  "properties": {
+    "actionId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "idempotencyKey": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["EXECUTED", "APPROVED_NOT_EXECUTED"] },
+    "attemptedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": ["string", "null"], "format": "date-time" },
+    "externalReference": { "type": ["string", "null"] },
+    "message": { "type": ["string", "null"] }
+  }
 }

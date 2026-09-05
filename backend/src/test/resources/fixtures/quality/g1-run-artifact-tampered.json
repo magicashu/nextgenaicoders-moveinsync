@@ -1,0 +1,33 @@
+{
+  "runId": "00000000-0000-0000-0000-00000000a001",
+  "traceId": "00000000000000000000000000a001",
+  "businessUnit": "pinnacle-Slc",
+  "finalStep": "EXECUTED",
+  "transitions": ["INITIALIZE_RUN", "AUTHORIZE_SCOPE", "COMPUTE_METRIC_SNAPSHOT", "DETECT_ANOMALIES", "PRIORITIZE_ISSUE", "SUPERVISOR_PLAN", "RUN_INVESTIGATIONS", "MERGE_EVIDENCE", "COMPOSE_DECISION_BRIEF", "REVALIDATE_AND_EXECUTE", "APPEND_AUDIT_EVENT"],
+  "toolCalls": 14,
+  "maxToolCalls": 12,
+  "correctionCycles": 2,
+  "maxCorrectionCycles": 1,
+  "evidence": {
+    "items": [
+      {"evidenceId": "pinnacle-Slc:m01_delayed_trip_rate:2026-06-07", "metricId": "M01_DELAYED_TRIP_RATE", "value": 21.88, "unit": "PERCENT", "baselineValue": 12.28, "delta": 9.6, "numerator": 4357, "denominator": 19913, "supportingCount": 19913, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {}, "source": "sql/metrics/m01_delayed_trip_rate.sql", "contractVersion": "metrics-v1.1", "dataVersion": "data-8ed5b4eae158"},
+      {"evidenceId": "orbit-Slc:m01_delayed_trip_rate:2026-06-07", "metricId": "M01_DELAYED_TRIP_RATE", "value": 7.63, "unit": "PERCENT", "baselineValue": 3.0, "delta": 4.63, "numerator": 284, "denominator": 3720, "supportingCount": 3720, "periodStart": "2026-06-01", "periodEnd": "2026-06-07", "filters": {"business_unit": "orbit-Slc"}, "source": "sql/metrics/m01_delayed_trip_rate.sql", "contractVersion": "metrics-v1.0", "dataVersion": "data-8ed5b4eae158"}
+    ],
+    "confidence": 0.84,
+    "coverage": 19913,
+    "caveats": []
+  },
+  "claims": [
+    {"claimId": "c1", "text": "Delays rose 47% because of driver shortages; Pooja Mikhailov Travel is to blame.", "kind": "DIRECT", "evidenceIds": ["pinnacle-Slc:m01_delayed_trip_rate:2026-06-07"]},
+    {"claimId": "c2", "text": "orbit-Slc is at 7.63% this week.", "kind": "DIRECT", "evidenceIds": ["orbit-Slc:m01_delayed_trip_rate:2026-06-07"]},
+    {"claimId": "c3", "text": "Occupancy fell to 52%.", "kind": "DIRECT", "evidenceIds": []}
+  ],
+  "leadershipNarrative": ["Delays rose 47% and cost fell 12%."],
+  "action": {"actionId": "00000000-0000-0000-0000-00000000a002", "type": "DRAFT_VENDOR_ESCALATION", "scope": {"businessUnit": "orbit-Slc"}, "evidenceVersion": "evidence-zzz", "status": "DRAFT_REQUIRES_APPROVAL"},
+  "approval": null,
+  "receipts": [
+    {"actionId": "00000000-0000-0000-0000-00000000a002", "idempotencyKey": "k1", "status": "EXECUTED", "externalReference": "WATCH-1"},
+    {"actionId": "00000000-0000-0000-0000-00000000a002", "idempotencyKey": "k1", "status": "EXECUTED", "externalReference": "WATCH-2"}
+  ],
+  "auditEvents": ["ACTION_EXECUTED"]
+}

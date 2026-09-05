@@ -3,33 +3,29 @@ spring:
     name: mobility-decision-copilot
 
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
 
 mobility:
-  local-api:
-    enabled: ${MOBILITY_LOCAL_API_ENABLED:false}
-  # This branch provides team scaffolding. The old sample endpoint is not a governed product API.
-  demo:
-    enabled: false
+  sarvam:
+    api-key: ${SARVAM_API_KEY:}
+    endpoint: ${SARVAM_ENDPOINT:https://api.sarvam.ai/v1/chat/completions}
+    model: ${SARVAM_MODEL:sarvam-105b}
+    timeout: ${SARVAM_TIMEOUT:30s}
   data:
-    directory: ${MOBILITY_DATA_DIR:outputs/MoveInSync - Anonymised Trip-Log Dataset}
-  ai:
-    # Select exactly one provider: none, sarvam or ollama.
-    provider: ${MOBILITY_AI_PROVIDER:none}
-    sarvam:
-      api-key: ${SARVAM_API_KEY:}
-      endpoint: ${SARVAM_ENDPOINT:https://api.sarvam.ai/v1/chat/completions}
-      model: ${SARVAM_MODEL:sarvam-105b}
-      timeout: ${SARVAM_TIMEOUT:30s}
-      max-prompt-chars: 24000
-    agent:
-      role: ${MOBILITY_AGENT_ROLE:all}
-      max-evidence-items: 64
-    ollama:
-      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-      model: ${OLLAMA_MODEL:gemma3:4b}
-      temperature: ${OLLAMA_TEMPERATURE:0.1}
-      timeout: ${OLLAMA_TIMEOUT:30s}
+    directory: ${MOBILITY_DATA_DIR:data/fixtures}
+  workflow:
+    analytics-gateway: ${ANALYTICS_GATEWAY:governed}
+    control-plane: ${CONTROL_PLANE:in-memory}
+    language-model: ${LANGUAGE_MODEL:auto}
+    max-investigation-steps: ${MAX_INVESTIGATION_STEPS:4}
+    max-correction-cycles: ${MAX_CORRECTION_CYCLES:1}
+    max-tool-calls: ${MAX_TOOL_CALLS:12}
+    tool-timeout: ${TOOL_TIMEOUT:10s}
+    model-timeout: ${SARVAM_TIMEOUT:30s}
+    approval-ttl: ${APPROVAL_TTL:30m}
+  api:
+    gateway: ${DECISION_RUN_GATEWAY:workflow}
+    actor-resolver: ${ACTOR_RESOLVER:governance}
 
 management:
   endpoints:

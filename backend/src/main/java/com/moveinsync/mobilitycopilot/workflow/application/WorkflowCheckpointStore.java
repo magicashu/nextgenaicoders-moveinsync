@@ -1,13 +1,16 @@
 package com.moveinsync.mobilitycopilot.workflow.application;
 
-import com.moveinsync.mobilitycopilot.access.domain.TenantContext;
-import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowCheckpoint;
+import com.moveinsync.mobilitycopilot.workflow.domain.VersionedWorkflowState;
+import com.moveinsync.mobilitycopilot.workflow.domain.WorkflowState;
+
 import java.util.Optional;
 import java.util.UUID;
 
-/** WS3: updates must atomically compare version and tenant before writing. */
 public interface WorkflowCheckpointStore {
-    Optional<WorkflowCheckpoint> find(TenantContext tenant, UUID runId);
-    boolean create(WorkflowCheckpoint initial);
-    boolean compareAndSet(WorkflowCheckpoint next, long expectedVersion);
+
+    long NEW_CHECKPOINT = -1;
+
+    VersionedWorkflowState save(WorkflowState state, long expectedVersion);
+
+    Optional<VersionedWorkflowState> find(UUID runId);
 }

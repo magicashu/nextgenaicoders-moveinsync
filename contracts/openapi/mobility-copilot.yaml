@@ -1,33 +1,319 @@
 openapi: 3.1.0
 info:
-  title: Mobility Decision Copilot — team scaffold
-  version: 0.2.0
-  description: >
-    Only structural capability metadata is implemented. Product endpoints,
-    authorization, governed analytics, agents and approvals are team TODOs.
-    Shared request/output shapes are in schemas/team-contracts.schema.json.
+  title: Mobility Decision Copilot API
+  version: 0.3.0
+  description: Tenant-scoped proactive briefs, contextual investigation, approval, and audit API.
+components:
+  parameters:
+    Actor:
+      in: header
+      name: X-Actor-Id
+      required: false
+      schema: { type: string }
+    BusinessUnit:
+      in: header
+      name: X-Business-Unit
+      required: true
+      schema: { type: string }
+    Roles:
+      in: header
+      name: X-Roles
+      required: false
+      schema: { type: string }
+  schemas:
+    TransitionView:
+      type: object
+      properties:
+        node: { type: string }
+        subNode: { type: [string, 'null'] }
+        outcome: { type: string }
+        durationMs: { type: integer }
+        startedAt: { type: string, format: date-time }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+    MorningBrief:
+      type: object
+      required: [runId, workflowId, businessUnit, asOfDate, persona, status, operations, leadership, evidence, trust]
+      properties:
+        runId: { type: string, format: uuid }
+        workflowId: { type: string, format: uuid }
+        businessUnit: { type: string }
+        asOfDate: { type: string, format: date }
+        persona: { type: string }
+        status: { enum: [AWAITING_APPROVAL, REPORT_ONLY, HEALTHY, EXECUTED, APPROVED_NOT_EXECUTED, REJECTED, EXPIRED, FAILED] }
+        operations: { type: object }
+        leadership: { type: object }
+        evidence: { $ref: ../schemas/evidence-bundle.schema.json }
+        trust: { type: object }
+        suggestedQuestions: { type: array, items: { type: string } }
+        errors: { type: array, items: { type: string } }
+    WorkflowRunRequest:
+      type: object
+      properties:
+        asOfDate: { type: string, format: date }
+        persona: { enum: [TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER] }
+    QuestionRequest:
+      type: object
+      required: [question]
+      properties:
+        question: { type: string, minLength: 1, maxLength: 500 }
+        asOfDate: { type: string, format: date }
+        relatedRunId: { type: string, format: uuid }
+        persona: { enum: [TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER] }
+    QuestionResponse:
+      type: object
+      required: [businessUnit, intent, workers, refused, answer, supportingFindings, caveats, followUps]
+      properties:
+        runId: { type: [string, 'null'], format: uuid }
+        businessUnit: { type: string }
+        intent: { type: string }
+        workers: { type: array, items: { type: string } }
+        refused: { type: boolean }
+        refusalReason: { type: [string, 'null'] }
+        answer: { type: string }
+        supportingFindings: { type: array, items: { type: object } }
+        caveats: { type: array, items: { type: object } }
+        evidence: { oneOf: [{ $ref: ../schemas/evidence-bundle.schema.json }, { type: 'null' }] }
+        trust: { type: [object, 'null'] }
+        draftedAction: { oneOf: [{ $ref: ../schemas/action-proposal.schema.json }, { type: 'null' }] }
+        followUps: { type: array, items: { type: string } }
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { enum: [APPROVE, REJECT, EDIT] }
+        comment: { type: string, maxLength: 1000 }
+        editedScope: { type: object, additionalProperties: { type: string } }
+    ApprovalDecisionResponse:
+      type: object
+      required: [approvalId, runId, decision, approvalStatus, workflowStatus, revalidation, trust]
+      properties:
+        approvalId: { type: string, format: uuid }
+        runId: { type: string, format: uuid }
+        decision: { enum: [APPROVE, REJECT, EDIT] }
+        approvalStatus: { enum: [APPROVED, REJECTED, EDITED, EXPIRED] }
+        workflowStatus: { type: string }
+        receipt: { oneOf: [{ $ref: ../schemas/execution-receipt.schema.json }, { type: 'null' }] }
+        revalidation: { type: array, items: { type: string } }
+        trust: { type: object }
+    ApprovalView:
+      type: object
+      required: [approvalId, actionId, status, actionType, title, scope, evidenceVersion, createdAt, expiresAt, consequence]
+      properties:
+        approvalId: { type: string, format: uuid }
+        actionId: { type: string, format: uuid }
+        status: { enum: [PENDING, APPROVED, REJECTED, EDITED, EXPIRED] }
+        actionType: { type: string }
+        title: { type: string }
+        rationale: { type: string }
+        scope: { type: object, additionalProperties: { type: string } }
+        evidenceVersion: { type: string }
+        evidenceTimestamp: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        consequence: { type: string }
+    AuditResponse:
+      type: object
+      required: [runId, businessUnit, traceId, events, count]
+      properties:
+        runId: { type: string, format: uuid }
+        businessUnit: { type: string }
+        traceId: { type: string }
+        events: { type: array, items: { type: object } }
+        count: { type: integer, minimum: 0 }
+  responses:
+    BadRequest: { description: Invalid identity, input, date, or decision }
+    Forbidden: { description: Authenticated actor lacks the required role }
+    NotFound: { description: Resource is missing or outside the actor's tenant }
+    Conflict: { description: Approval is stale or already decided }
 paths:
-  /api/v1/capabilities:
+  /api/v1/dashboard:
     get:
-      summary: Identify the scaffold without claiming a working governed runtime
+      summary: Read governed weekly dashboard charts without starting an agent run
+      description: M01 delayed-trip and M04 on-time-pickup metrics, vendor/site contribution rankings, and daily M01 snapshots. Windows and provenance are returned by the existing governed services. Prior-four-week baseline; null means unavailable.
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: query
+          name: asOf
+          required: true
+          schema: { type: string, format: date }
       responses:
-        "200":
-          description: Structural metadata; implemented governed capabilities remain empty
+        '200':
+          description: Governed metric, onTime, vendors, sites and trend results
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties: false
-                required: [mode, governedRuntimeReady, agentRoles, workflowNodes, investigationStages, workers, declaredMetrics, implementedGovernedCapabilities, message]
+                required: [metric, onTime, vendors, sites, trend]
                 properties:
-                  mode: { const: SCAFFOLD }
-                  governedRuntimeReady: { const: false }
-                  agentRoles: { type: integer }
-                  workflowNodes: { type: integer }
-                  investigationStages: { type: integer }
-                  workers: { type: integer }
-                  declaredMetrics: { type: integer }
-                  implementedGovernedCapabilities:
-                    type: array
-                    items: { type: string }
-                  message: { type: string }
+                  metric: { type: object }
+                  onTime: { type: object }
+                  vendors: { type: object }
+                  sites: { type: object }
+                  trend: { type: object }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/workflows/graph:
+    get:
+      summary: Inspect the compiled LangGraph4j graph topology
+      responses:
+        '200':
+          description: Engine name, version and Mermaid graph source
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  engine: { type: string }
+                  version: { type: string }
+                  mermaid: { type: string }
+  /api/v1/workflows/{runId}/execution:
+    get:
+      summary: Inspect tenant-scoped node decisions, model usage and OTLP spans
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: runId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Run transitions, model usage, exporter status and local OTLP trace
+          content:
+            application/json:
+              schema: { type: object }
+        '403': { description: Actor cannot access this tenant }
+        '404': { description: Run not found in the authorized tenant }
+  /api/v1/briefs/morning:
+    get:
+      summary: Generate the proactive evidence-backed morning brief
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: query
+          name: asOf
+          schema: { type: string, format: date, default: 2026-06-08 }
+        - in: query
+          name: persona
+          schema: { enum: [TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER] }
+      responses:
+        '200':
+          description: Evidence-backed operations and leadership brief
+          content: { application/json: { schema: { $ref: '#/components/schemas/MorningBrief' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/workflows:
+    post:
+      summary: Start an on-demand decision workflow
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowRunRequest' } } }
+      responses:
+        '201':
+          description: Workflow started and run to its deterministic pause or terminal state
+          content: { application/json: { schema: { $ref: '#/components/schemas/MorningBrief' } } }
+  /api/v1/workflows/{workflowId}:
+    get:
+      summary: Read one workflow inside the actor's tenant
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: workflowId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current workflow view
+          content: { application/json: { schema: { $ref: '#/components/schemas/MorningBrief' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/questions:
+    post:
+      summary: Ask a bounded, tenant-scoped question about mobility evidence
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/QuestionRequest' } } }
+      responses:
+        '200':
+          description: Governed answer or typed refusal
+          content: { application/json: { schema: { $ref: '#/components/schemas/QuestionResponse' } } }
+  /api/v1/approvals/{approvalId}:
+    get:
+      summary: Preview a pending approval and its consequence
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: approvalId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Approval preview
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalView' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/approvals/{approvalId}/decision:
+    post:
+      summary: Approve, reject, or narrow an action, then resume with fresh revalidation
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: approvalId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalDecisionRequest' } } }
+      responses:
+        '200':
+          description: Resumed workflow result and execution receipt, if applicable
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalDecisionResponse' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/audit/{workflowId}:
+    get:
+      summary: Read the tenant-scoped append-only business audit trail
+      parameters:
+        - { $ref: '#/components/parameters/Actor' }
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - { $ref: '#/components/parameters/Roles' }
+        - in: path
+          name: workflowId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Ordered audit events sharing the workflow trace id
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuditResponse' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/demo/brief:
+    get:
+      deprecated: true
+      summary: Compatibility endpoint for the original deterministic brief contract
+      parameters:
+        - { $ref: '#/components/parameters/BusinessUnit' }
+        - in: query
+          name: asOf
+          schema: { type: string, format: date, default: 2026-06-08 }
+      responses:
+        '200':
+          description: Compatibility DecisionBrief
+          content: { application/json: { schema: { $ref: ../schemas/decision-brief.schema.json } } }

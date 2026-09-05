@@ -1,5 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://moveinsync.example/schemas/metric-evidence.schema.json",
-  "$ref": "team-contracts.schema.json#/$defs/metricEvidence"
-}
