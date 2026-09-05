@@ -3,4 +3,4 @@
 *.java text eol=lf
 *.ts text eol=lf
 *.tsx text eol=lf
-outputs/official_dataset/*.csv filter=lfs diff=lfs merge=lfs -text
+"outputs/MoveInSync - Anonymised Trip-Log Dataset/*.csv" filter=lfs diff=lfs merge=lfs -text

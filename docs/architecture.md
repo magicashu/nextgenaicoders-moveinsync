@@ -219,7 +219,7 @@ export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
 
 The current metadata endpoint is GET /api/v1/capabilities. It intentionally reports that the governed runtime is not ready. The team must implement and pass requirement.md's G1–G3 and control gates before changing that status.
 
-Configure the immutable official input through MOBILITY_DATA_DIR when the data owner implements the runtime. The tiny sample and corrupted/synthetic fixtures are test material, not official business definitions. AWS remains a deployment story for a future containerized application with durable control storage and observability; no cloud deployment is performed by this scaffold.
+Configure the immutable official input through MOBILITY_DATA_DIR when the data owner implements the runtime. Install Git LFS and run `git lfs pull` to retrieve the CSV files, then set `MOBILITY_DATA_DIR="outputs/MoveInSync - Anonymised Trip-Log Dataset"` from the repository root. The tiny sample and corrupted/synthetic fixtures are test material, not official business definitions. AWS remains a deployment story for a future containerized application with durable control storage and observability; no cloud deployment is performed by this scaffold.
 
 ## Current decisions
 
@@ -229,5 +229,6 @@ Configure the immutable official input through MOBILITY_DATA_DIR when the data o
 | D-052 — Selected design | Four agents, Java/Spring Boot, React, DuckDB analytics, PostgreSQL control state and optional Sarvam; document retrieval and replay remain conditional. |
 | D-053 — Separate team scaffold | Basic structure only. Individual members implement logic; no completed application or provider/persistence integration is claimed. |
 | D-054 — Documentation consolidation | Keep four content documents: requirements, architecture, agent responsibilities and the plain-English problem walkthrough. Technical workspace instructions and runtime prompt resources are separate. |
+| D-055 — Shared dataset delivery | Publish the supplied anonymised dataset and dictionary on Java-branch, use Git LFS for all seven CSV files, and carry over the user's removal of the old self-generated dataset. Preserve original bytes and the approved metric contracts. |
 
 Future material architecture, scope, metric, data, security, evaluation or demo decisions are recorded in this section alongside the relevant requirements change. Earlier review documents and decision history remain in Git history rather than separate current manuals.

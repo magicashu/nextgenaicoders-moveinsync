@@ -205,6 +205,8 @@ The following approved profile values are reference observations for the team to
 
 ### Inventory and checksums
 
+The shared dataset is in `outputs/MoveInSync - Anonymised Trip-Log Dataset/`. Its seven CSV files are stored with Git LFS; run `git lfs pull` after cloning with Git LFS installed. The accompanying `Dictionary/` contains the supplied field descriptions. The earlier self-generated dataset has been removed from this branch; approved contracts and original-file checksums remain unchanged.
+
 | File | Rows (data) | Size | SHA-256 (first 16) | Grain |
 |---|---:|---:|---|---|
 | `Ride_data _trip-may_2026.csv` | 188,992 | 45.9 MB | `c449ec4a4f35c84d` | one trip |

@@ -1,7 +1,0 @@
-tenant_id,site_id,site_name,city,latitude,longitude
-TNT_001,SITE_BLR_01,Bengaluru Campus 1,Bengaluru,12.8456,77.6603
-TNT_001,SITE_BLR_02,Bengaluru Campus 2,Bengaluru,12.9698,77.7499
-TNT_002,SITE_HYD_01,Hyderabad Campus 1,Hyderabad,17.4435,78.3772
-TNT_002,SITE_HYD_02,Hyderabad Campus 2,Hyderabad,17.4312,78.3564
-TNT_003,SITE_NCR_01,NCR Campus 1,Gurugram,28.4595,77.0266
-TNT_003,SITE_NCR_02,NCR Campus 2,Noida,28.5355,77.391
