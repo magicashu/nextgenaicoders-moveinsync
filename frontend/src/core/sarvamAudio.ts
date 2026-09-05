@@ -43,26 +43,99 @@ export class SpeechToTextEngine {
   }
 }
 
+type SpeechAudio = { audio: string; contentType: string }
+type PreparedSpeech = { controller: AbortController; ready: boolean; result: Promise<SpeechAudio | null> }
+const prepared = new Map<string, PreparedSpeech>()
+const PREPARATION_TIMEOUT_MS = 30_000
+const PLAYBACK_WAIT_MS = 4_000
+const speechKey = (text: string, identity: Identity, voice: string) =>
+  JSON.stringify([identity.actorId, identity.businessUnit, [...identity.roles].sort(), voice, text])
+
 let audio: HTMLAudioElement | null = null
-let pending: AbortController | null = null
 let generation = 0
-export function stopSpeaking() {
-  generation++; pending?.abort(); pending = null
+function stopPlayback() {
+  generation++
   audio?.pause(); audio = null
   if ('speechSynthesis' in window) window.speechSynthesis.cancel()
 }
-export async function speakText(text: string, identity: Identity, voice: string, callbacks: {
-  onStart: () => void; onEnd: () => void; onNotice: (text: string) => void
-}) {
+function cancelPreparationsExcept(key?: string) {
+  for (const [id, entry] of prepared) {
+    if (id !== key && !entry.ready) { prepared.delete(id); entry.controller.abort() }
+  }
+}
+export function stopSpeaking() {
+  stopPlayback()
+  cancelPreparationsExcept()
+}
+export function clearSpeechCache() {
   stopSpeaking()
+  prepared.clear()
+}
+
+// One shared request per exact answer/voice/identity. Preparation never starts playback.
+function preparedSpeech(text: string, identity: Identity, voice: string): Promise<SpeechAudio | null> {
+  if (!text.trim() || text.length > 2500) return Promise.resolve(null)
+  const key = speechKey(text, identity, voice)
+  cancelPreparationsExcept(key)
+  const existing = prepared.get(key)
+  if (existing) {
+    prepared.delete(key); prepared.set(key, existing)
+    return existing.result
+  }
+  while (prepared.size >= 8) {
+    const oldest = prepared.keys().next().value!
+    prepared.get(oldest)?.controller.abort()
+    prepared.delete(oldest)
+  }
+  const entry: PreparedSpeech = { controller: new AbortController(), ready: false, result: Promise.resolve(null) }
+  prepared.set(key, entry)
+  entry.result = (async () => {
+    const timeout = setTimeout(() => entry.controller.abort(), PREPARATION_TIMEOUT_MS)
+    try {
+      const response = await fetch('/api/v1/speech', { method: 'POST', signal: entry.controller.signal,
+        headers: { 'Content-Type': 'application/json', ...identityHeaders(identity) }, body: JSON.stringify({ text, voice }) })
+      if (!response.ok) throw new Error('Audio unavailable')
+      const value: SpeechAudio = await response.json()
+      if (entry.controller.signal.aborted || value.contentType !== 'audio/mpeg' || !value.audio) throw new Error('Audio unavailable')
+      entry.ready = true
+      return value
+    } catch {
+      if (prepared.get(key) === entry) prepared.delete(key)
+      return null
+    } finally { clearTimeout(timeout) }
+  })()
+  return entry.result
+}
+export async function prepareSpeech(text: string, identity: Identity, voice: string) {
+  return (await preparedSpeech(text, identity, voice)) !== null
+}
+type SpeechCallbacks = { onStart: () => void; onEnd: () => void; onNotice: (text: string) => void }
+function browserSpeech(text: string, attempt: number, callbacks: SpeechCallbacks, slow: boolean) {
+  if (attempt !== generation) return
+  if (!('speechSynthesis' in window)) {
+    callbacks.onNotice('Audio is unavailable in this browser. Your answer is available as text.')
+    callbacks.onEnd(); return
+  }
+  callbacks.onNotice(slow ? 'Using your browser voice to start sooner.' : 'Using your browser voice because online audio is unavailable.')
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'en-IN'; utterance.rate = 1
+  utterance.onstart = () => { if (attempt === generation) callbacks.onStart() }
+  utterance.onend = () => { if (attempt === generation) callbacks.onEnd() }
+  utterance.onerror = () => { if (attempt === generation) { callbacks.onNotice('Audio playback is unavailable. Your answer is available as text.'); callbacks.onEnd() } }
+  window.speechSynthesis.speak(utterance)
+}
+export async function speakText(text: string, identity: Identity, voice: string, callbacks: SpeechCallbacks) {
+  // Keep the matching preparation alive when Play is clicked.
+  stopPlayback()
   const attempt = generation
-  pending = new AbortController()
+  const result = preparedSpeech(text, identity, voice)
+  let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    const response = await fetch('/api/v1/speech', { method: 'POST', signal: pending.signal,
-      headers: { 'Content-Type': 'application/json', ...identityHeaders(identity) }, body: JSON.stringify({ text, voice }) })
-    if (!response.ok) throw new Error('Audio unavailable')
-    const value: { audio: string; contentType: string } = await response.json()
+    const value = 'speechSynthesis' in window
+      ? await Promise.race([result, new Promise<'slow'>(resolve => { timeout = setTimeout(() => resolve('slow'), PLAYBACK_WAIT_MS) })])
+      : await result
     if (attempt !== generation) return
+    if (value === 'slow' || !value) { browserSpeech(text, attempt, callbacks, value === 'slow'); return }
     const player = new Audio('data:' + value.contentType + ';base64,' + value.audio)
     audio = player
     player.onended = () => { if (attempt === generation) { audio = null; callbacks.onEnd() } }
@@ -70,15 +143,9 @@ export async function speakText(text: string, identity: Identity, voice: string,
     await player.play()
     if (attempt === generation) callbacks.onStart()
   } catch {
-    if (attempt !== generation) return
-    if (!('speechSynthesis' in window)) { callbacks.onNotice('Audio is unavailable in this browser. Your answer is available as text.'); callbacks.onEnd(); return }
-    callbacks.onNotice('Using your browser voice because online audio is unavailable.')
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'en-IN'; utterance.rate = 1
-    utterance.onstart = () => { if (attempt === generation) callbacks.onStart() }
-    utterance.onend = () => { if (attempt === generation) callbacks.onEnd() }
-    utterance.onerror = () => { if (attempt === generation) { callbacks.onNotice('Audio playback is unavailable. Your answer is available as text.'); callbacks.onEnd() } }
-    window.speechSynthesis.speak(utterance)
-  } finally { if (attempt === generation) pending = null }
+    if (attempt === generation) {
+      audio?.pause(); audio = null
+      browserSpeech(text, attempt, callbacks, false)
+    }
+  } finally { clearTimeout(timeout) }
 }
-

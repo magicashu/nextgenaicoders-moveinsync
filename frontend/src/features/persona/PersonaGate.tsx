@@ -13,7 +13,7 @@ export function PersonaGate({ onContinue }: { onContinue: () => void }) {
   const [role, setRole] = useState<ManagerRole>(store.role)
   const [tenant, setTenant] = useState<Tenant>(store.tenant)
   return <main className="persona-screen">
-    <div className="persona-welcome"><span className="hero-badge">MoveInSync · Mobility Copilot</span>
+    <div className="persona-welcome"><span className="hero-badge">MoveIn Sync Mobility Dashboard</span>
       <h1>How would you like to view your operations?</h1>
       <p>Choose your role and business unit to open a workspace tailored to your decisions.</p>
     </div>

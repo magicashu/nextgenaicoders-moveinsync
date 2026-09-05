@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { id: 'incidents', icon: '⚑', label: 'Incidents' },
   { id: 'trust', icon: '◌', label: 'LLM & Trust' },
   { id: 'workflow', icon: '⬡', label: '3D Workflow' },
-  { id: 'brief', icon: '◉', label: 'Reports' },
+  { id: 'brief', icon: '◉', label: 'Decision Brief' },
   { id: 'audit', icon: '◎', label: 'Audit Trail' },
   { id: 'scorecard', icon: '◆', label: 'Scorecard' },
 ]
@@ -30,7 +30,7 @@ export function TopNav({ page, setPage }: Props) {
           <path d="M11 4v7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           <circle cx="11" cy="11" r="2" fill="currentColor" />
         </svg>
-        Mobility Decision Copilot
+        MoveIn Sync Mobility Dashboard
       </div>
       <div className="topnav-right">
         <span className="live-dot" />
@@ -65,10 +65,11 @@ export function SideNav({ page, setPage }: Props) {
   return (
     <aside className="sidenav">
       <div className="sidenav-section">Navigation</div>
-      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'brief', 'incidents'].includes(item.id)).map((item) => (
+      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'brief', 'incidents', 'workflow', 'audit'].includes(item.id)).map((item) => (
         <button
           key={item.id}
           className={`sidenav-item ${page === item.id ? 'active' : ''}`}
+          aria-current={page === item.id ? 'page' : undefined}
           onClick={() => setPage(item.id)}
           type="button"
         >

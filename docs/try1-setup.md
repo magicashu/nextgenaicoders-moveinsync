@@ -101,7 +101,7 @@ lockfile. Subsequent starts only need the PATH export and `npm run dev`.
 
 Open <http://localhost:5173>. Use business unit `pinnacle-Slc` and date
 `2026-06-08`, which matches the supplied dataset's verified scenario.
-Choose your persona first, then open Dashboard, Incidents or Reports. Use the
+Choose your persona first, then open Dashboard, Incidents, Decision Brief, 3D Workflow or Audit Trail. Use the
 bottom-right chat icon for questions, microphone input and read-aloud answers.
 Evidence starts collapsed. Unchanged selections reuse the displayed capture;
 Refresh explicitly requests a new investigation. See the [text and voice guide](supervisor-voice-chat-copilot.md).
@@ -125,9 +125,11 @@ frontend proxy is configured to use that port.
 
 ## 6. Inspect the LLM calls and graph nodes
 
-Developer diagnostics are hidden from manager screens by default. To inspect
-execution locally, set `VITE_SHOW_DIAGNOSTICS=true` in frontend terminal 2 and
-restart Vite. After running a brief or a question, open **Trust**. Expand **LLM execution** to
+3D Workflow, Audit Trail and Decision Brief are available in the normal
+navigation and share the selected report. Replay only animates recorded steps;
+Reload events only reads the audit log. Expand a graph node or an audit event
+for recorded decisions. To also expose **LLM & Trust** and **Scorecard**, set
+`VITE_SHOW_DIAGNOSTICS=true` in frontend terminal 2 and restart Vite. Open **LLM & Trust** Expand **LLM execution** to
 see each role's attempt, model, duration, input/output tokens, fallback reason and
 structured proposal. Expand **Decision details** on each workflow node to see
 the next node, selected issue, workers, validation results, critic verdict and
@@ -271,7 +273,7 @@ The picker retains the incoming design; the current backend requires seven conse
 - **Transport Manager:** operational findings, arrival reliability, vendor/site comparisons and incident responses.
 - **Transport & Facilities Head:** performance and cost overview, leadership report and incident responses.
 - **Team / Line Manager:** read-only arrival, no-show and shift information. No investigation or approval permissions. Business-unit data is not an authenticated manager-to-team mapping.
-- **Ask Copilot:** simple-English explanations; covered questions reuse current findings. Supporting evidence is grouped and collapsed initially.
+- **Bottom-right chatbot icon:** simple-English explanations; covered questions reuse current findings. Supporting evidence is grouped and collapsed initially.
 - **Reports:** readable narratives and supporting figures.
 - **Incidents:** actual proposals from retained captures, with current approval state, affected scope, review expiry and a confirmation step. Approve, narrow existing multi-site/shift scope where available, or dismiss with a reason. Actions remain simulated; recording a response does not resolve the underlying real-world issue.
 

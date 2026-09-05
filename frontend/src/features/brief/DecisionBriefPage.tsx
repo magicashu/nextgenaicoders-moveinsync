@@ -8,9 +8,9 @@ export function DecisionBriefPage({ onIncidents }: { onIncidents: () => void }) 
   if (!run) return <div className="card card-body">Open the dashboard to load your selected report.</div>
   const metric = run.operations.headlineKpi.metric
   return <div>
-    <h1 className="page-title">{role === 'FACILITIES_HEAD' ? 'Leadership report' : 'Transport report'}</h1>
+    <h1 className="page-title">Decision Brief</h1>
     <p className="page-subtitle">{MANAGER_ROLES[role]} · {tenant} · {metric.periodStart} to {metric.periodEnd}</p>
-    <div className="hero-banner"><div className="hero-badge">Your selected report</div>
+    <div className="hero-banner"><div className="hero-badge">{role === 'FACILITIES_HEAD' ? 'Leadership report' : 'Transport report'} · {run.status.replaceAll('_', ' ').toLowerCase()}</div>
       <h2>{plain(run.operations.headline)}</h2>
       <p>{formatValue(metric.value, metric.unit)} · {metric.metricName} · previous four weeks: {formatValue(metric.baselineValue, metric.unit)}</p>
     </div>

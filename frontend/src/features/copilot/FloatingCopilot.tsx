@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { httpApi } from '../../core/api'
 import type { QuestionResponse } from '../../core/contracts'
 import { identityFor, useAppStore } from '../../core/store'
-import { SpeechToTextEngine, speakText, stopSpeaking } from '../../core/sarvamAudio'
+import { SpeechToTextEngine, prepareSpeech, speakText, stopSpeaking, clearSpeechCache } from '../../core/sarvamAudio'
 import { EvidenceSummary } from '../../shared/EvidenceSummary'
 import { plain } from '../../core/presentation'
 
 type Message = { id: string; sender: 'user' | 'assistant'; text: string; voice?: boolean; response?: QuestionResponse }
 const suggestions = ['Which sites and shifts were most affected?', 'What reasons were recorded for the delays?', 'Did the cost per trip increase?']
-export function SupervisorCopilotPage({ onOpenReport }: { onOpenReport: () => void }) {
+export function FloatingCopilot({ onOpenReport }: { onOpenReport: () => void }) {
   const { tenant, role, asOf, run, epoch, busy: dashboardBusy } = useAppStore()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
@@ -31,10 +31,16 @@ export function SupervisorCopilotPage({ onOpenReport }: { onOpenReport: () => vo
     active.current = true
     engine.current = new SpeechToTextEngine()
     setVoiceSupported(engine.current.isSupported())
-    return () => { active.current = false; engine.current?.dispose(); stopSpeaking() }
+    return () => { active.current = false; engine.current?.dispose(); clearSpeechCache() }
   }, [])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
   useEffect(() => { if (open) bottom.current?.scrollIntoView({ block: 'nearest' }) }, [open, messages, busy])
+  useEffect(() => {
+    const latest = messages.at(-1)
+    if (open && latest?.sender === 'assistant') {
+      void prepareSpeech(latest.text, identityFor(tenant, role), voice)
+    }
+  }, [open, messages, tenant, role, voice])
   const current = () => active.current && useAppStore.getState().epoch === epoch
   const close = () => {
     engine.current?.stopListening(); stopSpeaking(); setListening(false); setAudioId(null); setAudioLoading(false); setOpen(false)
@@ -66,6 +72,7 @@ export function SupervisorCopilotPage({ onOpenReport }: { onOpenReport: () => vo
   }
   const play = (message: Message) => {
     if (audioId === message.id) { stopSpeaking(); setAudioId(null); setAudioLoading(false); return }
+    engine.current?.stopListening(); setListening(false)
     setNotice(''); setAudioId(message.id); setAudioLoading(true)
     void speakText(message.text, identityFor(tenant, role), voice, {
       onStart: () => { if (current()) setAudioLoading(false) },
@@ -100,7 +107,7 @@ export function SupervisorCopilotPage({ onOpenReport }: { onOpenReport: () => vo
             <div className="chat-text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
             {message.response && !message.response.refused && <EvidenceSummary findings={message.response.supportingFindings} caveats={message.response.caveats} evidence={message.response.evidence} />}
             {message.response?.runId && message.response.runId !== run?.runId && <button className="btn btn-secondary" disabled={busy} onClick={() => void openReport(message.response!)}>Open supporting report</button>}
-            {message.sender === 'assistant' && <div className="audio-player-bar"><button className="play-audio-btn" type="button" onClick={() => play(message)} aria-label={audioId === message.id ? 'Stop reading answer' : 'Read answer aloud'}>{audioId === message.id ? audioLoading ? '■ Stop · preparing audio…' : '■ Stop reading' : '▷ Read aloud'}</button></div>}
+            {message.sender === 'assistant' && <div className="audio-player-bar"><button className="play-audio-btn" type="button" onClick={() => play(message)} aria-label={audioId === message.id ? audioLoading ? 'Cancel audio preparation' : 'Stop reading answer' : 'Read answer aloud'}>{audioId === message.id ? audioLoading ? '■ Cancel' : '■ Stop reading' : '▷ Read aloud'}</button>{audioId === message.id && audioLoading && <span className="audio-preparing" role="status"><span className="audio-spinner" aria-hidden="true" />Preparing audio…</span>}</div>}
           </div>
         </div>)}
         {busy && <p className="chat-working" role="status">Preparing your answer…</p>}

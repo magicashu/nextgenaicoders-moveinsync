@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Html, Line } from '@react-three/drei'
-import { useRef, useState, useEffect } from 'react'
+import { Component, useRef, useState, useEffect, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { WORKFLOW_NODES, NODE_AGENT, AGENT_COLORS } from '../../core/workflowDesign'
 import { useAppStore } from '../../core/store'
@@ -43,8 +43,8 @@ const EDGES: [WorkflowNode, WorkflowNode][] = [
   ['APPROVAL_INTERRUPT','REVALIDATE_AND_EXECUTE'], ['REVALIDATE_AND_EXECUTE','APPEND_AUDIT_EVENT'],
 ]
 
-function NodeSphere({ node, recorded, selected, onSelect }: {
-  node: WorkflowNode; recorded: boolean
+function NodeSphere({ node, recorded, outcome, selected, onSelect }: {
+  node: WorkflowNode; recorded: boolean; outcome?: string
   selected: boolean; onSelect: () => void
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
@@ -64,8 +64,10 @@ function NodeSphere({ node, recorded, selected, onSelect }: {
     }
   })
 
-  const nodeColor = isDone ? '#10b981' : isActive ? color : '#1e3a5f'
-  const emissive = isDone ? '#052' : isActive ? color : '#000'
+  const failed = /fail|error|denied|blocked/i.test(outcome ?? '')
+  const paused = /paused|approval required/i.test(outcome ?? '')
+  const nodeColor = isDone ? failed ? '#ef4444' : paused ? '#f59e0b' : '#10b981' : '#cbd5e1'
+  const emissive = isActive ? color : isDone ? nodeColor : '#000'
 
   return (
     <group position={pos}>
@@ -74,9 +76,9 @@ function NodeSphere({ node, recorded, selected, onSelect }: {
         <meshStandardMaterial
           color={nodeColor}
           emissive={emissive}
-          emissiveIntensity={isActive ? 1.2 : isDone ? 0.4 : 0.05}
-          roughness={0.3}
-          metalness={0.6}
+          emissiveIntensity={isActive ? 0.25 : 0.08}
+          roughness={0.55}
+          metalness={0.1}
         />
       </mesh>
       {selected && (
@@ -93,10 +95,10 @@ function NodeSphere({ node, recorded, selected, onSelect }: {
       )}
       <Html center distanceFactor={12} style={{ pointerEvents: 'none' }}>
         <div style={{
-          background: 'rgba(6,11,24,0.9)', border: `1px solid ${isActive || selected ? color : '#1e3a5f'}`,
-          borderRadius: 6, padding: '2px 6px', fontSize: 9, fontWeight: 700,
-          color: isActive || selected ? color : '#7a97c0',
-          whiteSpace: 'nowrap', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis',
+          background: 'rgba(255,255,255,0.96)', border: `1px solid ${isActive || selected ? color : '#1e3a5f'}`,
+          borderRadius: 6, padding: '2px 6px', fontSize: 11, fontWeight: 700,
+          color: '#1e293b',
+          whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis',
           transform: 'translateY(-28px)', pointerEvents: 'none',
         }}>
           {node.replace(/_/g, ' ')}
@@ -120,11 +122,11 @@ function ParticleEdge({ from, to, active }: { from: WorkflowNode; to: WorkflowNo
 
   return (
     <>
-      <Line points={[start, end]} color={active ? '#06b6d4' : '#1e3a5f'} lineWidth={active ? 1.5 : 0.8} transparent opacity={active ? 0.9 : 0.3} />
+      <Line points={[start, end]} color={active ? '#06b6d4' : '#1e3a5f'} lineWidth={active ? 1.5 : 0.8} transparent opacity={active ? 0.85 : 0.65} />
       {active && (
         <mesh ref={particleRef} position={start.clone()}>
           <sphereGeometry args={[0.08, 8, 8]} />
-          <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={2} />
+          <meshStandardMaterial color="#2563eb" emissive="#2563eb" emissiveIntensity={0.4} />
         </mesh>
       )}
     </>
@@ -141,51 +143,71 @@ function AgentClusterLabel({ label, pos, color }: { label: string; pos: [number,
   )
 }
 
-function Scene({ recorded, selectedNode, onSelect }: {
-  recorded: Set<string>; selectedNode: string | null; onSelect: (n: string) => void
+function Scene({ recorded, outcomes, traversed, selectedNode, onSelect }: {
+  recorded: Set<string>; outcomes: Map<string, string>; traversed: [WorkflowNode, WorkflowNode][]; selectedNode: string | null; onSelect: (n: string) => void
 }) {
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <pointLight position={[0, 8, 5]} intensity={1.2} color="#06b6d4" />
-      <pointLight position={[-6, 0, 3]} intensity={0.8} color="#6366f1" />
-      <pointLight position={[6, -4, 3]} intensity={0.8} color="#10b981" />
-      <fog attach="fog" args={['#060b18', 12, 22]} />
+      <color attach="background" args={['#ffffff']} />
+      <ambientLight intensity={1.6} />
+      <directionalLight position={[0, 8, 8]} intensity={2} color="#ffffff" />
+      <pointLight position={[-6, 0, 3]} intensity={0.5} color="#ffffff" />
+      <pointLight position={[6, -4, 3]} intensity={0.5} color="#ffffff" />
 
-      <AgentClusterLabel label="System" pos={[-3, 4.5, 0]} color="#6366f1" />
-      <AgentClusterLabel label="Supervisor" pos={[-2, 2.1, 0]} color="#06b6d4" />
-      <AgentClusterLabel label="Investigator" pos={[-3.5, -0.4, 0]} color="#10b981" />
-      <AgentClusterLabel label="Critic" pos={[2.5, -0.4, 0]} color="#f59e0b" />
-      <AgentClusterLabel label="Briefing" pos={[0.5, -5.0, 0]} color="#ec4899" />
+      <AgentClusterLabel label="System" pos={[0, 7.4, 0]} color="#334155" />
+      <AgentClusterLabel label="Supervisor" pos={[0, 3.9, 0]} color="#166534" />
+      <AgentClusterLabel label="Investigator" pos={[-5, 0.4, 0]} color="#166534" />
+      <AgentClusterLabel label="Critic" pos={[5, 0.4, 0]} color="#92400e" />
+      <AgentClusterLabel label="Briefing" pos={[-2, -5.0, 0]} color="#9d174d" />
 
-      {EDGES.map(([from, to], i) => {
-        const active = recorded.has(from) && recorded.has(to)
-        return <ParticleEdge key={i} from={from} to={to} active={active} />
-      })}
+      {[...EDGES, ...traversed.filter(([from, to]) => !EDGES.some(([a, b]) => a === from && b === to))].map(([from, to]) =>
+        <ParticleEdge key={from + ':' + to} from={from} to={to} active={traversed.some(([a, b]) => a === from && b === to)} />
+      )}
 
       {WORKFLOW_NODES.map((node, i) => (
         <NodeSphere
           key={node}
           node={node}
           recorded={recorded.has(node)}
+          outcome={outcomes.get(node)}
           selected={selectedNode === node}
           onSelect={() => onSelect(node)}
         />
       ))}
 
-      <OrbitControls enablePan={false} minDistance={5} maxDistance={18} />
+      <OrbitControls enablePan={false} target={[0, 1, 0]} minDistance={5} maxDistance={24} />
     </>
   )
 }
 
+class WorkflowCanvasBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() {
+    return this.state.failed
+      ? <div className="card card-body" role="status">3D rendering is unavailable in this browser. Use the node buttons and recorded execution details below.</div>
+      : this.props.children
+  }
+}
+
 export function WorkflowGraph3D() {
   const { run, setActiveNode, timelineStep, setTimelineStep, isLive, setLive } = useAppStore()
+  const [viewVersion, setViewVersion] = useState(0)
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const transitions = run?.trust.transitions.filter(t => !t.subNode) ?? []
   const finalStep = Math.max(0, transitions.length - 1)
-  const recorded = new Set(transitions.slice(0, timelineStep + 1).map(t => t.node.toUpperCase()))
+  const visibleTransitions = transitions.slice(0, Math.min(timelineStep, finalStep) + 1)
+  const recorded = new Set(visibleTransitions.map(t => t.node.toUpperCase()))
+  const outcomes = new Map(visibleTransitions.map(t => [t.node.toUpperCase(), t.outcome]))
+  const traversed: [WorkflowNode, WorkflowNode][] = []
+  visibleTransitions.forEach((transition, index) => {
+    if (index === 0) return
+    const from = visibleTransitions[index - 1].node.toUpperCase() as WorkflowNode
+    const to = transition.node.toUpperCase() as WorkflowNode
+    if (from !== to && NODE_POSITIONS[from] && NODE_POSITIONS[to] && !traversed.some(([a, b]) => a === from && b === to)) traversed.push([from, to])
+  })
 
-  useEffect(() => { setTimelineStep(finalStep); setLive(false) }, [run, finalStep])
+  useEffect(() => { setTimelineStep(finalStep); setLive(false); setSelectedNode(null) }, [run, finalStep])
   useEffect(() => {
     if (!isLive) return
     if (timelineStep >= finalStep) { setLive(false); return }
@@ -198,29 +220,30 @@ export function WorkflowGraph3D() {
   }
 
   const selNode = selectedNode as WorkflowNode | null
-  const selectedRecords = transitions.filter(t => t.node.toUpperCase() === selectedNode)
+  const selectedRecords = visibleTransitions.filter(t => t.node.toUpperCase() === selectedNode)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2 className="page-title">3D Workflow Graph</h2>
         <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-          onClick={() => { setTimelineStep(0); setLive(true) }}>
+          disabled={!transitions.length} onClick={() => { setTimelineStep(0); setLive(true) }}>
           ▶ Replay recorded run
         </button>
         <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-          onClick={() => { setTimelineStep(finalStep); setLive(false) }}>
+          disabled={!transitions.length} onClick={() => { setTimelineStep(finalStep); setLive(false) }}>
           ⏭ Final state
         </button>
+        <button className="btn btn-secondary" onClick={() => setViewVersion(value => value + 1)}>Reset view</button>
         {isLive && <span style={{ fontSize: '0.78rem', color: 'var(--accent)' }}><span className="live-dot" /> Animating…</span>}
       </div>
 
-      <p className="page-subtitle">LangGraph4j · 18 nodes · {run ? `Run ${run.runId} · ${run.trust.finalStep}` : 'Run an investigation to see execution records.'} · Animation replays recorded results.</p>
+      <p className="page-subtitle">LangGraph4j · 18 nodes · {run ? `Run ${run.runId} · ${run.trust.finalStep}` : 'Open Dashboard to load a report and its execution records.'} · Animation replays recorded results.</p>
       <div className="timeline-scrubber">
         <div className="scrubber-track">
           <span className="scrubber-label">0</span>
           <input
-            type="range" className="scrubber-input" min={0} max={finalStep} value={timelineStep}
+            type="range" aria-label="Recorded workflow step" disabled={!transitions.length} className="scrubber-input" min={0} max={finalStep} value={Math.min(timelineStep, finalStep)}
             onChange={(e) => { setLive(false); setTimelineStep(Number(e.target.value)) }}
           />
           <span className="scrubber-label">{finalStep}</span>
@@ -230,10 +253,10 @@ export function WorkflowGraph3D() {
         </div>
       </div>
 
-      <div style={{ position: 'relative', flex: 1, borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', minHeight: 420 }}>
-        <Canvas camera={{ position: [0, 0, 14], fov: 55 }} style={{ background: '#060b18' }}>
-          <Scene recorded={recorded} selectedNode={selectedNode} onSelect={handleNodeSelect} />
-        </Canvas>
+      <div style={{ position: 'relative', height: 480, flexShrink: 0, borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', minHeight: 420 }}>
+        <WorkflowCanvasBoundary key={viewVersion}><Canvas camera={{ position: [0, 1, 16], fov: 55 }} style={{ background: '#ffffff' }}>
+          <Scene recorded={recorded} outcomes={outcomes} traversed={traversed} selectedNode={selectedNode} onSelect={handleNodeSelect} />
+        </Canvas></WorkflowCanvasBoundary>
 
         {selNode && (
           <div className="node-info-panel">
@@ -270,9 +293,10 @@ export function WorkflowGraph3D() {
         </div>
       </div>
 
+      <p className="page-subtitle">Green: recorded · Amber: awaiting approval · Red: failed or blocked · Grey: not reached at this replay step. Select any node for its recorded decisions.</p>
       <div className="node-transitions">
         {WORKFLOW_NODES.map((n, i) => (
-          <button type="button" key={n} className="node-chip" style={{
+          <button type="button" key={n} aria-pressed={n === selectedNode} className="node-chip" style={{
             background: recorded.has(n) ? 'rgba(16,185,129,0.12)' : n === selectedNode ? 'rgba(6,182,212,0.15)' : 'var(--bg3)',
             borderColor: recorded.has(n) ? 'rgba(16,185,129,0.4)' : n === selectedNode ? 'rgba(6,182,212,0.4)' : 'var(--border)',
             color: recorded.has(n) ? 'var(--green)' : n === selectedNode ? 'var(--accent)' : 'var(--text-muted)',
@@ -282,6 +306,14 @@ export function WorkflowGraph3D() {
           </button>
         ))}
       </div>
+      <details className="card card-body workflow-records"><summary>Recorded execution details · {run?.trust.transitions.length ?? 0} records</summary>
+        {run?.trust.transitions.map((record, index) => <details key={index} style={{ marginTop: 12 }}>
+          <summary>{record.node.replaceAll('_', ' ')}{record.subNode ? ' / ' + record.subNode : ''} · {record.outcome} · {record.durationMs} ms</summary>
+          <p>{new Date(record.startedAt).toLocaleString()}</p>
+          <pre>{JSON.stringify(record.attributes ?? {}, null, 2)}</pre>
+        </details>)}
+        {!run && <p>No execution records are available until a report is loaded.</p>}
+      </details>
     </div>
   )
 }

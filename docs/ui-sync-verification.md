@@ -45,3 +45,55 @@ after a restart before acting on an old incident. This is not a million-user
 load certification or production authentication rollout.
 
 See [setup](try1-setup.md) and [text/voice behavior](supervisor-voice-chat-copilot.md).
+
+## Read-aloud latency follow-up (D-052)
+
+The reported delay was reproduced against the local speech endpoint with a real
+dataset-backed delay-reason answer: 463 characters took 19.26 seconds; a shorter
+218-character opening took 11.21 seconds; the repeated opening took under 0.01
+seconds from the server cache. These are single observations, not benchmarks or
+guarantees.
+
+The frontend now prepares the latest answer without playing it, shares that
+request when Read aloud is clicked, and reuses up to eight prepared responses in
+memory. A four-second wait triggers browser speech when available with a visible
+notice. Prepared provider audio never interrupts an answer already being spoken.
+The loading state has a spinner and Cancel button. Context changes clear the cache.
+
+Validation: production frontend build passed. A focused runtime harness importing
+the actual TypeScript module checked silent preparation, request deduplication,
+cached replay, the four-second fallback, prevention of late playback, cancellation,
+tenant/voice isolation, eight-entry eviction and the 30-second preparation timeout.
+All passed. The harness used simulated browser audio and timers; it does not prove
+device-specific browser voice startup time. No automated project suite was run.
+
+## Restored inspection views and white workflow (D-053)
+
+3D Workflow, Audit Trail and Decision Brief are available without a diagnostics
+flag. The graph has a white background, darker labels/paths, distinct recorded,
+paused and failed colors, a Reset view control, real traversed connections and
+collapsible execution records. Audit has structured event details, filtering,
+pagination, reload and recoverable errors. Decision Brief keeps the verified
+narrative, grouped evidence and incident response link.
+
+Removed the unused standalone AskCopilotPage and AskDrawer components, obsolete
+full-page/pipeline styles and the old page naming. FloatingCopilot is the only
+chat surface and remains a bottom-right icon on all workspace pages.
+
+Validation:
+- Frontend production build and whitespace checks pass.
+- Live backend reads for Transport Manager and Facilities Head each returned 16
+  top-level transitions and 28 audit events; Line Manager returned 7 transitions
+  and 9 events. All had decision narratives and retained their capture IDs after
+  read-only inspection.
+- Cross-tenant audit reads returned 404 for all three personas.
+- Browser inspection confirmed the white WebGL canvas, restored navigation,
+  decision narrative, incident response button and 10 collapsed evidence findings.
+- Browser node selection showed the actual Supervisor outcome and duration.
+  Audit filtering reduced 28 events to four approval-related events; event
+  details expanded as structured fields; Reload events retained capture time.
+- No legacy Ask page/drawer, route or pipeline-page selector remains in source.
+
+These checks used the isolated local backend with analytical model calls disabled;
+they do not re-certify live LLM/Langfuse behavior. Automated project suites were
+not run. Replay follows recorded data; it does not issue a workflow request.

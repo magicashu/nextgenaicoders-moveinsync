@@ -30,7 +30,7 @@ export function AppShell({ identity, onIdentity, asOf, onAsOf, view, onView, onA
     <div className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Mobility Decision Copilot</p>
+          <p className="eyebrow">MoveIn Sync Mobility Dashboard</p>
           <h1>Proactive operations brief</h1>
         </div>
         <form className="identity" onSubmit={(e) => e.preventDefault()} aria-label="Trusted identity (demo stand-in for gateway claims)">

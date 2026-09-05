@@ -545,3 +545,28 @@ Append entries using this template:
 - **Guardrails:** Reject unrelated, malformed, technical-internal and instruction-override requests before analytical/model work. Return ordinary product-language replies and suggestions; never echo internal refusal diagnostics. Render messages as React text, never untrusted HTML.
 - **Voice:** Browser-supported dictation is explicit and transcripts are reviewed before sending. Read-aloud calls Sarvam through the backend using the existing server-only key, allowlisted voices, bounded input/output and concurrency; unavailable audio falls back to browser speech with a visible notice. No frontend provider credential.
 - **Validation:** Production builds, focused backend cases and real browser walkthrough; test-suite skip remains as requested.
+
+## D-052: Prepare read-aloud audio early and bound the wait to speak
+
+- **Trigger:** The user reported slow read-aloud startup. A live 463-character dataset-backed answer took 19.26 seconds to synthesize; a cached request returned in under 0.01 seconds. This is an observation, not a latency SLA.
+- **Decision:** Silently prepare the latest visible answer in the selected voice while the user reads it. Playback remains click-only. Reuse one in-flight request and a bounded eight-entry memory cache keyed by actor, tenant, roles, voice and exact text. No persistent audio storage or browser provider credentials.
+- **Fallback:** If audio is not ready within four seconds of clicking, use browser speech when available and explain the change. Do not switch voices midway through an answer. Slow provider work can finish in the background for replay, bounded by a 30-second request deadline.
+- **Lifecycle:** Stop, close, microphone use and new questions cancel pending preparation; persona/capture changes also clear the browser audio cache. Only the latest answer is prepared automatically; changing voice prepares that selection. Long answers exceeding the speech endpoint limit use browser speech.
+- **Tradeoff:** Preparing the latest answer can incur a speech request even when it is never played. This avoids waiting until the playback click to start synthesis. No additional agent workflow or analytics query is started.
+
+## D-053: Restore workflow, audit and decision brief navigation
+
+- **Trigger:** The user explicitly requested the 3D workflow, audit trail and decision brief on 2026-09-05. This overrides D-050/D-051's navigation hiding for these named views.
+- **Presentation:** Show 3D Workflow, Audit Trail and Decision Brief alongside Dashboard and Incidents without requiring a diagnostics environment flag. Keep chat guardrails and plain dashboard/incident language intact; deliberate inspection screens expose recorded execution details.
+- **Data:** All three views use the selected persona, tenant and report capture. Audit refresh reads only the audit endpoint. Graph replay animates recorded transitions and cannot start a workflow; distinguish the static node layout from actually traversed edges.
+- **Resilience:** Clear stale details when scope changes, expose empty/error/retry states, provide readable execution records when WebGL is unavailable, and preserve the current evidence and incident-response links in the brief.
+- **Visual follow-up:** Use a white 3D canvas with contrasting nodes, labels and paths. Remove unused standalone Ask page/drawer components and obsolete pipeline/page styles; the single FloatingCopilot remains the bottom-right chat entry point.
+
+## D-054: Refresh the hackathon presentation with current product evidence
+
+- **Trigger:** The user requested a content review, current screenshots and tiles, web-informed presentation improvements, and very brief, catchy copy on 2026-09-05.
+- **Naming follow-up:** Use the user's exact name, `MoveIn Sync Mobility Dashboard`, in the presentation. The current frontend navigation, welcome screen and browser title also contain this name.
+- **Decision:** Deliver a separate 10-slide editable PowerPoint, preserving the source deck and team credits. Use the current light dashboard, KPI tiles, incident response controls, workflow and audit screens from the local canonical workspace. Keep supporting facts and citations in speaker notes.
+- **Evidence:** Reproduce displayed analytical numbers with DuckDB and the governed M01 definitions. Present the June 1–7 case against the prior four weeks. Clearwater contributes roughly 51% of delayed trips, rather than exclusively containing the issue; all volume-qualified vendors rose.
+- **Claim boundaries:** Remove the invented weekly chart, unmeasured speed/productivity promises, zero-hallucination guarantees and permanent-audit claim. Clearly label approved effects as simulated, local persistence as in-memory, and workflow playback as recorded execution. Do not present target evaluation gates as achieved results.
+- **Design:** Short headlines, focused screenshot crops, restrained navy/green styling, and one main idea per slide. References: https://www.ycombinator.com/blog/how-to-design-a-better-pitch-deck/ and https://info.devpost.com/blog/how-to-present-a-successful-hackathon-demo .
