@@ -13,6 +13,8 @@ interface AppStore {
   setLive: (v: boolean) => void
   approvalState: 'pending' | 'approved' | 'rejected'
   setApprovalState: (s: 'pending' | 'approved' | 'rejected') => void
+  lastRefresh: number
+  refresh: () => void
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -26,4 +28,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setLive: (isLive) => set({ isLive }),
   approvalState: 'pending',
   setApprovalState: (approvalState) => set({ approvalState }),
+  lastRefresh: Date.now(),
+  refresh: () => set({ lastRefresh: Date.now() }),
 }))

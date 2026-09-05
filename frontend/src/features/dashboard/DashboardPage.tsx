@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
-  LineChart, Line, PieChart, Pie, Cell, Legend, CartesianGrid
+  LineChart, Line, PieChart, Pie, Cell, Legend, CartesianGrid, LabelList
 } from 'recharts'
 import { vendorData, siteData, trendData, g1RunArtifact } from '../../core/mockData'
 import { useAppStore } from '../../core/store'
+import { DateRangePicker } from '../../shared/DateRangePicker'
 
-const COLORS = ['#06b6d4','#6366f1','#10b981','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#84cc16','#fb7185']
+const COLORS = ['#3FA535','#3C68D0','#10ADAE','#FF9D00','#C13D6D','#638FE7','#27D22E','#FF4444','#2E7D3E','#815FD5']
 
 function MetricChips() {
   const m = g1RunArtifact.metric
@@ -39,13 +41,13 @@ function TrendChart() {
       <div className="card-body">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={trendData} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(99,147,220,0.08)" />
-            <XAxis dataKey="week" tick={{ fill: '#7a97c0', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#7a97c0', fontSize: 11 }} axisLine={false} tickLine={false} domain={[8, 24]} tickFormatter={(v: number) => `${v}%`} />
-            <Tooltip contentStyle={{ background: '#0d1526', border: '1px solid #1e3a5f', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2eaf8' }} />
-            <ReferenceLine y={12.28} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Baseline', fill: '#f59e0b', fontSize: 11 }} />
-            <Line type="monotone" dataKey="delayed" stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} name="Delayed %" />
-            <Line type="monotone" dataKey="baseline" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="5 3" dot={false} name="Baseline" />
+            <CartesianGrid stroke="rgba(0,0,0,0.06)" />
+            <XAxis dataKey="week" tick={{ fill: '#6B7A70', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#6B7A70', fontSize: 11 }} axisLine={false} tickLine={false} domain={[8, 24]} tickFormatter={(v: number) => `${v}%`} />
+            <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#16211B' }} />
+            <ReferenceLine y={12.28} stroke="#D4900C" strokeDasharray="4 4" label={{ value: 'Baseline', fill: '#D4900C', fontSize: 11 }} />
+            <Line type="monotone" dataKey="delayed" stroke="#B00020" strokeWidth={2.5} dot={{ fill: '#B00020', r: 4 }} name="Delayed %" />
+            <Line type="monotone" dataKey="baseline" stroke="#3FA535" strokeWidth={1.5} strokeDasharray="5 3" dot={false} name="Baseline" />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -54,25 +56,56 @@ function TrendChart() {
 }
 
 function VendorChart() {
-  const top6 = vendorData.slice(0, 6).map(v => ({
-    name: v.vendor.split(' ').slice(0, 2).join(' '),
+  const data = vendorData.map(v => ({
+    name: v.vendor.replace(' Travel', ''),
     current: v.value,
     baseline: v.baseline,
   }))
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Vendor Delay Rates — Top 6 by volume</div>
+        <div className="card-title">Vendor Delay Rates — Current vs Baseline</div>
+        <div style={{ display: 'flex', gap: 14, fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#B00020', marginRight: 4 }} />Current</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3FA535', marginRight: 4 }} />Baseline</span>
+        </div>
       </div>
-      <div className="card-body">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={top6} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(99,147,220,0.08)" />
-            <XAxis dataKey="name" tick={{ fill: '#7a97c0', fontSize: 10 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#7a97c0', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
-            <Tooltip contentStyle={{ background: '#0d1526', border: '1px solid #1e3a5f', borderRadius: 8, fontSize: 12 }} />
-            <Bar dataKey="current" fill="#ef4444" name="Current" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="baseline" fill="#06b6d4" name="Baseline" radius={[3, 3, 0, 0]} />
+      <div className="card-body" style={{ paddingRight: 8 }}>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 0, right: 48, left: 0, bottom: 0 }}
+            barCategoryGap="30%"
+            barGap={3}
+          >
+            <CartesianGrid stroke="rgba(0,0,0,0.05)" horizontal={false} />
+            <XAxis
+              type="number"
+              tick={{ fill: '#6B7A70', fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => `${v}%`}
+              domain={[0, 35]}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fill: '#16211B', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={130}
+            />
+            <Tooltip
+              contentStyle={{ background: '#fff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }}
+              formatter={(v: number) => `${v.toFixed(1)}%`}
+            />
+            <Bar dataKey="current" fill="#B00020" name="Current" radius={[0, 3, 3, 0]} maxBarSize={10}>
+              <LabelList dataKey="current" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#B00020', fontWeight: 600 }} />
+            </Bar>
+            <Bar dataKey="baseline" fill="#3FA535" name="Baseline" radius={[0, 3, 3, 0]} maxBarSize={10}>
+              <LabelList dataKey="baseline" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#3FA535', fontWeight: 600 }} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -88,13 +121,13 @@ function SiteDonut() {
         <div className="card-title">Site Delay Share</div>
       </div>
       <div className="card-body">
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie data={data} cx="45%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" nameKey="name" paddingAngle={3}>
               {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
             </Pie>
-            <Tooltip contentStyle={{ background: '#0d1526', border: '1px solid #1e3a5f', borderRadius: 8, fontSize: 12 }} />
-            <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: '#7a97c0' }} />
+            <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }} />
+            <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: '#6B7A70' }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -116,7 +149,7 @@ function VendorDeltaBars() {
             <div className="delta-bar-track">
               <div className="delta-bar-fill" style={{
                 width: `${(v.delta / max) * 100}%`,
-                background: v.delta > 10 ? '#ef4444' : v.delta > 7 ? '#f59e0b' : '#06b6d4'
+                background: v.delta > 10 ? '#B00020' : v.delta > 7 ? '#D4900C' : '#3FA535'
               }} />
             </div>
             <div className="delta-bar-val">+{v.delta.toFixed(1)}</div>
@@ -130,9 +163,24 @@ function VendorDeltaBars() {
 export function DashboardPage() {
   const { tenant } = useAppStore()
   const run = g1RunArtifact
+  const [dateRange, setDateRange] = useState({ from: run.metric.periodStart, to: run.metric.periodEnd })
 
   return (
     <div>
+      {/* Filter bar */}
+      <div className="filter-bar">
+        <div className="filter-group">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--mis-green)' }}>
+            <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span className="filter-label">Tenant</span>
+          <span className="filter-value">{tenant}</span>
+        </div>
+        <div className="filter-divider" />
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <button className="filter-apply-btn" type="button">Apply</button>
+      </div>
+
       <div className="hero-banner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -153,7 +201,7 @@ export function DashboardPage() {
       <MetricChips />
       <TrendChart />
 
-      <div className="two-col" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
         <VendorChart />
         <SiteDonut />
       </div>
