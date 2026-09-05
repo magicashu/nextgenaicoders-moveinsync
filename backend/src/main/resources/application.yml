@@ -6,6 +6,8 @@ server:
   port: ${SERVER_PORT:8080}
 
 mobility:
+  local-api:
+    enabled: ${MOBILITY_LOCAL_API_ENABLED:false}
   # This branch provides team scaffolding. The old sample endpoint is not a governed product API.
   demo:
     enabled: false
@@ -20,6 +22,8 @@ mobility:
       model: ${SARVAM_MODEL:sarvam-105b}
       timeout: ${SARVAM_TIMEOUT:30s}
       max-prompt-chars: 24000
+    agent:
+      role: ${MOBILITY_AGENT_ROLE:all}
       max-evidence-items: 64
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}

@@ -23,14 +23,20 @@ public final class AgentWorkflowService {
         this.supervisor=supervisor;this.investigator=investigator;this.critic=critic;this.briefing=briefing;this.metrics=metrics;
     }
     public Result investigate(RunContext context,MetricRequest request) {
+        return investigate(context, request, "");
+    }
+    public Result investigate(RunContext context,MetricRequest request,String question) {
+        RunGuards.requireRequest(context,request);RunGuards.requireTime(context);
+        InvestigationPlan plan=plan(context, request, question);
+        return execute(context, plan);
+    }
+    public InvestigationPlan plan(RunContext context, MetricRequest request, String question) {
         RunGuards.requireRequest(context,request);RunGuards.requireTime(context);
         MetricRequest primaryRequest=request.metricId()==MetricId.M03_DELAY_REASON_MIX&&request.measure()==MetricRequest.Measure.VALUE
                 ?new MetricRequest(request.tenant(),request.metricId(),MetricRequest.Measure.REASON_EMPLOYEE,request.window(),request.filters(),request.dataVersion()):request;
         MetricEvidence primary=metrics.compute(primaryRequest);
         if(primary.status()==MetricStatus.UNAVAILABLE) {
-            var unavailable=new InvestigationResult(List.of(primary),List.of(),List.of(),primary.warnings());
-            var verification=critic.review(context,unavailable);
-            return new Result(null,unavailable,briefing.draft(context,verification));
+            throw new IllegalArgumentException("Requested metric is unavailable; no investigation plan can be created");
         }
         Map<MetricId,CapabilityMatrix.Capability> capabilities=new EnumMap<>(MetricId.class);
         // Implementation availability does not imply a usable population in every requested window.
@@ -43,13 +49,22 @@ public final class AgentWorkflowService {
         var issue=new AnomalyIssue("request-"+context.runId(),context.tenant(),context.versions().data(),
                 "Requested governed investigation","UNASSESSED","REQUESTED_ANALYSIS",List.of(primary),Map.of(),primary.warnings());
         var input=new SupervisorPlanningRequest(context,issue,new CapabilityMatrix(context.tenant(),context.versions().data(),Map.copyOf(capabilities)),"");
-        InvestigationPlan plan=supervisor.plan(input);
+        InvestigationPlan plan=supervisor.plan(input, question);
         // Preserve explicit caller filters and family statistic on primary-metric tasks.
         List<InvestigationTask> scoped=plan.tasks().stream().map(t->new InvestigationTask(t.taskId(),t.worker(),t.question(),
                 t.requests().stream().map(r->new MetricRequest(r.tenant(),r.metricId(),r.metricId()==request.metricId()?request.measure():r.measure(),
                         r.window(),request.filters(),r.dataVersion())).toList(),t.dependencies())).toList();
         plan=new InvestigationPlan(plan.planId(),plan.issueId(),scoped,plan.requiredEvidence(),plan.stopConditions());
-        return execute(context,plan);
+        return plan;
+    }
+    public InvestigationResult investigatePlan(RunContext context, InvestigationPlan plan) {
+        RunGuards.requireAuthorized(context); return investigator.investigate(context, plan);
+    }
+    public VerificationResult critique(RunContext context, InvestigationResult investigation) {
+        RunGuards.requireAuthorized(context); return critic.review(context, investigation);
+    }
+    public DecisionBrief brief(RunContext context, VerificationResult verification) {
+        RunGuards.requireAuthorized(context); return briefing.draft(context, verification);
     }
     /** Explicit typed plans support multi-domain DS-20 and reviewed dynamic compositions. */
     public Result execute(RunContext context,InvestigationPlan plan) {
