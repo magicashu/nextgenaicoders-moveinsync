@@ -14,10 +14,10 @@ import java.util.List;
 public final class ScaffoldStatusController {
     @GetMapping("/api/v1/capabilities")
     public ScaffoldStatus capabilities() {
-        return new ScaffoldStatus("SCAFFOLD", false, AgentRole.values().length,
+        return new ScaffoldStatus("PARTIAL", false, AgentRole.values().length,
                 WorkflowNode.values().length, InvestigationNode.values().length,
-                WorkerType.values().length, MetricId.values().length, List.of(),
-                "Interfaces and DTOs only; assigned team members implement and verify the runtime.");
+                WorkerType.values().length, MetricId.values().length, List.of("M01_DELAYED_TRIP_RATE"),
+                "Official-data M01 is implemented; the governed runtime remains incomplete until all required metrics and workflow controls pass their gates.");
     }
 
     public record ScaffoldStatus(String mode, boolean governedRuntimeReady, int agentRoles,
