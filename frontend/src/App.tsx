@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import { TopNav, SideNav } from './shared/Nav'
 import { DashboardPage } from './features/dashboard/DashboardPage'
+import { SupervisorCopilotPage } from './features/copilot/SupervisorCopilotPage'
+import { WorkflowGraph3D } from './features/workflow/WorkflowGraph3D'
 const WorkflowGraph3D = lazy(() => import('./features/workflow/WorkflowGraph3D').then(m => ({ default: m.WorkflowGraph3D })))
 import { DecisionBriefPage } from './features/brief/DecisionBriefPage'
 import { AuditPage } from './features/audit/AuditPage'
@@ -30,6 +32,8 @@ export default function App() {
           {page === 'scorecard' && <ScorecardPage />}
         </main>
       </div>
+      {/* Global Floating Supervisor Voice & Chat Copilot Widget */}
+      <SupervisorCopilotPage />
     </div>
   )
 }
