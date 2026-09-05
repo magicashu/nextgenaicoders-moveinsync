@@ -1,6 +1,6 @@
 # Local setup and running the agents
 
-The supported local path is Java 21, the Maven wrapper and the supplied CSVs. DuckDB is embedded: no separate DuckDB server, PostgreSQL, Docker or model API key is needed for the deterministic agent tests. The four-agent backend is callable from Java; an authenticated product HTTP investigation endpoint is still pending.
+The supported local path is Java 21, the Maven wrapper and the supplied CSVs. DuckDB is embedded. Docker Compose runs four separate role containers over the official data and Sarvam.
 
 ## 1. Prerequisites and checkout
 
@@ -50,6 +50,41 @@ The scenarios exercise the four agents without a live language model. See [the i
 ./mvnw -pl backend spring-boot:run
 ```
 
+For local prompt testing, enable local API explicitly:
+
+```sh
+export MOBILITY_AI_PROVIDER=sarvam
+export SARVAM_API_KEY='your-key'
+export SARVAM_MODEL='sarvam-105b'
+export SARVAM_ENDPOINT='https://api.sarvam.ai/v1/chat/completions'
+./mvnw -pl backend spring-boot:run
+```
+
+This endpoint uses a fixed local Transport Manager identity. It is not production authentication.
+
+## 5. Test with an actual prompt
+
+Supervisor prompt test:
+
+```sh
+curl --fail --silent --show-error \
+	-H 'Content-Type: application/json' \
+	-d '{"businessUnit":"pinnacle-Slc","asOf":"2026-06-08","prompt":"Where is this delay anomaly concentrated by site and shift?"}' \
+	http://localhost:8080/api/v1/agent/supervisor | jq
+```
+
+Pass returned `plan` to `/api/v1/agent/investigator`, returned `investigation` to `/api/v1/agent/evidence-critic`, then returned `verification` to `/api/v1/agent/briefing-action`. Each endpoint executes one role only. This is local testing only; production authentication is not implemented.
+
+Question must mention one governed metric. Examples:
+
+```text
+Where is this delay anomaly concentrated by site and shift?
+Did every high-volume vendor deteriorate on pickup?
+What evidence explains the low driver rating rate?
+```
+
+The router rejects ambiguous or unsupported questions. Sarvam output only selects among allowlisted investigations; deterministic metrics, scope and evidence verification remain authoritative.
+
 In another terminal:
 
 ```sh
@@ -61,7 +96,7 @@ Expect health `UP` and capabilities listing all 18 implemented contracts. `gover
 
 To invoke agents from trusted backend code, inject `AgentWorkflowService`. Use `investigate(RunContext, MetricRequest)` for a governed metric or `execute(RunContext, InvestigationPlan)` for a reviewed multi-domain plan. Build the context from authorized actor/tenant information and pin the data version from `OfficialAnalyticsStore.dataVersion()`, metric registry version, window and budget. The integration test supplies working examples. Do not construct tenant authorization from an untrusted request header.
 
-## 5. Optional UI and model
+## 6. Optional UI
 
 The current UI provides a dashboard, 3D workflow, briefs, audit and scorecard backed by `frontend/src/core/mockData.ts`; it is not connected to the completed backend reporting path. To inspect it, use Node 22.13+ within the 22.x line or Node 24+ as required by the lockfile, then run:
 
@@ -70,9 +105,9 @@ npm ci
 npm run dev
 ```
 
-Vite serves port 5173 and proxies `/api` to port 8080. The displayed mock values are not evidence of a live agent run. The older demo page/API also remains in the source tree, with the endpoint disabled by default; do not enable it as a substitute for authenticated agent serving.
+Vite serves port 5173 and proxies `/api` to port 8080. The displayed mock values are not evidence of a live agent run.
 
-Optional Ollama integration is configured with `MOBILITY_AI_PROVIDER=ollama`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL` and `OLLAMA_TIMEOUT`. A running Ollama server with the selected model is required. Keep `none` for reproducible validation. Model output cannot override deterministic evidence verification or approve actions.
+Sarvam is the configured model provider for prompt testing. Do not set `MOBILITY_AI_PROVIDER=ollama`. Deterministic validation remains active and model output cannot override evidence or approve actions.
 
 ## Operational settings and troubleshooting
 
@@ -84,4 +119,13 @@ Defaults under `mobility.analytics` are 512 MB DuckDB memory, two SQL threads, f
 - Unavailable metrics: inspect evidence caveats and eligible populations. Q2 cost/km restrictions and empty severe-alert populations are expected results.
 - Capacity/timeouts: inspect the workload and configured limits before increasing parallelism; exact quantiles can cost more than rollup counts.
 
-The checked-in Docker Compose file still mounts fixture data and is not the official-data launch path described here. The PostgreSQL profile/index migration has not been validated against a running database in this implementation. Use the Java/DuckDB path above for the verified local setup.
+## 7. Run separated Docker agents
+
+Export Sarvam credentials, then start four role containers:
+
+```sh
+export SARVAM_API_KEY='your-key'
+docker compose up --build
+```
+
+Endpoints: Supervisor `http://localhost:8081`, Investigator `http://localhost:8082`, Evidence Critic `http://localhost:8083`, Briefing/Action `http://localhost:8084`, frontend `http://localhost:3000`. Each container mounts official data read-only and owns separate DuckDB runtime storage. Frontend proxy routes each role path to its matching container.

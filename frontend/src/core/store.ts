@@ -25,6 +25,8 @@ interface AppStore {
   setLive: (v: boolean) => void
   approvalState: 'pending' | 'approved' | 'rejected'
   setApprovalState: (s: 'pending' | 'approved' | 'rejected') => void
+  lastRefresh: number
+  refresh: () => void
   
   // Copilot Voice & Chat State
   isAudioModeEnabled: boolean
@@ -51,6 +53,8 @@ export const useAppStore = create<AppStore>((set) => ({
   setLive: (isLive) => set({ isLive }),
   approvalState: 'pending',
   setApprovalState: (approvalState) => set({ approvalState }),
+  lastRefresh: Date.now(),
+  refresh: () => set({ lastRefresh: Date.now() }),
 
   // Copilot Voice & Chat defaults
   isAudioModeEnabled: false,
