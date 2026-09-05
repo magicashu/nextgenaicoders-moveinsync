@@ -98,13 +98,13 @@ function VendorChart() {
             />
             <Tooltip
               contentStyle={{ background: '#fff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12 }}
-              formatter={(v: number) => `${v.toFixed(1)}%`}
+              formatter={(v) => [`${Number(v).toFixed(1)}%`]}
             />
             <Bar dataKey="current" fill="#B00020" name="Current" radius={[0, 3, 3, 0]} maxBarSize={10}>
-              <LabelList dataKey="current" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#B00020', fontWeight: 600 }} />
+              <LabelList dataKey="current" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 10, fill: '#B00020', fontWeight: 600 }} />
             </Bar>
             <Bar dataKey="baseline" fill="#3FA535" name="Baseline" radius={[0, 3, 3, 0]} maxBarSize={10}>
-              <LabelList dataKey="baseline" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#3FA535', fontWeight: 600 }} />
+              <LabelList dataKey="baseline" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 10, fill: '#3FA535', fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
