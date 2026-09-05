@@ -468,7 +468,14 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Exclusions:** No application source, executable scripts, tests, dependencies, runtime configuration, migrations, API/schema contract files or official data are transferred. HTML/SVG architecture illustrations are documentation assets only. No branch merge or code cherry-pick is involved.
 - **Supersedes:** D-040's preserved-scaffold-only boundary for `Java-branch` solely to permit this documentation transfer. Implementation ownership and integration rules otherwise remain unchanged.
 
-## Live problem statement intake checklist (historical reference)
+## D-050: Plain-English team package without implementation references
+
+- **Status:** Accepted (2026-09-05), explicitly requested by the user.
+- **Decision:** Provide a self-contained architecture handbook describing all four agents, eighteen main nodes, four investigation stages, seven analytical workers and the architecture components in plain English. Include six assignable work packages plus an integration owner, shared-record definitions and acceptance criteria.
+- **Disclosure boundary:** The team handout contains no reference source filenames, implementation class names, private branch references or prior code-test claims. Architectural technology choices and approved data/metric definitions remain available. Update the architecture-reference branch's main document entry points to this design-focused vocabulary.
+- **Scope:** Documentation only. Do not transfer or modify application code. Proposed publication, DQ provenance and incident follow-up remain explicitly separate from the first-delivery scope. Distribute the standalone handbook folder, not repository history or internal review archives.
+
+## Live problem statement intake checklist (historical record)
 
 When the hackathon begins:
 

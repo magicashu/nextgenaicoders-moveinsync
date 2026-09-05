@@ -1,103 +1,57 @@
-# Mobility Decision Copilot — Project Structure
+# Mobility Decision Copilot — component responsibility map
 
-> Branch scope: implementation descriptions refer to Java-branch-2. This Java-branch copy transfers documentation only; see [branch scope](architecture-branch-scope.md).
+This map assigns responsibilities without exposing reference source files or requiring a particular class layout. The team can choose its internal structure after agreeing the shared records.
 
-Updated 2026-09-05 under D-048. This is the implemented repository map, not a scaffold checklist. Runtime architecture: [HLD](high-level-design.md) and [detailed node design](detailed-solution-architecture-plan.md).
+## 8. Every main architecture component
 
-## Runtime
+| Component | What it does | What it hands to others | Suggested work package |
+|---|---|---|---|
+| Dashboard | Shows briefs, evidence, questions, approval, audit and trust readings | Scoped user requests and decisions | 5 |
+| API boundary | Validates requests and connects screens to services | Consistent responses and safe errors | 4 |
+| Identity and access | Determines who may see or approve what | Authorized business-unit and role scope | 3 |
+| Request queue | Accepts bounded background work and reports progress | Job identifier, status and result reference | 4 |
+| Scheduler | Requests precomputation for configured historical dates and tenants | The same scoped work requests used by the UI | 4 |
+| Data loader and normalizer | Reads untouched files and handles approved formatting differences | Consistent data with provenance | 1 |
+| Data-quality profiler | Finds missing, invalid, duplicate and unmatched records | Quality report and exclusions | 1 |
+| Capability checker | Matches data availability to analysis requirements | Supported/limited/unavailable flags | 1 |
+| Metric registry | Defines each approved measurement and its denominator, unit and exclusions | Versioned definitions | 1, agreed with integration owner |
+| Analytical store and query service | Executes the governed calculations | Checked metric and contribution evidence | 1 |
+| Metric cache | Reuses recent calculations for identical authorized scope and versions | The same result with less repeated work | 1 |
+| Detector and prioritizer | Applies approved change/materiality/priority rules | Selected issue and its context | 1 |
+| Workflow controller | Coordinates the 18 steps, errors and budgets | A traceable run and terminal/pending status | 2 |
+| AI provider adapter | Sends bounded aggregate prompts to optional Sarvam assistance | Structured suggestions and usage records | 2 |
+| Evidence merger and verifier | Combines results and enforces claim rules | Verified claims plus limitations | 2 |
+| Report renderer | Presents checked facts for two audiences | Briefs, answers and shareable text | 4 |
+| Action policy and approval | Decides whether a proposal can be shown for a human decision | Pending/approved/edited/rejected decision | 3 |
+| Revalidation and action executor | Rechecks approved details and prevents duplicate simulated effects | Execution receipt or reason nothing happened | 3 |
+| Durable control store | Saves jobs, progress, pending decisions, evidence snapshots and receipts | Restart-readable control records | 3; queue behavior owned by 4 |
+| Business audit ledger | Records consequential business events | Who decided what, with which evidence and outcome | 3 |
+| Observability and evaluation | Measures durations, tool/model use and failures; checks release behavior | Diagnostics and acceptance evidence | 6 |
 
-One Java 21/Spring Boot application, one React/TypeScript frontend, process-local DuckDB analytics and selectable in-memory/PostgreSQL control repositories. The deterministic Java state machine is active. Sarvam is a direct LanguageModelPort adapter; Spring AI and LangGraph4j are not prerequisites for that integration.
+Recommended technology choices can remain Java/Spring Boot, React/TypeScript, DuckDB analytics, PostgreSQL shared control state, optional Sarvam and OpenTelemetry/Langfuse. These choices do not change the responsibilities above.
 
-## Backend ownership map
+## 9. What the components must exchange
 
-Paths below are relative to backend/src/main/java/com/moveinsync/mobilitycopilot/.
+Agree these records before building screens or independent components. Each record needs required/optional fields and error behavior. Use business names, then choose implementation names together.
 
-| Path | Implemented responsibility |
+| Record | Minimum meaning |
 |---|---|
-| api/ | Thin brief-job, brief, workflow, question, approval, audit and demo controllers; DTOs, request context and errors |
-| access/ | Registry identities, tenant roles and deterministic authorization |
-| config/ | WorkflowCompositionConfiguration, governed adapter wiring, SchedulingConfiguration, WorkflowProperties, capability health |
-| ingestion/application/AnalyticsStore.java | Analytical catalog and data-version boundary |
-| ingestion/adapter/duckdb/ | CSV discovery/loading/normalization and DuckDbAnalyticsStore |
-| metrics/domain/ | M01–M18 registry, query/result contracts and allowed dimensions |
-| metrics/application/BoundedMetricCache.java | Bounded TTL/LRU and single-flight metric work |
-| metrics/adapter/duckdb/ | DuckDbMetricService, DuckDbCapabilityMatrixService and governed SQL access |
-| anomaly/ | Deterministic materiality, baseline, quality/regime rules and contributions |
-| workflow/application/ | WorkflowEngine, ResumableWorkflowEngine, coordinator and checkpoint/snapshot ports |
-| workflow/application/ports/ | AnalyticsGateway, LanguageModelPort, DetectionSnapshot, WorkerEvidenceDto and TransitionListener |
-| workflow/domain/ | WorkflowState, WorkflowRun/Snapshot, RunContext, plan/results, node/transition/usage records |
-| workflow/adapter/statemachine/ | Active DeterministicWorkflowEngine |
-| workflow/adapter/sarvam/ | Server-side SarvamLanguageModel |
-| workflow/agents/ | SupervisorAgent, InvestigationAgent, EvidenceCriticAgent, BriefingActionAgent, ModelAssist and PromptLibrary |
-| workflow/nodes/ | EvidenceMerger and ActionPolicyGate; remaining node methods live in the state-machine adapter |
-| workflow/investigation/workers/ | WorkerType and WorkerToolRegistry: seven typed gateway worker adapters |
-| evidence/ | Claim/evidence records and deterministic EvidenceVerifier |
-| reporting/application/ | AsyncBriefService, BriefJobStore, DecisionRunGateway, RunView and BriefRenderer |
-| reporting/adapter/ | WorkflowDecisionRunGateway and InMemoryBriefJobStore |
-| approval/ | Approval lifecycle, checkpoint repositories and ControlPlaneBeans |
-| approval/adapter/postgres/ | JDBC approvals/checkpoints plus JdbcBriefJobStore and JdbcWorkflowSnapshotStore |
-| action/ | Proposal/type/status contracts, revalidation, idempotent execution repositories and mock adapters |
-| audit/ | Append-only audit ledger and in-memory/PostgreSQL adapters |
-| conversation/ | Constrained question intent and scoped evidence reuse/investigation |
-| observability/ | TraceRecorder, redaction, timing and optional export |
+| Request | Who asked, business unit, role, as-of date, request purpose and allowed filters |
+| Job status | Job ID, queued/running/complete/failed, timestamps, result reference and safe error |
+| Run | Run ID, scope, current step, versions, work allowance, errors and outcome |
+| Metric evidence | Metric ID/version, business unit, period, filters, value/unit, population, numerator/denominator when applicable, source and quality |
+| Investigation plan | Selected issue, allowed tasks, scope, required evidence and stop conditions |
+| Task result | Worker, complete/partial/failed status, evidence, findings and limitations |
+| Claim | Claim ID, exact text, kind and supporting evidence IDs |
+| Brief | Checked claims, operations/leadership presentations, caveats and optional proposal |
+| Proposal | Action ID, type, run, tenant scope, exact proposed details, evidence version and expiry |
+| Human decision | Proposal/approval identity, approver, approve/edit/reject, time and approved details |
+| Receipt | Action identity, duplicate-prevention key, simulated outcome, time and audit reference |
+| Audit event | Tenant/run/action references, actor, event type, time and outcome |
 
-No seven-class worker hierarchy or nodes/deterministic/nodes/generative tree is required: the current registry and typed node methods implement those responsibilities.
+A data version identifies an analytical dataset. A run ID identifies one analysis attempt. An action ID identifies one proposal/effect. Keep them distinct.
 
-## Resources and contracts
 
-| Path from repository root | Purpose |
-|---|---|
-| backend/src/main/resources/application.yml | Workflow, queue, Sarvam, cache namespace and cost settings |
-| backend/src/main/resources/application-postgres.yml | PostgreSQL runtime profile |
-| backend/src/main/resources/prompts/v1/ | Runtime prompts; metadata revision prompts-v1.1 |
-| backend/src/main/resources/sql/ | Reviewed schema/view/metric/contribution SQL |
-| backend/src/main/resources/db/migration/ | V1–V3 control schema, including async jobs and rich snapshots |
-| contracts/openapi/mobility-copilot.yaml | API 0.3.0 including async brief jobs |
-| contracts/schemas/ | Evidence, metric, brief, action, approval, receipt and audit schemas |
-| contracts/data/official-checksums.sha256 | Immutable organizer-file integrity gate |
-| outputs/official dataset/ | Official CSVs and dictionary; never edited or moved |
-| data/fixtures/ | Tiny and seven-file test inputs |
-| evals/ | Golden, adversarial, recovery, corrupted-input and scorecard artifacts |
+## Ownership and handoff
 
-## Frontend map
-
-| Path under frontend/src/ | Responsibility |
-|---|---|
-| App.tsx | Identity/date/view state, request cancellation and stale-response protection |
-| app/AppShell.tsx | Responsive workspace shell and controls |
-| app/ApiContext.tsx | Typed API provider |
-| core/api.ts / contracts.ts | Async polling, transport and backend DTO mirror |
-| features/morning-brief/ | MorningBriefPage and memoized EvidenceCharts |
-| features/anomaly-investigation/ | Branch findings, capability gaps and evidence table |
-| features/conversation/ | AskDrawer |
-| features/approval-inbox/ | Approval preview/decisions and receipt |
-| features/audit-trail/ | Audit history |
-| features/trust-panel/ | Versions, traces, provider/fallback/token/cost readings |
-| shared/ | Metric cards, evidence drawers/chips, icons, formatting and useDialogFocus |
-| styles.css | Responsive layout, keyboard focus, reduced motion and print rules |
-| mocks/ / test/ | Typed fixtures and test setup |
-
-The browser displays governed readings. It does not calculate operational metrics, issue SQL or approve actions without backend validation.
-
-## Storage and boundaries
-
-- DuckDB is owned by the application process for analytical loading/querying; the model's tool surface is read-only.
-- PostgreSQL owns shared jobs, checkpoints, rich decision snapshots, approvals, action idempotency/receipts and audit. Current identity/target configuration remains registry/configuration-driven.
-- In-memory control adapters support one local demo process. Metric/capability caches remain process-local even in PostgreSQL mode.
-- Use (business_unit, trip_id) for trip-level joins and aggregates. Every query/cache/evidence/action carries tenant scope.
-- Agents return typed records; metrics, verification, policy and state transitions remain deterministic.
-- A run snapshot is not a published dataset; an execution receipt is not incident resolution.
-- Authorization precedes retrieval/reuse. No external communications or arbitrary SQL tools are present.
-- Framework alternatives and unimplemented incident/publication services are proposals, not directories to scaffold automatically.
-
-## Build and verification entry points
-
-- Root/backend Maven builds and frontend/package.json own dependencies; .env.example documents configuration names.
-- scripts/verify.sh: default Java/React, contract and fixture checks.
-- scripts/release/verify-release.sh: official-file integrity, governed reconciliation, fixture/official HTTP and evaluation gates.
-- scripts/performance/benchmark.py: explicitly separate fresh computation from completed-run reuse.
-- Backend tests follow owning capability packages plus integration, contract, security, quality and architecture suites.
-- PostgreSQL adapter integration uses the postgres Maven profile and an isolated test database; full application PostgreSQL execution also needs the Spring postgres profile.
-- Frontend tests cover briefs, evidence, approval, questions, trust and keyboard interaction.
-
-The integrated features and recorded verification are detailed in [component/node review](component-node-review-2026-09-05.md). Publication rollback, incident lifecycle and persistent DQ drill-down remain proposed extensions in the HLD.
+Use the [team work packages](team-handbook/team-work-packages.md) for assignments, dependencies and acceptance criteria. Each person owns a capability with agreed inputs/outputs; the integration owner controls shared-contract changes. Runtime agent count does not determine developer count.
