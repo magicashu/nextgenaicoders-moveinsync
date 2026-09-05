@@ -475,6 +475,25 @@ This file is the source of truth for decisions made before the hackathon. When t
 - **Disclosure boundary:** The team handout contains no reference source filenames, implementation class names, private branch references or prior code-test claims. Architectural technology choices and approved data/metric definitions remain available. Update the architecture-reference branch's main document entry points to this design-focused vocabulary.
 - **Scope:** Documentation only. Do not transfer or modify application code. Proposed publication, DQ provenance and incident follow-up remain explicitly separate from the first-delivery scope. Distribute the standalone handbook folder, not repository history or internal review archives.
 
+## D-051: Review boundary for new requirements, architecture and build guides
+
+- **Status:** Review recommendation (2026-09-05); no replacement architecture or implementation authorized.
+- **Decision:** Treat root `architecture.md`, `requirement.md` and `mobility_codex_readmes 4` as proposed inputs. Preserve their useful requirement traceability, deterministic evidence, modular boundaries and exception-focused UI ideas, but reconcile them before team adoption.
+- **Required corrections:** Keep M01–M18 v1.1, G1–G3, composite tenant/trip identity and approved data-quality rules. Resolve Angular/PostgreSQL/five-agent versus Streamlit/LangGraph/four-agent contradictions against the accepted Java state machine, React, DuckDB and selectable durable control plane. RAG and replay remain conditional additions; framework or metric changes require a recorded reconsideration, not implicit adoption of a new file.
+- **Team boundary:** The bundle contains Markdown build guides, not installable skills. Complete shared API/evidence/action records and retain clear integration ownership before distribution. Preserve the source-reference disclosure boundary in D-050.
+- **Evidence:** `docs/new-document-alignment-review-2026-09-05.md`; review of all fifteen proposed Markdown documents, archive/extracted-file parity, approved problem/data/decision documents and official provider/library documentation. No code changes, provider executions or new performance results are claimed.
+- **Supersedes:** None.
+
+## D-052: Select one architecture against the problem statement and official data
+
+- **Status:** Accepted (2026-09-05), at the user's request to choose the best fit rather than follow imported documents verbatim.
+- **Selection:** Retain the Java 21/Spring Boot modular monolith, React/TypeScript, explicit eighteen-node Java state machine, four agent roles with an Evidence Critic, seven governed analytical workers, DuckDB analytics, selectable PostgreSQL durable control state and optional server-side Sarvam. Spring AI remains optional. This preserves accepted responsibility boundaries and minimizes unproven dependencies; it does not claim universal performance superiority.
+- **Data authority:** M01–M18 v1.1, G1–G3, per-tenant capabilities, composite tenant/trip identity and approved normalization/exclusion rules remain unchanged. Reject replacement five-minute OTA, uncapped governed occupancy, ambiguous billing/alert semantics and unqualified vendor-blame examples as defaults.
+- **Adopt from the proposals:** Requirement-to-test IDs, explicit reconciliation acceptance, exception-first presentation, supported category filters, actual workflow progress, evidence and approval detail, accessibility and provider-contract checks. Clarify identity/version propagation, claim-to-evidence mappings and approval revalidation in team contracts. These are specifications; documentation does not claim new features implemented.
+- **Defer:** Mandatory RAG/local embeddings/vector infrastructure, replay-first delivery, speculative framework/storage migration, live GPS or invented impacts, and numerical scale/latency claims without a measured workload. Complete the official-data golden path first. Analytical publication, persistent row-level DQ provenance and incident follow-up retain separate acceptance.
+- **Documentation:** Reconcile root `architecture.md` and `requirement.md`; retain original proposals as review evidence and label imported guides reference-only. Keep the plain-English handbook's component/ownership model. Carry only selected documentation to the architecture branch, preserving application code and the D-050 disclosure boundary.
+- **Supersedes:** Unreconciled choices in the imported proposals for this build. D-051 remains the historical review; existing accepted metric/runtime decisions are reaffirmed rather than replaced.
+
 ## Live problem statement intake checklist (historical record)
 
 When the hackathon begins:
