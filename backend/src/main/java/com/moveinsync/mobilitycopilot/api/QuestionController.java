@@ -46,7 +46,7 @@ public class QuestionController {
         QuestionScope scope = questions.classify(actor, request.question());
         if (scope.refused()) {
             return new ApiDtos.QuestionResponse(null, actor.businessUnit(), scope.intent(), List.of(), true, scope.refusalReason(),
-                    "I can only answer governed analytical questions about " + actor.businessUnit() + ". " + scope.refusalReason() + ".",
+                    scope.refusalReason(),
                     List.of(), List.of(), null, null, null, questions.suggestedQuestions());
         }
         LocalDate asOf = request.asOfDate() == null ? LocalDate.parse("2026-06-08") : request.asOfDate();

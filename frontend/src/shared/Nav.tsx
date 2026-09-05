@@ -4,7 +4,6 @@ import { diagnosticsEnabled, MANAGER_ROLES } from '../core/presentation'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '◈', label: 'Dashboard' },
-  { id: 'ask', icon: '◇', label: 'Ask Copilot' },
   { id: 'incidents', icon: '⚑', label: 'Incidents' },
   { id: 'trust', icon: '◌', label: 'LLM & Trust' },
   { id: 'workflow', icon: '⬡', label: '3D Workflow' },
@@ -66,7 +65,7 @@ export function SideNav({ page, setPage }: Props) {
   return (
     <aside className="sidenav">
       <div className="sidenav-section">Navigation</div>
-      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'ask', 'brief', 'incidents'].includes(item.id)).map((item) => (
+      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'brief', 'incidents'].includes(item.id)).map((item) => (
         <button
           key={item.id}
           className={`sidenav-item ${page === item.id ? 'active' : ''}`}

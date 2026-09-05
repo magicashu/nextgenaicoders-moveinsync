@@ -34,7 +34,7 @@ public class ContextualQuestionService {
             "EXPERIENCE", List.of("rating", "feedback", "experience", "complain"),
             "SAFETY", List.of("alert", "safety", "device", "panic", "escort", "tracking"),
             "ROSTER", List.of("no-show", "no show", "roster", "pickup", "drop", "leg", "boarded"),
-            "EVIDENCE", List.of("evidence", "support", "confident", "confidence", "how do you know", "reliable", "what should", "explain", "happened", "anomal"));
+            "EVIDENCE", List.of("report", "transport", "trip", "delay", "arrival", "evidence", "support", "confident", "confidence", "how do you know", "reliable", "what should", "explain", "happened", "anomal"));
     private static final Pattern FORBIDDEN = Pattern.compile(
             "(select\\s+.+\\s+from|drop\\s+table|delete\\s+from|insert\\s+into|update\\s+\\w+\\s+set|;--|\\bexec(ute)?\\b.*\\b(action|escalation|ticket)|\\bsend\\b.*\\b(email|mail|message)\\b|https?://|\\bcurl\\b|\\bshell\\b|\\bpassword\\b|ignore (all|your|previous) (rules|instructions))",
             Pattern.CASE_INSENSITIVE);
@@ -58,27 +58,29 @@ public class ContextualQuestionService {
     }
 
     public QuestionScope classify(ActorContext actor, String question) {
-        String normalised = question == null ? "" : question.trim().replaceAll("\\s+", " ");
+        String normalised = QuestionGuardrails.normalize(question);
+        var directReply = QuestionGuardrails.reply(normalised);
+        if (directReply.isPresent()) return QuestionScope.refused(directReply.get(), normalised);
         if (normalised.isBlank()) {
             return QuestionScope.refused("Question is empty", normalised);
         }
         String lower = normalised.toLowerCase(Locale.ROOT);
         if (FORBIDDEN.matcher(lower).find()) {
-            return QuestionScope.refused("The question asks for SQL, external access, instruction override or direct execution; only governed analytical questions are supported", normalised);
+            return QuestionScope.refused(QuestionGuardrails.UNSUPPORTED, normalised);
         }
         for (String tenant : OTHER_TENANTS) {
             if (!tenant.equals(actor.businessUnit()) && lower.contains(tenant.toLowerCase(Locale.ROOT))) {
-                return QuestionScope.refused("Cross-tenant comparison is not available to this identity", normalised);
+                return QuestionScope.refused("I can only discuss the business unit selected in your dashboard. Switch business units to review another report.", normalised);
             }
         }
         List<String> intents = new ArrayList<>();
         for (var entry : INTENTS.entrySet()) {
-            if (entry.getValue().stream().anyMatch(lower::contains)) {
+            if (entry.getValue().stream().anyMatch(term -> Pattern.compile("\\b" + Pattern.quote(term) + "\\w*\\b").matcher(lower).find())) {
                 intents.add(entry.getKey());
             }
         }
         if (intents.isEmpty()) {
-            return QuestionScope.refused("The question does not map to a supported analytical intent; try one of the suggested questions", normalised);
+            return QuestionScope.refused(QuestionGuardrails.UNSUPPORTED, normalised);
         }
         List<String> workers = intents.stream().map(ContextualQuestionService::workerFor).filter(Optional::isPresent).map(Optional::get).distinct().toList();
         return new QuestionScope(String.join("+", intents), workers, false, null, normalised);

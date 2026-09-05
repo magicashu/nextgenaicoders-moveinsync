@@ -204,10 +204,10 @@ function VendorChart({ data }: { data: VendorRow[] }) {
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Vendor Delay Rates vs Prior Four Weeks</div>
+        <div className="card-title">Vendor Delay Rates vs Previous Four Weeks</div>
         <div style={{ display: 'flex', gap: 14, fontSize: '0.72rem', color: '#6B7A70' }}>
           <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#B00020', marginRight: 4 }} />Current</span>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3FA535', marginRight: 4 }} />Prior 4 weeks</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3FA535', marginRight: 4 }} />Previous four weeks</span>
         </div>
       </div>
       <div className="card-body" style={{ paddingRight: 4 }}>
@@ -223,7 +223,7 @@ function VendorChart({ data }: { data: VendorRow[] }) {
               ))}
               <LabelList dataKey="current" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 9, fontWeight: 700 }} />
             </Bar>
-            <Bar dataKey="baseline" fill="#3FA535" name="Prior 4 weeks" radius={[0, 3, 3, 0]} maxBarSize={9}>
+            <Bar dataKey="baseline" fill="#3FA535" name="Previous four weeks" radius={[0, 3, 3, 0]} maxBarSize={9}>
               <LabelList dataKey="baseline" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 9, fill: '#3FA535', fontWeight: 600 }} />
             </Bar>
           </BarChart>
@@ -270,8 +270,8 @@ function VendorDeltaBars({ data }: { data: VendorRow[] }) {
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Vendor Performance Delta vs Baseline (pp)</div>
-        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>+ = higher than baseline</div>
+        <div className="card-title">Change in Vendor Delay Rate (pp)</div>
+        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>+ = increase from previous four weeks</div>
       </div>
       <div className="card-body">
         {top.map((v) => {
@@ -313,12 +313,12 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
               <th>Site</th>
               <th style={{ textAlign: 'right' }}>Rate</th>
               <th style={{ textAlign: 'right' }}>Trips</th>
-              <th style={{ textAlign: 'right' }}>vs Baseline</th>
+              <th style={{ textAlign: 'right' }}>vs prior 4 weeks</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((s) => {
-              const sevColor = (s.delta ?? 0) > 0 ? '#B00020' : '#2E7D3E'
+              const sevColor = s.delta == null ? '#6B7A70' : s.delta > 0 ? '#B00020' : '#2E7D3E'
               return (
                 <tr key={s.site}>
                   <td style={{ fontWeight: 500 }}>{s.site}</td>
@@ -328,8 +328,8 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
                   <td style={{ textAlign: 'right', color: '#6B7A70', fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.78rem' }}>
                     {s.trips.toLocaleString()}
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem', color: (s.delta ?? 0) > 0 ? '#B00020' : '#2E7D3E' }}>
-                    {s.delta != null && s.delta >= 0 ? '+' : ''}{s.delta?.toFixed(1) ?? '—'}
+                  <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem', color: sevColor }}>
+                    {s.delta == null ? '—' : `${s.delta >= 0 ? '+' : ''}${s.delta.toFixed(1)}`}
                   </td>
                 </tr>
               )

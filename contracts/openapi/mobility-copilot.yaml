@@ -61,6 +61,18 @@ components:
         asOfDate: { type: string, format: date }
         relatedRunId: { type: string, format: uuid }
         persona: { enum: [TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER] }
+    SpeechRequest:
+      type: object
+      required: [text, voice]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 2500 }
+        voice: { enum: [shubh, ritu, rahul] }
+    SpeechResponse:
+      type: object
+      required: [audio, contentType]
+      properties:
+        audio: { type: string, contentEncoding: base64 }
+        contentType: { const: audio/mpeg }
     QuestionResponse:
       type: object
       required: [businessUnit, intent, workers, refused, answer, supportingFindings, caveats, followUps]
@@ -128,6 +140,29 @@ components:
     NotFound: { description: Resource is missing or outside the actor's tenant }
     Conflict: { description: Approval is stale or already decided }
 paths:
+  /api/v1/speech:
+    post:
+      summary: Read text aloud using a server-side speech provider
+      description: Tenant-authorized, bounded synthesis; no provider credentials are returned.
+      parameters:
+        - $ref: '#/components/parameters/Actor'
+        - $ref: '#/components/parameters/BusinessUnit'
+        - $ref: '#/components/parameters/Roles'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpeechRequest' }
+      responses:
+        '200':
+          description: Base64 MP3 audio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpeechResponse' }
+        '400': { description: Invalid text or voice }
+        '403': { description: Unauthorized tenant or role }
+        '429': { description: Speech capacity reached; retry later }
+        '503': { description: Speech temporarily unavailable }
   /api/v1/dashboard:
     get:
       summary: Read governed weekly dashboard charts without starting an agent run

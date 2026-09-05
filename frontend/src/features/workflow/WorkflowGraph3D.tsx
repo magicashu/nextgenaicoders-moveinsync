@@ -7,24 +7,28 @@ import { useAppStore } from '../../core/store'
 import type { WorkflowNode } from '../../core/workflowDesign'
 
 const NODE_POSITIONS: Record<WorkflowNode, [number, number, number]> = {
-  INITIALIZE_RUN:           [-5.5,  3.5,  0],
-  AUTHORIZE_SCOPE:          [-3.5,  3.5,  0],
-  PROFILE_DATASET:          [-1.5,  3.5,  0],
-  BUILD_CAPABILITY_MATRIX:  [ 0.5,  3.5,  0],
-  COMPUTE_METRIC_SNAPSHOT:  [ 2.5,  3.5,  0],
-  DETECT_ANOMALIES:         [ 4.5,  3.5,  0],
-  PRIORITIZE_ISSUE:         [ 6.5,  3.5,  0],
-  SUPERVISOR_PLAN:          [-3.0,  1.0,  0],
-  VALIDATE_PLAN:            [-1.0,  1.0,  0],
-  RUN_INVESTIGATIONS:       [-4.5, -1.5,  0],
-  MERGE_EVIDENCE:           [-2.5, -1.5,  0],
-  EVIDENCE_CRITIC:          [ 1.5, -1.5,  0],
-  VERIFY_EVIDENCE:          [ 3.5, -1.5,  0],
-  COMPOSE_DECISION_BRIEF:   [-1.5, -4.0,  0],
-  ACTION_POLICY_GATE:       [ 0.5, -4.0,  0],
-  APPROVAL_INTERRUPT:       [ 2.5, -4.0,  0],
-  REVALIDATE_AND_EXECUTE:   [ 4.5, -4.0, 0],
-  APPEND_AUDIT_EVENT:       [ 6.5, -4.0, 0],
+  // System row — full width, high up
+  INITIALIZE_RUN:           [ -9.0,  6.5,  0.8],
+  AUTHORIZE_SCOPE:          [ -6.0,  6.5,  0.0],
+  PROFILE_DATASET:          [ -3.0,  6.5,  1.0],
+  BUILD_CAPABILITY_MATRIX:  [  0.0,  6.5, -0.4],
+  COMPUTE_METRIC_SNAPSHOT:  [  3.0,  6.5,  0.9],
+  DETECT_ANOMALIES:         [  6.0,  6.5,  0.2],
+  PRIORITIZE_ISSUE:         [  9.0,  6.5,  0.7],
+  // Supervisor
+  SUPERVISOR_PLAN:          [ -2.5,  3.0, -1.0],
+  VALIDATE_PLAN:            [  2.5,  3.0, -0.3],
+  // Investigator + Critic
+  RUN_INVESTIGATIONS:       [ -7.5, -0.5,  0.9],
+  MERGE_EVIDENCE:           [ -2.5, -0.5,  0.0],
+  EVIDENCE_CRITIC:          [  2.5, -0.5, -0.7],
+  VERIFY_EVIDENCE:          [  7.5, -0.5,  0.5],
+  // Briefing + post-approval (2 extra nodes from main)
+  COMPOSE_DECISION_BRIEF:   [ -6.0, -4.0,  0.5],
+  ACTION_POLICY_GATE:       [ -2.0, -4.0, -0.5],
+  APPROVAL_INTERRUPT:       [  1.5, -4.0,  0.9],
+  REVALIDATE_AND_EXECUTE:   [  5.0, -4.0,  0.0],
+  APPEND_AUDIT_EVENT:       [  8.5, -4.0,  0.6],
 }
 
 const EDGES: [WorkflowNode, WorkflowNode][] = [

@@ -1,6 +1,6 @@
-# Run try1 locally
+# Run the integrated application locally
 
-`try1` builds on Java-branch-2 and now uses LangGraph4j 1.8.25, replacing the
+The current implementation builds on Java-branch-2 and now uses LangGraph4j 1.8.25, replacing the
 custom Java state-machine engine. The four agent roles use Sarvam for bounded
 planning, investigation choices, critique and selection of verified briefing
 claims. DuckDB computes the facts. The main graph has 18 business nodes; each
@@ -57,7 +57,6 @@ These commands use the JDK and official dataset already present on your Mac:
 
 ```bash
 cd /Users/miniorange/Desktop/miniOrange-IAM/try/hackathon
-git switch try1
 export JAVA_HOME="/Users/miniorange/Library/Java/JavaVirtualMachines/jbr-21.0.10/Contents/Home"
 export PATH="$JAVA_HOME/bin:$PATH"
 export MOBILITY_DATA_DIR="$PWD/outputs/MoveInSync - Anonymised Trip-Log Dataset"
@@ -102,8 +101,10 @@ lockfile. Subsequent starts only need the PATH export and `npm run dev`.
 
 Open <http://localhost:5173>. Use business unit `pinnacle-Slc` and date
 `2026-06-08`, which matches the supplied dataset's verified scenario.
-Explore the morning brief, investigation, approval and audit views. Use the
-Ask interface or a suggested question to ask about the current brief.
+Choose your persona first, then open Dashboard, Incidents or Reports. Use the
+bottom-right chat icon for questions, microphone input and read-aloud answers.
+Evidence starts collapsed. Unchanged selections reuse the displayed capture;
+Refresh explicitly requests a new investigation. See the [text and voice guide](supervisor-voice-chat-copilot.md).
 
 This local configuration requires neither an operator token nor PostgreSQL.
 Approvals, checkpoints and audit state are held in memory and reset when the
@@ -124,7 +125,9 @@ frontend proxy is configured to use that port.
 
 ## 6. Inspect the LLM calls and graph nodes
 
-After running a brief or a question, open **Trust**. Expand **LLM execution** to
+Developer diagnostics are hidden from manager screens by default. To inspect
+execution locally, set `VITE_SHOW_DIAGNOSTICS=true` in frontend terminal 2 and
+restart Vite. After running a brief or a question, open **Trust**. Expand **LLM execution** to
 see each role's attempt, model, duration, input/output tokens, fallback reason and
 structured proposal. Expand **Decision details** on each workflow node to see
 the next node, selected issue, workers, validation results, critic verdict and
