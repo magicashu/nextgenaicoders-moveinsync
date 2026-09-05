@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../../core/store'
 import { fetchInvestigation, type InvestigateResponse } from '../../core/api'
 import { DateRangePicker } from '../../shared/DateRangePicker'
+import { AGENT_COLORS } from '../../core/mockData'
 
 function ApprovalModal({ onConfirm, onCancel, action }: { onConfirm: () => void; onCancel: () => void; action: 'approve' | 'reject' }) {
   return (
@@ -17,6 +18,73 @@ function ApprovalModal({ onConfirm, onCancel, action }: { onConfirm: () => void;
             {action === 'approve' ? 'Approve' : 'Reject'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+const PIPELINE_STEPS = [
+  { label: 'Supervisor', desc: 'Scopes the investigation and detects anomalies', color: AGENT_COLORS.supervisor },
+  { label: 'Investigator', desc: 'Queries metrics across vendors, sites, and shifts', color: AGENT_COLORS.investigator },
+  { label: 'Critic', desc: 'Verifies evidence integrity and cross-validates claims', color: AGENT_COLORS.critic },
+  { label: 'Briefing', desc: 'Composes the decision brief and proposes actions', color: AGENT_COLORS.briefing },
+]
+
+function EmptyState() {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ padding: '28px 24px', background: 'var(--bg2)', borderRadius: 16, border: '1px solid var(--border)', marginBottom: 16, textAlign: 'center' }}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Generate a Decision Brief</div>
+        <div style={{ fontSize: '0.83rem', color: 'var(--text-dim)', maxWidth: 420, margin: '0 auto' }}>
+          Select a date range and click <strong>Generate Brief</strong> to run the full 4-agent pipeline and produce an evidence-backed decision brief.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)' }}>
+        <div style={{ padding: '12px 18px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>4-Agent Pipeline Preview</div>
+        </div>
+        {PIPELINE_STEPS.map((step, i) => (
+          <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < PIPELINE_STEPS.length - 1 ? '1px solid var(--border)' : 'none', background: 'var(--bg)' }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+              background: `${step.color}18`, border: `1px solid ${step.color}44`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.72rem', fontWeight: 900, color: step.color,
+            }}>
+              {i + 1}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: step.color, marginBottom: 2 }}>{step.label}</div>
+              <div style={{ fontSize: '0.77rem', color: 'var(--text-dim)' }}>{step.desc}</div>
+            </div>
+            {i < PIPELINE_STEPS.length - 1 && (
+              <div style={{ color: 'var(--border)', fontSize: 18 }}>→</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)' }}>
+        {PIPELINE_STEPS.map((step, i) => (
+          <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < PIPELINE_STEPS.length - 1 ? '1px solid var(--border)' : 'none', background: 'var(--bg)' }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+              border: `2px solid ${step.color}44`, borderTopColor: step.color,
+              animation: 'spin 1.2s linear infinite',
+            }} />
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: step.color, marginBottom: 2 }}>{step.label} agent running…</div>
+              <div style={{ fontSize: '0.77rem', color: 'var(--text-dim)' }}>{step.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -49,22 +117,24 @@ export function DecisionBriefPage() {
     }
   }
 
+  const statusBadge = brief ? (
+    <span style={{
+      padding: '4px 12px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 800,
+      background: approvalState === 'pending' ? 'rgba(245,158,11,0.15)' : approvalState === 'approved' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+      color: approvalState === 'pending' ? 'var(--yellow)' : approvalState === 'approved' ? 'var(--green)' : 'var(--red)',
+      border: '1px solid currentColor',
+    }}>
+      {approvalState === 'pending' ? 'AWAITING APPROVAL' : approvalState === 'approved' ? 'APPROVED' : 'REJECTED'}
+    </span>
+  ) : null
+
   return (
     <div>
       {modal && <ApprovalModal action={modal} onConfirm={handleConfirm} onCancel={() => setModal(null)} />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
         <h1 className="page-title">Decision Brief</h1>
-        {brief && (
-          <span style={{
-            padding: '4px 12px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 800,
-            background: approvalState === 'pending' ? 'rgba(245,158,11,0.15)' : approvalState === 'approved' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-            color: approvalState === 'pending' ? 'var(--yellow)' : approvalState === 'approved' ? 'var(--green)' : 'var(--red)',
-            border: '1px solid',
-          }}>
-            {approvalState === 'pending' ? 'AWAITING APPROVAL' : approvalState === 'approved' ? 'APPROVED' : 'REJECTED'}
-          </span>
-        )}
+        {statusBadge}
       </div>
 
       <div className="filter-bar" style={{ marginBottom: 16 }}>
@@ -85,28 +155,15 @@ export function DecisionBriefPage() {
         </div>
       )}
 
-      {!brief && !loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, gap: 12, color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)' }}>No brief generated</div>
-          <div style={{ fontSize: '0.85rem', textAlign: 'center', maxWidth: 360 }}>
-            Select a date range and click <strong>Generate Brief</strong> to run the full agent pipeline.
-          </div>
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
-          <div style={{ width: 32, height: 32, border: '3px solid #E0E0E0', borderTopColor: '#3FA535', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          <div style={{ fontSize: '0.9rem', color: 'var(--text-dim)' }}>Running agent pipeline…</div>
-        </div>
-      )}
+      {!brief && !loading && <EmptyState />}
+      {loading && <LoadingState />}
 
       {brief && (
         <>
-          {/* Hero */}
+          {/* Hero banner */}
           <div className="hero-banner" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+              <div style={{ flex: 1 }}>
                 <div className="hero-badge">
                   {brief.verificationStatus === 'VERIFIED' ? '✓ Verified' : brief.verificationStatus === 'QUALIFIED' ? '~ Qualified' : '✗ ' + brief.verificationStatus}
                   &nbsp;·&nbsp;M01 Delayed Trip Rate
@@ -130,7 +187,10 @@ export function DecisionBriefPage() {
           <div className="two-col" style={{ marginBottom: 16 }}>
             {/* Findings */}
             <div className="card">
-              <div className="card-header"><div className="card-title">Key Findings</div></div>
+              <div className="card-header">
+                <div className="card-title">Key Findings</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{brief.findings.length} findings</div>
+              </div>
               <div className="card-body">
                 {brief.findings.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -138,32 +198,44 @@ export function DecisionBriefPage() {
                   </p>
                 ) : brief.findings.map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
-                    <div style={{ minWidth: 22, height: 22, borderRadius: '50%', background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--accent)', fontWeight: 900, flexShrink: 0 }}>{i + 1}</div>
+                    <div style={{
+                      minWidth: 22, height: 22, borderRadius: '50%',
+                      background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 11, color: 'var(--accent)', fontWeight: 900, flexShrink: 0,
+                    }}>{i + 1}</div>
                     <div style={{ fontSize: '0.87rem', color: 'var(--text)', lineHeight: 1.65 }}>{f}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Action / Summary */}
+            {/* Action */}
             <div className="action-card">
               <div className="card-title" style={{ marginBottom: 10 }}>
                 {brief.proposedActions.length > 0 ? 'Recommended Action' : 'Operational Summary'}
               </div>
               {brief.proposedActions.length > 0 ? (
                 <>
-                  <h3>{brief.proposedActions[0].title}</h3>
-                  <p>{brief.proposedActions[0].rationale}</p>
-                  <div style={{ marginBottom: 12, fontSize: '0.78rem', color: 'var(--text-dim)' }}>
-                    Type: <code style={{ color: 'var(--pink)' }}>{brief.proposedActions[0].type}</code>
+                  <div style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 999, marginBottom: 10, fontSize: '0.7rem', fontWeight: 800, background: 'rgba(6,182,212,0.12)', color: 'var(--accent)', border: '1px solid rgba(6,182,212,0.3)' }}>
+                    {brief.proposedActions[0].type}
                   </div>
+                  <h3 style={{ marginBottom: 8, marginTop: 0 }}>{brief.proposedActions[0].title}</h3>
+                  <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', lineHeight: 1.65, marginBottom: 16 }}>{brief.proposedActions[0].rationale}</p>
                   {approvalState === 'pending' ? (
                     <div className="action-buttons">
-                      <button className="btn btn-approve" onClick={() => setModal('approve')}>Approve</button>
-                      <button className="btn btn-reject" onClick={() => setModal('reject')}>Reject</button>
+                      <button className="btn btn-approve" onClick={() => setModal('approve')}>✓ Approve</button>
+                      <button className="btn btn-reject" onClick={() => setModal('reject')}>✗ Reject</button>
                     </div>
                   ) : (
-                    <div style={{ padding: '10px 14px', borderRadius: 10, background: approvalState === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: '1px solid', borderColor: approvalState === 'approved' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)', color: approvalState === 'approved' ? 'var(--green)' : 'var(--red)', fontSize: '0.85rem', fontWeight: 800 }}>
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      background: approvalState === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                      border: '1px solid',
+                      borderColor: approvalState === 'approved' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)',
+                      color: approvalState === 'approved' ? 'var(--green)' : 'var(--red)',
+                      fontSize: '0.85rem', fontWeight: 800,
+                    }}>
                       {approvalState === 'approved' ? '✓ Approved — pending durable action service' : '✗ Rejected — draft discarded'}
                     </div>
                   )}
@@ -208,7 +280,11 @@ export function DecisionBriefPage() {
                           {e.evidenceId.replace('ev-', '').slice(0, 16)}…
                         </td>
                         <td>
-                          <span style={{ color: e.status === 'AVAILABLE' ? 'var(--green)' : 'var(--yellow)', fontWeight: 700, fontSize: '0.8rem' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 700,
+                            background: e.status === 'AVAILABLE' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                            color: e.status === 'AVAILABLE' ? 'var(--green)' : 'var(--yellow)',
+                          }}>
                             {e.status}
                           </span>
                         </td>

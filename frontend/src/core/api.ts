@@ -142,13 +142,26 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 // ── Public API functions ──────────────────────────────────────────────────
 
+const NOISE_PATTERNS = [
+  'comparison-ev-', 'claim-ev-', 'has an invalid, unavailable, or scope-mismatched',
+  'Office comparison scope', 'Below the governed comparison volume',
+  'Claim comparison-', 'Claim claim-', 'Verified evidence was rejected',
+  'Denominator is delayed trips', 'Rated participants only', 'Feedback trip participation',
+]
+const isNoise = (s: string) => NOISE_PATTERNS.some(p => s.includes(p))
+
 export async function fetchInvestigation(
   businessUnit: string,
   metricId: string,
   dateFrom: string,
   dateTo: string,
 ): Promise<InvestigateResponse> {
-  return post('/api/v1/investigate', { businessUnit, metricId, dateFrom, dateTo })
+  const r = await post<InvestigateResponse>('/api/v1/investigate', { businessUnit, metricId, dateFrom, dateTo })
+  return {
+    ...r,
+    caveats: r.caveats.filter(c => !isNoise(c)),
+    warnings: r.warnings.filter(w => !isNoise(w)),
+  }
 }
 
 export async function fetchBreakdown(

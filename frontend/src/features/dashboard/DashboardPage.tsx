@@ -220,8 +220,10 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
               formatter={(v) => [`${Number(v).toFixed(1)}%`, 'Delayed rate']} />
             {baseline > 0 && (
               <ReferenceLine y={baseline} stroke="#D4900C" strokeDasharray="5 3"
-                label={{ value: `Avg ${baseline.toFixed(1)}%`, fill: '#D4900C', fontSize: 11, position: 'insideTopRight' }} />
+                label={{ value: `7-wk avg ${baseline.toFixed(1)}%`, fill: '#D4900C', fontSize: 11, position: 'insideTopRight' }} />
             )}
+            <ReferenceLine y={9.0} stroke="#3C68D0" strokeDasharray="4 4"
+              label={{ value: 'IT/ITeS sector 9%', fill: '#3C68D0', fontSize: 10, position: 'insideBottomRight' }} />
             <Area type="monotone" dataKey="delayed" stroke="#B00020" strokeWidth={2.5}
               fill="url(#trendGrad)" dot={{ fill: '#B00020', r: 4, strokeWidth: 2, stroke: '#fff' }}
               activeDot={{ r: 6, stroke: '#B00020', strokeWidth: 2 }} />
@@ -374,6 +376,139 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
             })}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Industry Benchmarks (from MoveInSync IT/ITeS & Financial Services Sector Reports 2026) ──
+
+const INDUSTRY_BENCHMARKS = [
+  {
+    label: 'Delayed Trip Rate',
+    sector: 'IT/ITeS sector avg',
+    benchmark: 9.0,
+    unit: '%',
+    description: 'On-time arrival 89–93% across Bengaluru, Hyderabad, Delhi NCR, Chennai',
+    good: (v: number) => v <= 9,
+    format: (v: number) => `${v.toFixed(1)}%`,
+  },
+  {
+    label: 'No-Show Rate',
+    sector: 'IT/ITeS sector avg',
+    benchmark: 4.2,
+    unit: '%',
+    description: 'Ghost trips (seats booked, no passenger) — sector range 2.3–6.8%',
+    good: (_: number) => true,
+    format: (v: number) => `${v.toFixed(1)}%`,
+  },
+  {
+    label: 'Seat Utilisation',
+    sector: 'IT/ITeS sector avg',
+    benchmark: 68,
+    unit: '%',
+    description: 'Occupied seats / available seats — Bengaluru leads at 72%, Delhi NCR at 63%',
+    good: (v: number) => v >= 68,
+    format: (v: number) => `${v.toFixed(0)}%`,
+  },
+  {
+    label: 'Safe Reach Verification',
+    sector: 'Financial Services avg',
+    benchmark: 97.5,
+    unit: '%',
+    description: 'Employee safe-reach confirmation rate — sector range 96–99%',
+    good: (v: number) => v >= 96,
+    format: (v: number) => `${v.toFixed(1)}%`,
+  },
+]
+
+function IndustryBenchmarkPanel({ delayRate }: { delayRate: number }) {
+  const industryDelayBenchmark = 9.0
+  const deltaVsIndustry = delayRate - industryDelayBenchmark
+  const isAboveBenchmark = deltaVsIndustry > 0
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-title">Industry Benchmark Context</div>
+          <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(60,104,208,0.08)', color: '#3C68D0', fontWeight: 700 }}>
+            MoveInSync IT/ITeS Report 2026
+          </span>
+        </div>
+        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>
+          Source: Commute Trends Across IT/ITeS Sector · Financial Services Sector 2026
+        </div>
+      </div>
+      <div className="card-body">
+        {/* Headline comparison */}
+        <div style={{
+          padding: '16px 20px', borderRadius: 12, marginBottom: 16,
+          background: isAboveBenchmark ? 'linear-gradient(135deg, #FFF0F0, #FFF8F0)' : 'linear-gradient(135deg, #F0FFF4, #F0FFF8)',
+          border: `1px solid ${isAboveBenchmark ? 'rgba(176,0,32,0.2)' : 'rgba(46,125,62,0.2)'}`,
+          display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: '0.75rem', color: '#6B7A70', marginBottom: 4 }}>
+              Your delayed trip rate vs IT/ITeS industry average
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: 1 }}>Your Fleet</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: isAboveBenchmark ? '#B00020' : '#2E7D3E', lineHeight: 1 }}>
+                  {delayRate.toFixed(1)}%
+                </div>
+              </div>
+              <div style={{ fontSize: '1.4rem', color: '#C8CDD3' }}>vs</div>
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: 1 }}>Sector avg</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: '#3C68D0', lineHeight: 1 }}>
+                  {industryDelayBenchmark.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '12px 20px', borderRadius: 10, background: isAboveBenchmark ? 'rgba(176,0,32,0.08)' : 'rgba(46,125,62,0.08)', border: `1px solid ${isAboveBenchmark ? 'rgba(176,0,32,0.2)' : 'rgba(46,125,62,0.2)'}` }}>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: isAboveBenchmark ? '#B00020' : '#2E7D3E', lineHeight: 1 }}>
+              {isAboveBenchmark ? '+' : ''}{deltaVsIndustry.toFixed(1)}pp
+            </div>
+            <div style={{ fontSize: '0.68rem', color: '#6B7A70', marginTop: 4 }}>
+              {isAboveBenchmark ? '▲ above industry' : '▼ below industry'}
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 180, fontSize: '0.8rem', color: '#6B7A70', lineHeight: 1.65 }}>
+            {isAboveBenchmark
+              ? `At ${delayRate.toFixed(1)}%, this fleet is running ${deltaVsIndustry.toFixed(1)}pp above the IT/ITeS sector average. Driver-related delays are the leading cause across the sector (5–8% of trips).`
+              : `This fleet is performing ${Math.abs(deltaVsIndustry).toFixed(1)}pp better than the IT/ITeS sector average of 9%. On-time arrivals across Bengaluru, Hyderabad, Delhi NCR and Chennai average 89–93%.`
+            }
+          </div>
+        </div>
+
+        {/* Benchmark grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          {INDUSTRY_BENCHMARKS.map(b => (
+            <div key={b.label} style={{ padding: '12px 14px', background: '#FAFAFA', border: '1px solid #E8ECEE', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                {b.label}
+              </div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: '#3C68D0', lineHeight: 1, marginBottom: 4 }}>
+                {b.format(b.benchmark)}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#A8B2AB', marginBottom: 6, fontStyle: 'italic' }}>{b.sector}</div>
+              <div style={{ fontSize: '0.7rem', color: '#6B7A70', lineHeight: 1.4 }}>{b.description}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Cost context */}
+        <div style={{ marginTop: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(60,104,208,0.04)', border: '1px solid rgba(60,104,208,0.12)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3C68D0' }}>Cost Context:</span>
+          <span style={{ fontSize: '0.75rem', color: '#6B7A70' }}>
+            Enterprise commute cost averages <strong style={{ color: '#16211B' }}>₹7.7k–₹15.8k/employee/month</strong> in the IT/ITeS sector.
+            Each percentage point reduction in delayed trips translates directly to productivity gains and SLA compliance.
+            Hyderabad leads EV adoption at <strong style={{ color: '#2E7D3E' }}>11%</strong> — saving 89.4 tonnes of CO₂ monthly.
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -614,6 +749,9 @@ export function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 8 }}>
             <AgentInsightPanel data={d} />
           </div>
+
+          {/* Industry benchmark context */}
+          <IndustryBenchmarkPanel delayRate={d.metric.value} />
 
           {d.evidence.caveats.map((c, i) => (
             <div key={i} className="caveat-ribbon" style={{ marginTop: 8 }}>⚠ {c}</div>
