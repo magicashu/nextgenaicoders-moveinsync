@@ -57,7 +57,7 @@ The browser never calculates governed facts, reads source CSVs, calls the provid
 
 | Agent | Plain-English job | Boundary |
 |---|---|---|
-| Supervisor / Planner | Decide which allowed investigations can explain a prioritized issue. | Propose a bounded plan; deterministic validation preserves required comparisons and checks scope, tools and capabilities. |
+| Supervisor / Planner | Decide which allowed investigations can explain a prioritized issue. | Optional LLM selects among allowlisted workers using bounded untrusted question/context; deterministic validation preserves required comparisons and checks scope, tools and capabilities. |
 | Investigator | Choose and run the smallest useful set of governed analyses. | Tools calculate facts; the model cannot generate arbitrary SQL or inspect unrestricted records. |
 | Evidence Critic | Challenge claims, comparisons, missing-data caveats and unsupported blame. | Deterministic verification checks the cited values, populations, units, dates and versions. |
 | Briefing / Action | Explain verified findings for operations and leadership and draft a bounded recommendation. | Deterministic rendering preserves facts; policy, approval, revalidation and execution remain separate. |
@@ -230,5 +230,6 @@ Configure the immutable official input through MOBILITY_DATA_DIR when the data o
 | D-053 — Separate team scaffold | Basic structure only. Individual members implement logic; no completed application or provider/persistence integration is claimed. |
 | D-054 — Documentation consolidation | Keep four content documents: requirements, architecture, agent responsibilities and the plain-English problem walkthrough. Technical workspace instructions and runtime prompt resources are separate. |
 | D-055 — Shared dataset delivery | Publish the supplied anonymised dataset and dictionary on Java-branch, use Git LFS for all seven CSV files, and carry over the user's removal of the old self-generated dataset. Preserve original bytes and the approved metric contracts. |
+| D-056 — Supervisor planner | Node 8 uses governed planning over a tenant/data-version-scoped selected issue and capability matrix. Optional Sarvam output selects only typed allowlisted workers/metrics from bounded untrusted question/context; deterministic fallback, mandatory comparisons, current-versus-prior-four-complete-week requests, capability filtering and tool budget remain enforced. Node 9 remains final validator. |
 
 Future material architecture, scope, metric, data, security, evaluation or demo decisions are recorded in this section alongside the relevant requirements change. Earlier review documents and decision history remain in Git history rather than separate current manuals.
