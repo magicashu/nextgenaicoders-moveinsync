@@ -11,6 +11,15 @@ mobility:
     enabled: false
   data:
     directory: ${MOBILITY_DATA_DIR:outputs/official dataset}
+  ai:
+    sarvam:
+      enabled: ${SARVAM_ENABLED:false}
+      api-key: ${SARVAM_API_KEY:}
+      endpoint: ${SARVAM_ENDPOINT:https://api.sarvam.ai/v1/chat/completions}
+      model: ${SARVAM_MODEL:sarvam-m}
+      timeout: ${SARVAM_TIMEOUT:10s}
+      max-prompt-chars: ${SARVAM_MAX_PROMPT_CHARS:12000}
+      max-evidence-items: ${SARVAM_MAX_EVIDENCE_ITEMS:32}
 
 management:
   endpoints:
