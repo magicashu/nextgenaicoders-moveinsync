@@ -88,7 +88,8 @@ public class BriefRenderer {
             return null;
         }
         var request = run.approvalRequest();
-        var proposal = request.proposal();
+        var proposal = "EDITED".equals(run.approvalStatus()) && run.recommendedAction() != null
+                ? run.recommendedAction() : request.proposal();
         String consequence = switch (proposal.type()) {
             case CREATE_SITE_SHIFT_WATCHLIST -> "Creates a mock watchlist entry for the listed site and shifts (" + proposal.scope().getOrDefault("watchDays", "7") + " days) and opens a mock investigation ticket. No message is sent to any vendor.";
             case CREATE_INVESTIGATION_TICKET -> "Opens a mock investigation ticket in the tracking system. No external communication.";

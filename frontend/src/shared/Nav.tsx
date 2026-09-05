@@ -1,14 +1,15 @@
 import { TENANTS } from '../core/workflowDesign'
 import { useAppStore } from '../core/store'
+import { diagnosticsEnabled, MANAGER_ROLES } from '../core/presentation'
 
-const NAV_ICONS: Record<string, JSX.Element> = {
+const NAV_ICONS: Record<string, React.ReactElement> = {
   dashboard: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" />
       <rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" />
     </svg>
   ),
-  ask: (
+  incidents: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 10.5c0 .83-.67 1.5-1.5 1.5H4l-3 3V3.5C1 2.67 1.67 2 2.5 2h10c.83 0 1.5.67 1.5 1.5v7z" />
     </svg>
@@ -45,7 +46,7 @@ const NAV_ICONS: Record<string, JSX.Element> = {
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard' },
-  { id: 'ask', label: 'Ask Copilot' },
+  { id: 'incidents', label: 'Ask Copilot' },
   { id: 'trust', label: 'LLM & Trust' },
   { id: 'workflow', label: '3D Workflow' },
   { id: 'brief', label: 'Decision Brief' },
@@ -59,7 +60,7 @@ interface Props {
 }
 
 export function TopNav({ page, setPage }: Props) {
-  const { tenant, setTenant, refresh, lastRefresh, busy: spinning, run } = useAppStore()
+  const { tenant, setTenant, role, changePersona, refresh, lastRefresh, busy: spinning, run } = useAppStore()
   const handleRefresh = () => { void refresh() }
   const lastRefreshStr = lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : '—'
 
@@ -76,9 +77,9 @@ export function TopNav({ page, setPage }: Props) {
       <div className="topnav-right">
         <span className="live-dot" />
         <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          Last updated {lastRefreshStr}
+          Captured {lastRefreshStr}
         </span>
-        <button className="refresh-btn" onClick={handleRefresh} title="Reload current run" type="button" disabled={!run || spinning}>
+        <button className="refresh-btn" onClick={handleRefresh} title="Capture a new investigation" type="button" disabled={!run || spinning}>
           <svg
             width="14" height="14" viewBox="0 0 14 14" fill="none"
             style={{ transition: 'transform 0.8s ease', transform: spinning ? 'rotate(360deg)' : 'rotate(0deg)' }}
@@ -89,6 +90,7 @@ export function TopNav({ page, setPage }: Props) {
           </svg>
           Refresh
         </button>
+        <button className="btn btn-secondary" type="button" onClick={changePersona}>{MANAGER_ROLES[role]} · Switch persona</button>
         <select
           className="tenant-select" aria-label="Business unit"
           value={tenant}
@@ -105,7 +107,7 @@ export function SideNav({ page, setPage }: Props) {
   return (
     <aside className="sidenav">
       <div className="sidenav-section">Navigation</div>
-      {NAV_ITEMS.map((item) => {
+      {NAV_ITEMS.filter(item => diagnosticsEnabled || ['dashboard', 'brief', 'incidents'].includes(item.id)).map((item) => {
         const isActive = page === item.id
         return (
           <button

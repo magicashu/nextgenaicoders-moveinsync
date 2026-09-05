@@ -61,6 +61,18 @@ components:
         asOfDate: { type: string, format: date }
         relatedRunId: { type: string, format: uuid }
         persona: { enum: [TRANSPORT_MANAGER, FACILITIES_HEAD, LINE_MANAGER] }
+    SpeechRequest:
+      type: object
+      required: [text, voice]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 2500 }
+        voice: { enum: [shubh, ritu, rahul] }
+    SpeechResponse:
+      type: object
+      required: [audio, contentType]
+      properties:
+        audio: { type: string, contentEncoding: base64 }
+        contentType: { const: audio/mpeg }
     QuestionResponse:
       type: object
       required: [businessUnit, intent, workers, refused, answer, supportingFindings, caveats, followUps]
@@ -128,6 +140,29 @@ components:
     NotFound: { description: Resource is missing or outside the actor's tenant }
     Conflict: { description: Approval is stale or already decided }
 paths:
+  /api/v1/speech:
+    post:
+      summary: Read text aloud using a server-side speech provider
+      description: Tenant-authorized, bounded synthesis; no provider credentials are returned.
+      parameters:
+        - $ref: '#/components/parameters/Actor'
+        - $ref: '#/components/parameters/BusinessUnit'
+        - $ref: '#/components/parameters/Roles'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpeechRequest' }
+      responses:
+        '200':
+          description: Base64 MP3 audio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpeechResponse' }
+        '400': { description: Invalid text or voice }
+        '403': { description: Unauthorized tenant or role }
+        '429': { description: Speech capacity reached; retry later }
+        '503': { description: Speech temporarily unavailable }
   /api/v1/dashboard:
     get:
       summary: Read governed weekly dashboard charts without starting an agent run
@@ -142,18 +177,21 @@ paths:
           schema: { type: string, format: date }
       responses:
         '200':
-          description: Governed metric, onTime, vendors, sites and trend results
+          description: Cached governed metric, onTime, noShow, cost, vendor, site, shift and trend results
           content:
             application/json:
               schema:
                 type: object
-                required: [metric, onTime, vendors, sites, trend]
+                required: [metric, onTime, vendors, sites, shifts, noShow, cost, trend]
                 properties:
                   metric: { type: object }
                   onTime: { type: object }
                   vendors: { type: object }
                   sites: { type: object }
                   trend: { type: object }
+                  shifts: { type: object }
+                  noShow: { type: object }
+                  cost: { type: object }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/workflows/graph:
@@ -191,7 +229,7 @@ paths:
         '404': { description: Run not found in the authorized tenant }
   /api/v1/briefs/morning:
     get:
-      summary: Generate the proactive evidence-backed morning brief
+      summary: Resolve the authorized persona and date capture, creating it only when absent
       parameters:
         - { $ref: '#/components/parameters/Actor' }
         - { $ref: '#/components/parameters/BusinessUnit' }
@@ -210,17 +248,21 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
   /api/v1/workflows:
     post:
-      summary: Start an on-demand decision workflow
+      summary: Resolve an on-demand capture or explicitly refresh it
       parameters:
         - { $ref: '#/components/parameters/Actor' }
         - { $ref: '#/components/parameters/BusinessUnit' }
         - { $ref: '#/components/parameters/Roles' }
+        - in: query
+          name: refresh
+          description: Create a replacement capture; concurrent identical requests share the same execution. Default reuses the current capture.
+          schema: { type: boolean, default: false }
       requestBody:
         required: false
         content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowRunRequest' } } }
       responses:
         '201':
-          description: Workflow started and run to its deterministic pause or terminal state
+          description: Existing or new capture with current approval state; Line Manager receives a read-only report
           content: { application/json: { schema: { $ref: '#/components/schemas/MorningBrief' } } }
   /api/v1/workflows/{workflowId}:
     get:

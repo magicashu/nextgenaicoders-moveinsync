@@ -1,456 +1,124 @@
-import { useState, useRef, useEffect } from 'react'
-import { useAppStore, CopilotMessage } from '../../core/store'
+import { useEffect, useRef, useState } from 'react'
+import { httpApi } from '../../core/api'
+import type { QuestionResponse } from '../../core/contracts'
+import { identityFor, useAppStore } from '../../core/store'
 import { SpeechToTextEngine, speakText, stopSpeaking } from '../../core/sarvamAudio'
+import { EvidenceSummary } from '../../shared/EvidenceSummary'
+import { plain } from '../../core/presentation'
 
-const PRESET_PROMPTS = [
-  'Why did delays spike in pinnacle-Slc during June?',
-  'Check employee punctuality and EV trip share for vanta-Aus',
-  'What was median billed trip cost for vanta-Sea in May?',
-  'Did pinnacle-Slc experience a safety alert spike?',
-]
-
-export function SupervisorCopilotPage() {
-  const {
-    tenant,
-    isCopilotWidgetOpen,
-    setCopilotWidgetOpen,
-    isListening,
-    setIsListening,
-    isPlayingAudio,
-    setIsPlayingAudio,
-    activeAudioMessageId,
-    setActiveAudioMessageId,
-    sarvamSpeaker,
-    setSarvamSpeaker,
-    copilotMessages,
-    addCopilotMessage,
-  } = useAppStore()
-
-  const [inputQuery, setInputQuery] = useState('')
-  const [pipelineStep, setPipelineStep] = useState<number | null>(null) // 0: supervisor, 1: investigator, 2: critic, 3: briefing
-  const [sttTranscript, setSttTranscript] = useState('')
-  
-  const [loadingAudioMsgId, setLoadingAudioMsgId] = useState<string | null>(null)
-  
-  const sttEngineRef = useRef<SpeechToTextEngine | null>(null)
-  const chatBottomRef = useRef<HTMLDivElement>(null)
-
+type Message = { id: string; sender: 'user' | 'assistant'; text: string; voice?: boolean; response?: QuestionResponse }
+const suggestions = ['Which sites and shifts were most affected?', 'What reasons were recorded for the delays?', 'Did the cost per trip increase?']
+export function SupervisorCopilotPage({ onOpenReport }: { onOpenReport: () => void }) {
+  const { tenant, role, asOf, run, epoch, busy: dashboardBusy } = useAppStore()
+  const [open, setOpen] = useState(false)
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
+  const [busy, setBusy] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [voiceInput, setVoiceInput] = useState(false)
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const [voice, setVoice] = useState('shubh')
+  const [audioId, setAudioId] = useState<string | null>(null)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [notice, setNotice] = useState('')
+  const engine = useRef<SpeechToTextEngine | null>(null)
+  const active = useRef(true)
+  const sending = useRef(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const launcher = useRef<HTMLButtonElement>(null)
+  const bottom = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    sttEngineRef.current = new SpeechToTextEngine()
+    active.current = true
+    engine.current = new SpeechToTextEngine()
+    setVoiceSupported(engine.current.isSupported())
+    return () => { active.current = false; engine.current?.dispose(); stopSpeaking() }
   }, [])
-
-  useEffect(() => {
-    if (isCopilotWidgetOpen) {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [copilotMessages, pipelineStep, sttTranscript, isCopilotWidgetOpen])
-
-  // Handle STT Voice Microphone Click
-  const toggleListening = () => {
-    if (!sttEngineRef.current) return
-
-    if (isListening) {
-      sttEngineRef.current.stopListening()
-      setIsListening(false)
-    } else {
-      setIsListening(true)
-      setSttTranscript('Listening...')
-      sttEngineRef.current.startListening({
-        onTranscript: (text, isFinal) => {
-          setSttTranscript(text)
-          setInputQuery(text)
-          if (isFinal) {
-            setIsListening(false)
-            setSttTranscript('')
-            handleSendQuery(text, true)
-          }
-        },
-        onError: (err) => {
-          console.warn('STT Error:', err)
-          setIsListening(false)
-          setSttTranscript('')
-        },
-        onEnd: () => {
-          setIsListening(false)
-        },
-      })
-    }
+  useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+  useEffect(() => { if (open) bottom.current?.scrollIntoView({ block: 'nearest' }) }, [open, messages, busy])
+  const current = () => active.current && useAppStore.getState().epoch === epoch
+  const close = () => {
+    engine.current?.stopListening(); stopSpeaking(); setListening(false); setAudioId(null); setAudioLoading(false); setOpen(false)
+    launcher.current?.focus()
   }
-
-  // Execute 4-Agent Pipeline
-  const handleSendQuery = async (queryText: string, isVoice = false) => {
-    const textToSend = queryText.trim()
-    if (!textToSend) return
-
-    setInputQuery('')
-    setSttTranscript('')
-
-    // 1. Add User Message
-    const userMsg: CopilotMessage = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isVoiceInput: isVoice,
-    }
-    addCopilotMessage(userMsg)
-
-    // 2. Animate Agent Pipeline Progress
-    setPipelineStep(0) // Supervisor Planning
-    await new Promise((r) => setTimeout(r, 600))
-    setPipelineStep(1) // Investigator Workers
-    await new Promise((r) => setTimeout(r, 900))
-    setPipelineStep(2) // Critic Verification
-    await new Promise((r) => setTimeout(r, 700))
-    setPipelineStep(3) // Briefing Summarization
-    await new Promise((r) => setTimeout(r, 500))
-
-    // 3. Generate Structured Agent Response based on Query Context
-    const agentMsgId = `agent-${Date.now()}`
-    let agentMsg: CopilotMessage
-
-    if (textToSend.toLowerCase().includes('pinnacle-slc') || textToSend.toLowerCase().includes('delay')) {
-      agentMsg = {
-        id: agentMsgId,
-        sender: 'agent',
-        text: `**Supervisor Briefing (${tenant})**: Delayed-trip rate spiked to **30.00%** (June 1–7) vs baseline **12.28%** (+17.72 pp). Clearwater Campus morning shift accounts for 68% of delays. Multi-vendor analysis confirms deterioration across all qualified vendors.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        metrics: [
-          { label: 'Current Delay Rate', value: '30.00%', delta: '+17.72 pp', color: 'var(--red)' },
-          { label: '4-Week Baseline', value: '12.28%', color: 'var(--accent)' },
-          { label: 'Site Concentration', value: 'Clearwater Morning', color: 'var(--yellow)' },
-        ],
-        evidence: [
-          'M01 Delayed Trip Rate: 30.0% (3,120 / 10,400 trips)',
-          'M03 Delay Reason Mix: Driver/Route 42%, Vehicle 31%, Traffic 27%',
-          'Vendor Comparison: Vendor-A (+14.2 pp), Vendor-B (+18.5 pp) - No single vendor blame.',
-        ],
-        recommendedAction: {
-          title: 'Create Clearwater Morning-Shift Watchlist',
-          rationale: 'Issue site-shift watchlist and delay ticket before operational escalation.',
-        },
-      }
-    } else if (textToSend.toLowerCase().includes('vanta-aus') || textToSend.toLowerCase().includes('punctuality')) {
-      agentMsg = {
-        id: agentMsgId,
-        sender: 'agent',
-        text: `**Supervisor Briefing (vanta-Aus)**: Employee pickup punctuality deteriorated to **78.4%** while EV trip share improved to **24.6%**. No-show rate showed positive improvement (4.2%). Low driver rating coverage caveat applies (18.2%).`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        metrics: [
-          { label: 'Pickup Punctuality', value: '78.40%', delta: '-11.20 pp', color: 'var(--red)' },
-          { label: 'EV Trip Share', value: '24.60%', delta: '+6.10 pp', color: 'var(--green)' },
-          { label: 'No-Show Rate', value: '4.20%', delta: '-1.80 pp', color: 'var(--green)' },
-        ],
-        evidence: [
-          'M04/M05 Punctuality: 78.4% eligible boarded legs within 10 minutes.',
-          'M17 EV Trip Share: 24.6% of total trips operated by electric vehicles.',
-          'M11 Driver Feedback: Rating 4.65/5 but low coverage caveat (18.2%).',
-        ],
-        recommendedAction: {
-          title: 'Review Roster Shift Timing for Cedar Ridge',
-          rationale: 'Address pickup delay concentration without impacting EV deployment targets.',
-        },
-      }
-    } else {
-      agentMsg = {
-        id: agentMsgId,
-        sender: 'agent',
-        text: `**Supervisor Analysis (${tenant})**: Evaluated 18 metric contracts across May–July 2026 data. Analyzed query "${textToSend}" with 7 analytical workers. All findings have been verified by the Evidence Critic.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        metrics: [
-          { label: 'Scope Verified', value: tenant, color: 'var(--accent)' },
-          { label: 'Worker DAGs Run', value: '7 / 7 Executed', color: 'var(--green)' },
-        ],
-        evidence: [
-          'Governed metrics computed using DuckDB engine snapshot.',
-          'Critic Verified: Zero ungrounded or single-vendor blame claims.',
-        ],
-      }
-    }
-
-    addCopilotMessage(agentMsg)
-    setPipelineStep(null)
+  const append = (message: Message) => setMessages(previous => [...previous, message].slice(-40))
+  const send = async (question = input) => {
+    const text = question.trim()
+    if (!text || text.length > 500 || sending.current || dashboardBusy) return
+    sending.current = true; setBusy(true); setNotice(''); setInput('')
+    engine.current?.stopListening(); setListening(false); stopSpeaking(); setAudioId(null); setAudioLoading(false)
+    append({ id: crypto.randomUUID(), sender: 'user', text, voice: voiceInput })
+    setVoiceInput(false)
+    try {
+      const response = await httpApi.ask(identityFor(tenant, role), { question: text, relatedRunId: run?.runId, asOfDate: asOf })
+      if (current()) append({ id: crypto.randomUUID(), sender: 'assistant', text: plain(response.answer), response })
+    } catch {
+      if (current()) append({ id: crypto.randomUUID(), sender: 'assistant', text: 'I could not get an answer right now. Please try again in a moment. Your dashboard data has not changed.' })
+    } finally { sending.current = false; if (current()) setBusy(false) }
   }
-
-  // Play Speech Audio via Sarvam TTS with Loading Spinner
-  const playAudioForMessage = (msgId: string, textToSpeak: string, speakerOverride?: string) => {
-    stopSpeaking()
-    if (activeAudioMessageId === msgId && isPlayingAudio && !speakerOverride) {
-      setIsPlayingAudio(false)
-      setActiveAudioMessageId(null)
-      setLoadingAudioMsgId(null)
-      return
-    }
-
-    const speakerToUse = speakerOverride || sarvamSpeaker
-    const plainText = textToSpeak.replace(/\*\*/g, '').replace(/\[|\]/g, '')
-    setActiveAudioMessageId(msgId)
-
-    speakText(
-      plainText,
-      speakerToUse,
-      () => {
-        setLoadingAudioMsgId(null)
-        setIsPlayingAudio(true)
-      },
-      () => {
-        setIsPlayingAudio(false)
-        setActiveAudioMessageId(null)
-        setLoadingAudioMsgId(null)
-      },
-      (isLoading) => {
-        if (isLoading) {
-          setLoadingAudioMsgId(msgId)
-        } else {
-          setLoadingAudioMsgId(null)
-        }
-      }
-    )
+  const microphone = () => {
+    if (listening) { engine.current?.stopListening(); setListening(false); return }
+    stopSpeaking(); setAudioId(null); setAudioLoading(false); setNotice(''); setListening(true)
+    engine.current?.startListening({
+      onTranscript: text => { if (current()) { setInput(text); setVoiceInput(true) } },
+      onError: message => { if (current()) { setNotice(message); setListening(false) } },
+      onEnd: () => { if (current()) setListening(false) },
+    })
   }
-
-  // Handle Instant Speaker Change
-  const handleSpeakerChange = (newSpeaker: string) => {
-    setSarvamSpeaker(newSpeaker)
-    if ((isPlayingAudio || loadingAudioMsgId) && activeAudioMessageId) {
-      const activeMsg = copilotMessages.find((m) => m.id === activeAudioMessageId)
-      if (activeMsg) {
-        playAudioForMessage(activeMsg.id, activeMsg.text, newSpeaker)
-      }
-    }
+  const play = (message: Message) => {
+    if (audioId === message.id) { stopSpeaking(); setAudioId(null); setAudioLoading(false); return }
+    setNotice(''); setAudioId(message.id); setAudioLoading(true)
+    void speakText(message.text, identityFor(tenant, role), voice, {
+      onStart: () => { if (current()) setAudioLoading(false) },
+      onEnd: () => { if (current()) { setAudioId(null); setAudioLoading(false) } },
+      onNotice: text => { if (current()) setNotice(text) },
+    })
   }
-
-  // Collapsed Floating Trigger Button (FAB)
-  if (!isCopilotWidgetOpen) {
-    return (
-      <button
-        className="copilot-floating-fab"
-        onClick={() => setCopilotWidgetOpen(true)}
-        title="Open Voice & Chat Copilot"
-      >
-        <span className="fab-icon">🎙</span>
-        <span className="fab-label">Voice Copilot</span>
-      </button>
-    )
+  const openReport = async (response: QuestionResponse) => {
+    if (!response.runId || sending.current) return
+    sending.current = true; setBusy(true)
+    try {
+      const next = await httpApi.getWorkflow(identityFor(tenant, role), response.runId)
+      if (current()) { useAppStore.getState().setRun(next, epoch); onOpenReport(); close() }
+    } catch { if (current()) setNotice('That report is no longer available. Refresh the dashboard and ask again.') }
+    finally { sending.current = false; if (current()) setBusy(false) }
   }
-
-  // Expanded Floating Widget Box
-  return (
-    <div className="copilot-widget-container">
-      {/* Header Bar */}
-      <div className="copilot-widget-header">
-        <div className="copilot-header-title">
-          <span className="copilot-icon">🎙</span>
-          <div>
-            <h3>Supervisor Voice Copilot</h3>
-            <p>Multi-modal agent copilot</p>
+  return <>
+    <button ref={launcher} className="copilot-floating-fab" type="button" aria-label={open ? 'Close Copilot chat' : 'Open Copilot chat and voice'}
+      aria-expanded={open} aria-controls="copilot-chat" onClick={() => open ? close() : setOpen(true)}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 6V3M3 11v5M21 11v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="2.5" r="1.25" fill="currentColor"/><rect x="5" y="6" width="14" height="14" rx="4" stroke="currentColor" strokeWidth="1.8"/><circle cx="9" cy="11.5" r="1.25" fill="currentColor"/><circle cx="15" cy="11.5" r="1.25" fill="currentColor"/><path d="M9 16h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+    </button>
+    {open && <section id="copilot-chat" className="copilot-widget-container" role="dialog" aria-label="Mobility Copilot chat" onKeyDown={e => { if (e.key === 'Escape') close() }}>
+      <header className="copilot-widget-header">
+        <div className="copilot-header-title"><span className="copilot-icon" aria-hidden="true">◈</span><div><h3>Ask Copilot</h3><p>{tenant} · report as of {asOf}</p></div></div>
+        <button className="widget-close-btn" type="button" aria-label="Minimize chat" onClick={close}>×</button>
+      </header>
+      <div className="chat-thread" role="log" aria-live="polite" aria-relevant="additions">
+        {!messages.length && <div className="chat-welcome"><h3>How can I help?</h3><p>Ask about delays, arrivals, costs or safety in your selected report. Type a question or use the microphone.</p></div>}
+        {messages.map(message => <div key={message.id} className={`chat-bubble-row ${message.sender === 'user' ? 'user' : 'agent'}`}>
+          <div className="chat-bubble">
+            <div className="chat-bubble-header"><span className="chat-sender-name">{message.sender === 'user' ? 'You' : 'Copilot'}</span>{message.voice && <span className="voice-badge">Voice input</span>}</div>
+            <div className="chat-text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
+            {message.response && !message.response.refused && <EvidenceSummary findings={message.response.supportingFindings} caveats={message.response.caveats} evidence={message.response.evidence} />}
+            {message.response?.runId && message.response.runId !== run?.runId && <button className="btn btn-secondary" disabled={busy} onClick={() => void openReport(message.response!)}>Open supporting report</button>}
+            {message.sender === 'assistant' && <div className="audio-player-bar"><button className="play-audio-btn" type="button" onClick={() => play(message)} aria-label={audioId === message.id ? 'Stop reading answer' : 'Read answer aloud'}>{audioId === message.id ? audioLoading ? '■ Stop · preparing audio…' : '■ Stop reading' : '▷ Read aloud'}</button></div>}
           </div>
-        </div>
-
-        <div className="copilot-header-actions">
-          {/* Sarvam AI Speaker Voice Accent Selector */}
-          <div className="speaker-accent-wrapper">
-            <span className="accent-label">Voice:</span>
-            <select
-              className="speaker-accent-select"
-              value={sarvamSpeaker}
-              onChange={(e) => handleSpeakerChange(e.target.value)}
-              title="Select Sarvam AI Persona & Speaker (bulbul:v3)"
-            >
-              <option value="assistant">🤖 Assistant (Shubh)</option>
-              <option value="manager">👩‍💼 Manager (Ritu)</option>
-              <option value="expert">👨‍🏫 Expert (Rahul)</option>
-              <option value="executive">👔 Executive (Arvind)</option>
-              <option value="analyst">📊 Analyst (Meera)</option>
-            </select>
-          </div>
-
-          {/* Minimize Button */}
-          <button
-            className="widget-close-btn"
-            onClick={() => setCopilotWidgetOpen(false)}
-            title="Minimize Chat Widget"
-          >
-            ✕
-          </button>
-        </div>
+        </div>)}
+        {busy && <p className="chat-working" role="status">Preparing your answer…</p>}
+        <div ref={bottom} />
       </div>
-
-      {/* Agent Execution Pipeline Status Bar */}
-      {pipelineStep !== null && (
-        <div className="pipeline-status-bar">
-          <div className="pipeline-steps">
-            <span className={`pipeline-step ${pipelineStep >= 0 ? 'active supervisor' : ''}`}>
-              🔵 Plan
-            </span>
-            <span className="pipeline-arrow">→</span>
-            <span className={`pipeline-step ${pipelineStep >= 1 ? 'active investigator' : ''}`}>
-              🟢 Workers
-            </span>
-            <span className="pipeline-arrow">→</span>
-            <span className={`pipeline-step ${pipelineStep >= 2 ? 'active critic' : ''}`}>
-              🟡 Critic
-            </span>
-            <span className="pipeline-arrow">→</span>
-            <span className={`pipeline-step ${pipelineStep >= 3 ? 'active briefing' : ''}`}>
-              🩷 Brief
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Conversation Thread Area */}
-      <div className="chat-thread">
-        {copilotMessages.map((msg) => (
-          <div key={msg.id} className={`chat-bubble-row ${msg.sender}`}>
-            <div className="chat-avatar">{msg.sender === 'user' ? '👤' : '🤖'}</div>
-            <div className="chat-bubble">
-              <div className="chat-bubble-header">
-                <span className="chat-sender-name">
-                  {msg.sender === 'user' ? 'You' : 'Supervisor Agent'}
-                </span>
-                {msg.isVoiceInput && <span className="voice-badge">🎙 Voice</span>}
-                <span className="chat-timestamp">{msg.timestamp}</span>
-              </div>
-
-              {/* Message Narrative */}
-              <div className="chat-text" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.text) }} />
-
-              {/* Structured Metric Pills */}
-              {msg.metrics && msg.metrics.length > 0 && (
-                <div className="metric-pills-row">
-                  {msg.metrics.map((m, idx) => (
-                    <div key={idx} className="metric-pill" style={{ borderColor: m.color || 'var(--accent)' }}>
-                      <span className="pill-label">{m.label}:</span>
-                      <span className="pill-value">{m.value}</span>
-                      {m.delta && <span className="pill-delta">{m.delta}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Evidence Citations */}
-              {msg.evidence && (
-                <div className="evidence-citation-box">
-                  <div className="evidence-box-title">📌 Governed Evidence:</div>
-                  <ul>
-                    {msg.evidence.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Recommended Action Card */}
-              {msg.recommendedAction && (
-                <div className="recommended-action-box">
-                  <div className="action-box-title">🎯 Draft Proposal:</div>
-                  <div className="action-box-name">{msg.recommendedAction.title}</div>
-                  <div className="action-box-desc">{msg.recommendedAction.rationale}</div>
-                </div>
-              )}
-
-              {/* Sarvam Audio Player Bar */}
-              {msg.sender === 'agent' && (
-                <div className="audio-player-bar">
-                  <button
-                    className={`play-audio-btn ${loadingAudioMsgId === msg.id ? 'loading' : ''}`}
-                    onClick={() => playAudioForMessage(msg.id, msg.text)}
-                    disabled={loadingAudioMsgId === msg.id}
-                  >
-                    {loadingAudioMsgId === msg.id ? (
-                      <>
-                        <span className="spinner-icon">🌀</span> Generating Audio...
-                      </>
-                    ) : activeAudioMessageId === msg.id && isPlayingAudio ? (
-                      '⏸ Pause'
-                    ) : (
-                      '▶ Speak (Sarvam AI)'
-                    )}
-                  </button>
-
-                  {loadingAudioMsgId === msg.id && (
-                    <div className="audio-loader-dots">
-                      <span>Sarvam AI bulbul:v3 synthesizing...</span>
-                      <span className="dot-pulse" />
-                      <span className="dot-pulse" />
-                      <span className="dot-pulse" />
-                    </div>
-                  )}
-
-                  {activeAudioMessageId === msg.id && isPlayingAudio && (
-                    <div className="audio-waveform-animation">
-                      <span className="wave-bar" />
-                      <span className="wave-bar" />
-                      <span className="wave-bar" />
-                      <span className="wave-bar" />
-                      <span className="wave-bar" />
-                    </div>
-                  )}
-                  <span className="engine-tag">Sarvam AI bulbul:v3 ({sarvamSpeaker})</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={chatBottomRef} />
-      </div>
-
-      {/* Preset Prompt Suggestions */}
-      <div className="prompt-suggestions">
-        {PRESET_PROMPTS.map((prompt, idx) => (
-          <button
-            key={idx}
-            className="suggestion-chip"
-            onClick={() => handleSendQuery(prompt)}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
-
-      {/* STT Listening Banner */}
-      {isListening && (
-        <div className="stt-banner">
-          <span className="stt-mic-pulsing">🎙</span>
-          <span>Listening... {sttTranscript && `"${sttTranscript}"`}</span>
-        </div>
-      )}
-
-      {/* Voice & Text Input Bar */}
-      <div className="copilot-input-bar">
-        <button
-          className={`mic-button ${isListening ? 'listening' : ''}`}
-          onClick={toggleListening}
-          title="Speech-to-Text Voice Input"
-        >
-          🎙
+      {!messages.length && <div className="prompt-suggestions">{suggestions.map(prompt => <button className="suggestion-chip" key={prompt} disabled={busy || dashboardBusy} onClick={() => void send(prompt)}>{prompt}</button>)}</div>}
+      <div className="chat-voice-settings"><label>Read-aloud voice <select value={voice} onChange={e => { stopSpeaking(); setAudioId(null); setAudioLoading(false); setVoice(e.target.value) }}><option value="shubh">Voice 1</option><option value="ritu">Voice 2</option><option value="rahul">Voice 3</option></select></label><small>{listening ? 'Listening… Click the microphone to stop.' : 'Voice input fills the box. Review it, then send.'}</small></div>
+      {notice && <p className="chat-notice" role="status">{notice}</p>}
+      {!voiceSupported && <p className="chat-notice">Voice input is unavailable in this browser. Text chat and read-aloud are still available.</p>}
+      {dashboardBusy && <p className="chat-notice" role="status">Your report is being prepared. You can ask when it is ready.</p>}
+      <form className="copilot-input-bar" onSubmit={e => { e.preventDefault(); void send() }}>
+        <button className={`mic-button ${listening ? 'listening' : ''}`} type="button" onClick={microphone} disabled={!voiceSupported || busy || dashboardBusy} aria-label={listening ? 'Stop voice input' : 'Start voice input'} aria-pressed={listening}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" stroke="currentColor" strokeWidth="1.8"/></svg>
         </button>
-
-        <input
-          type="text"
-          className="copilot-input"
-          placeholder={isListening ? 'Listening...' : 'Ask Supervisor Copilot...'}
-          value={inputQuery}
-          onChange={(e) => setInputQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSendQuery(inputQuery)
-          }}
-        />
-
-        <button
-          className="send-button"
-          onClick={() => handleSendQuery(inputQuery)}
-          disabled={!inputQuery.trim()}
-        >
-          ➔
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function formatMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br />')
+        <textarea ref={inputRef} className="copilot-input" rows={2} maxLength={500} aria-label="Your question" placeholder="Ask about your transport report…" value={input}
+          onChange={e => { setInput(e.target.value); setVoiceInput(false) }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send() } }} />
+        <button className="send-button" type="submit" aria-label="Send question" disabled={!input.trim() || busy || dashboardBusy || listening}>➔</button>
+      </form>
+    </section>}
+  </>
 }

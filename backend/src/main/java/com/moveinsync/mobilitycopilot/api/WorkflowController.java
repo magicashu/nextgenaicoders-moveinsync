@@ -5,6 +5,8 @@ import com.moveinsync.mobilitycopilot.api.dto.ApiDtos;
 import com.moveinsync.mobilitycopilot.api.security.TrustedHeaders;
 import com.moveinsync.mobilitycopilot.conversation.application.ContextualQuestionService;
 import com.moveinsync.mobilitycopilot.reporting.application.BriefRenderer;
+import com.moveinsync.mobilitycopilot.reporting.application.DashboardRunService;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.moveinsync.mobilitycopilot.reporting.application.DecisionRunGateway;
 import com.moveinsync.mobilitycopilot.reporting.application.RunNotFoundException;
 import com.moveinsync.mobilitycopilot.reporting.application.RunView;
@@ -21,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/** POST /api/v1/workflows starts an on-demand run; GET /api/v1/workflows/{id} reads it (tenant-scoped). */
+/** POST /api/v1/workflows resolves a captured run (refresh=true explicitly replaces it); GET /api/v1/workflows/{id} reads it (tenant-scoped). */
 @RestController
 @RequestMapping("/api/v1/workflows")
 public class WorkflowController {
@@ -29,9 +31,11 @@ public class WorkflowController {
     private final RequestContext context;
     private final DecisionRunGateway gateway;
     private final BriefRenderer renderer;
+    private final DashboardRunService dashboard;
     private final ContextualQuestionService questions;
 
-    public WorkflowController(RequestContext context, DecisionRunGateway gateway, BriefRenderer renderer, ContextualQuestionService questions) {
+    public WorkflowController(RequestContext context, DecisionRunGateway gateway, BriefRenderer renderer, ContextualQuestionService questions, DashboardRunService dashboard) {
+        this.dashboard = dashboard;
         this.context = context;
         this.gateway = gateway;
         this.renderer = renderer;
@@ -44,10 +48,11 @@ public class WorkflowController {
             @RequestHeader(name = TrustedHeaders.ACTOR, required = false) String actorId,
             @RequestHeader(name = TrustedHeaders.BUSINESS_UNIT) String businessUnit,
             @RequestHeader(name = TrustedHeaders.ROLES, required = false) String roles,
-            @RequestBody(required = false) ApiDtos.WorkflowRunRequest request) {
+            @RequestBody(required = false) ApiDtos.WorkflowRunRequest request,
+            @RequestParam(defaultValue = "false") boolean refresh) {
         ActorContext actor = context.actor(actorId, businessUnit, roles);
         LocalDate asOf = request == null || request.asOfDate() == null ? LocalDate.parse("2026-06-08") : request.asOfDate();
-        RunView run = gateway.morningBrief(actor, context.tenant(actor), asOf, RequestContext.persona(actor, request == null ? null : request.persona()));
+        RunView run = dashboard.capture(actor, context.tenant(actor), asOf, RequestContext.persona(actor, request == null ? null : request.persona()), refresh);
         return renderer.render(run, questions.suggestedQuestions());
     }
 

@@ -5,7 +5,7 @@ import com.moveinsync.mobilitycopilot.api.dto.ApiDtos;
 import com.moveinsync.mobilitycopilot.api.security.TrustedHeaders;
 import com.moveinsync.mobilitycopilot.conversation.application.ContextualQuestionService;
 import com.moveinsync.mobilitycopilot.reporting.application.BriefRenderer;
-import com.moveinsync.mobilitycopilot.reporting.application.DecisionRunGateway;
+import com.moveinsync.mobilitycopilot.reporting.application.DashboardRunService;
 import com.moveinsync.mobilitycopilot.reporting.application.RunView;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,11 +22,11 @@ import java.time.LocalDate;
 public class BriefController {
 
     private final RequestContext context;
-    private final DecisionRunGateway gateway;
+    private final DashboardRunService gateway;
     private final BriefRenderer renderer;
     private final ContextualQuestionService questions;
 
-    public BriefController(RequestContext context, DecisionRunGateway gateway, BriefRenderer renderer, ContextualQuestionService questions) {
+    public BriefController(RequestContext context, DashboardRunService gateway, BriefRenderer renderer, ContextualQuestionService questions) {
         this.context = context;
         this.gateway = gateway;
         this.renderer = renderer;
@@ -42,7 +42,7 @@ public class BriefController {
             @RequestParam(name = "persona", required = false) String persona) {
         ActorContext actor = context.actor(actorId, businessUnit, roles);
         LocalDate asOfDate = asOf == null ? LocalDate.parse("2026-06-08") : asOf;
-        RunView run = gateway.morningBrief(actor, context.tenant(actor), asOfDate, RequestContext.persona(actor, persona));
+        RunView run = gateway.capture(actor, context.tenant(actor), asOfDate, RequestContext.persona(actor, persona), false);
         return renderer.render(run, questions.suggestedQuestions());
     }
 }

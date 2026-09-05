@@ -1825,3 +1825,53 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .node-info-panel { position: absolute; left: 12px; top: 12px; z-index: 2; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; width: 360px; }
 .node-info-panel h4 { margin-bottom: 12px; }
 .gate-pill { background: var(--bg3); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* Persona entry and manager response views reuse the dashboard's surface tokens. */
+.persona-screen { max-width: 1120px; margin: 0 auto; padding: 64px 24px; }
+.persona-welcome { max-width: 750px; margin-bottom: 32px; }
+.persona-welcome h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.2; margin: 16px 0; }
+.persona-welcome p, .persona-option p, .persona-scope p { color: var(--text-dim); line-height: 1.7; }
+.persona-options { border: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.persona-options legend { margin-bottom: 16px; font-weight: 700; }
+.persona-option { padding: 24px; cursor: pointer; border: 2px solid transparent; }
+.persona-option.selected { border-color: #3FA535; background: #f4faf2; }
+.persona-option h2 { font-size: 18px; margin: 14px 0; }
+.persona-option input { accent-color: #3FA535; }
+.persona-scope { margin-top: 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.persona-scope p { flex-basis: 100%; margin: 0; font-size: 13px; }
+.evidence-summary { margin: 20px 0; }
+.evidence-summary > summary { cursor: pointer; font-weight: 700; padding: 20px; }
+.evidence-summary .card-body { border-top: 1px solid var(--border); }
+.evidence-summary p { line-height: 1.7; }
+.scope-list { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: 10px; margin: 16px 0; }
+.scope-list dt { color: var(--text-dim); } .scope-list dd { margin: 0; overflow-wrap: anywhere; }
+.resolution-options { display: grid; gap: 10px; margin: 18px 0; }
+.resolution-options label { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.incident-status { font-size: 13px; font-weight: 700; color: var(--text-dim); }
+@media (max-width: 760px) { .persona-options { grid-template-columns: 1fr; } .persona-screen { padding: 32px 16px; } }
+
+/* Integrated floating chat: constrained to the viewport and independent of page navigation. */
+.copilot-floating-fab { position: fixed; right: 24px; bottom: 24px; z-index: 90; width: 58px; height: 58px; padding: 0; border-radius: 50%; justify-content: center; }
+.copilot-widget-container { position: fixed; right: 24px; bottom: 94px; width: min(480px, calc(100vw - 32px)); height: min(680px, calc(100dvh - 116px)); max-height: calc(100dvh - 116px); z-index: 90; display: flex; flex-direction: column; }
+.copilot-widget-header { flex-shrink: 0; padding: 14px 18px; }
+.copilot-header-title { min-width: 0; } .copilot-header-title p { overflow-wrap: anywhere; }
+.chat-thread { flex: 1; min-height: 80px; overflow: auto; overscroll-behavior: contain; padding: 16px; }
+.chat-welcome { padding: 12px 4px; line-height: 1.65; } .chat-welcome p { color: var(--text-dim); margin-top: 8px; }
+.chat-bubble-row { max-width: 100%; } .chat-bubble { min-width: 0; overflow-wrap: anywhere; }
+.chat-text { font-size: 14px; line-height: 1.65; }
+.chat-bubble .evidence-summary { margin: 12px 0 0; background: transparent; box-shadow: none; }
+.chat-bubble .evidence-summary > summary { padding: 10px; font-size: 12px; }
+.chat-bubble .evidence-summary .card-body { padding: 12px; font-size: 12px; }
+.chat-bubble .evidence-summary h3 { font-size: 13px; }
+.chat-voice-settings { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.chat-voice-settings select { margin-left: 6px; color: var(--text); border: 1px solid var(--border); background: var(--bg2); padding: 4px; border-radius: 5px; }
+.chat-voice-settings small { flex-basis: 100%; color: var(--text-dim); }
+.chat-notice, .chat-working { margin: 0; padding: 8px 16px; font-size: 12px; line-height: 1.5; color: var(--text-dim); background: var(--bg3); }
+.copilot-input-bar { flex-shrink: 0; padding: 12px; align-items: center; }
+.copilot-input-bar textarea { min-width: 0; width: auto; margin: 0; resize: none; font-size: 14px; }
+.copilot-input-bar .mic-button { flex-shrink: 0; display: grid; place-items: center; }
+.copilot-widget-container :focus-visible, .copilot-floating-fab:focus-visible { outline: 3px solid var(--mis-blue); outline-offset: 2px; }
+@media (max-width: 600px) { .copilot-floating-fab { right: 16px; bottom: 16px; } .copilot-widget-container { right: 16px; bottom: 84px; height: calc(100dvh - 104px); max-height: calc(100dvh - 104px); } .topnav { height: auto; min-height: 64px; flex-wrap: wrap; padding: 10px; gap: 8px; } .topnav-right { flex-wrap: wrap; } }
+
+.copilot-widget-container .prompt-suggestions { flex-wrap: wrap; overflow: visible; flex-shrink: 0; }
+.copilot-widget-container .suggestion-chip { white-space: normal; text-align: left; }

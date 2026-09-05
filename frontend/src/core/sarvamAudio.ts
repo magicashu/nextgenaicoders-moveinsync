@@ -1,308 +1,84 @@
-// Sarvam AI Voice Engine & Speech Services (STT + TTS)
+import type { Identity } from './contracts'
+import { identityHeaders } from './identity'
 
-export interface SpeechRecognitionResultHandler {
-  onTranscript: (text: string, isFinal: boolean) => void
-  onError?: (err: string) => void
-  onEnd?: () => void
+type Recognition = {
+  continuous: boolean; interimResults: boolean; lang: string
+  onresult: ((event: { resultIndex: number; results: { isFinal: boolean; 0: { transcript: string } }[] }) => void) | null
+  onerror: ((event: { error: string }) => void) | null
+  onend: (() => void) | null
+  start(): void; abort(): void
 }
-
-/**
- * Speech-to-Text (STT) Manager using Web Speech API with Sarvam AI Fallback
- */
+type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }
 export class SpeechToTextEngine {
-  private recognition: any = null
-  private isListening = false
-
+  private recognition: Recognition | null = null
+  private timer: ReturnType<typeof setTimeout> | undefined
   constructor() {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (SpeechRecognition) {
-      this.recognition = new SpeechRecognition()
-      this.recognition.continuous = false
-      this.recognition.interimResults = true
-      this.recognition.lang = 'en-IN' // Default to Indian English
+    const browser = window as VoiceWindow
+    const Constructor = browser.SpeechRecognition ?? browser.webkitSpeechRecognition
+    if (Constructor) {
+      this.recognition = new Constructor()
+      this.recognition.continuous = false; this.recognition.interimResults = true; this.recognition.lang = 'en-IN'
     }
   }
-
-  public isSupported(): boolean {
-    return !!this.recognition
+  isSupported() { return this.recognition !== null }
+  startListening(handler: { onTranscript: (text: string) => void; onError: (message: string) => void; onEnd: () => void }) {
+    const recognition = this.recognition
+    if (!recognition) { handler.onError('Voice input is not available in this browser. You can type your question.'); return }
+    recognition.onresult = event => {
+      const text = Array.from(event.results).map(result => result[0].transcript).join(' ')
+      handler.onTranscript(text.slice(0, 500))
+    }
+    recognition.onerror = event => {
+      handler.onError(event.error === 'not-allowed' ? 'Microphone access was not allowed. Enable it in your browser or type your question.'
+        : event.error === 'no-speech' ? 'No speech was detected. Try again or type your question.' : 'Voice input is unavailable right now. Please type your question.')
+    }
+    recognition.onend = () => { clearTimeout(this.timer); handler.onEnd() }
+    try { recognition.start(); this.timer = setTimeout(() => this.stopListening(), 30_000) }
+    catch { handler.onError('Could not start the microphone. Please try again.'); handler.onEnd() }
   }
-
-  public startListening(handler: SpeechRecognitionResultHandler) {
-    if (!this.recognition) {
-      handler.onError?.('Speech recognition is not supported in this browser.')
-      return
-    }
-
-    if (this.isListening) {
-      this.stopListening()
-    }
-
-    this.recognition.onresult = (event: any) => {
-      let interimTranscript = ''
-      let finalTranscript = ''
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript
-        } else {
-          interimTranscript += event.results[i][0].transcript
-        }
-      }
-
-      const text = finalTranscript || interimTranscript
-      if (text) {
-        handler.onTranscript(text, !!finalTranscript)
-      }
-    }
-
-    this.recognition.onerror = (event: any) => {
-      console.warn('STT Error:', event.error)
-      handler.onError?.(`Speech error: ${event.error}`)
-      this.isListening = false
-    }
-
-    this.recognition.onend = () => {
-      this.isListening = false
-      handler.onEnd?.()
-    }
-
-    try {
-      this.recognition.start()
-      this.isListening = true
-    } catch (e) {
-      console.error('Failed to start speech recognition', e)
-      this.isListening = false
-    }
-  }
-
-  public stopListening() {
-    if (this.recognition && this.isListening) {
-      try {
-        this.recognition.stop()
-      } catch (e) {
-        // ignore
-      }
-      this.isListening = false
-    }
+  stopListening() { clearTimeout(this.timer); this.recognition?.abort() }
+  dispose() {
+    this.stopListening()
+    if (this.recognition) { this.recognition.onresult = null; this.recognition.onerror = null; this.recognition.onend = null }
   }
 }
 
-/**
- * Sarvam AI Persona to Voice Speaker Mapping
- * Model: bulbul:v3
- * Codec: mp3
- */
-export const VOICE_MAP: Record<string, string> = {
-  assistant: 'shubh',
-  manager: 'ritu',
-  expert: 'rahul',
-  executive: 'arvind',
-  analyst: 'meera',
-}
-
-interface SpeakerProfile {
-  sarvamSpeaker: string
-  targetLanguage: string
-  webPitch: number
-  webRate: number
-  gender: 'female' | 'male'
-}
-
-const SPEAKER_PROFILES: Record<string, SpeakerProfile> = {
-  shubh: {
-    sarvamSpeaker: 'shubh',
-    targetLanguage: 'en-IN',
-    webPitch: 1.35,
-    webRate: 1.05,
-    gender: 'female',
-  },
-  ritu: {
-    sarvamSpeaker: 'ritu',
-    targetLanguage: 'en-IN',
-    webPitch: 1.25,
-    webRate: 1.0,
-    gender: 'female',
-  },
-  rahul: {
-    sarvamSpeaker: 'rahul',
-    targetLanguage: 'en-IN',
-    webPitch: 0.85,
-    webRate: 1.0,
-    gender: 'male',
-  },
-  arvind: {
-    sarvamSpeaker: 'arvind',
-    targetLanguage: 'en-IN',
-    webPitch: 0.7,
-    webRate: 0.95,
-    gender: 'male',
-  },
-  meera: {
-    sarvamSpeaker: 'meera',
-    targetLanguage: 'en-IN',
-    webPitch: 1.45,
-    webRate: 0.98,
-    gender: 'female',
-  },
-}
-
-export interface SarvamAudioResponse {
-  text: string
-  speaker: string
-  audio: string
-}
-
-let currentAudioElement: HTMLAudioElement | null = null
-
-/**
- * Harness Sarvam AI Text-To-Speech API (bulbul:v3 model, mp3 codec)
- * Returns structured JSON { text, speaker, audio }
- */
-export async function textToSpeech(
-  text: string,
-  personaOrSpeaker: string = 'assistant'
-): Promise<SarvamAudioResponse> {
-  const sarvamApiKey = import.meta.env.VITE_SARVAM_API_KEY
-  const speaker = VOICE_MAP[personaOrSpeaker] || personaOrSpeaker || 'shubh'
-
-  if (!sarvamApiKey || import.meta.env.VITE_USE_SARVAM_TTS === 'false') {
-    throw new Error('Sarvam AI API key is missing or disabled')
-  }
-
-  const response = await fetch('https://api.sarvam.ai/text-to-speech', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-subscription-key': sarvamApiKey,
-    },
-    body: JSON.stringify({
-      inputs: [text.substring(0, 500)],
-      target_language_code: 'en-IN',
-      model: 'bulbul:v3',
-      speaker: speaker,
-      output_audio_codec: 'mp3',
-    }),
-  })
-
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Sarvam AI API error (${response.status}): ${errText}`)
-  }
-
-  const data = await response.json()
-  const audioBase64 = data.audios?.[0] || data.audio || ''
-
-  return {
-    text: text,
-    speaker: personaOrSpeaker,
-    audio: audioBase64,
-  }
-}
-
-/**
- * Text-to-Speech (TTS) Execution with Instant Cancel, Loading Callback & Web Speech Fallback
- */
-export async function speakText(
-  text: string,
-  personaOrSpeaker: string = 'assistant',
-  onStart?: () => void,
-  onEnd?: () => void,
-  onLoadingChange?: (isLoading: boolean) => void
-): Promise<void> {
-  stopSpeaking()
-
-  const speakerKey = VOICE_MAP[personaOrSpeaker] || personaOrSpeaker || 'shubh'
-  const profile = SPEAKER_PROFILES[speakerKey] || SPEAKER_PROFILES['shubh']
-
-  const sarvamApiKey = import.meta.env.VITE_SARVAM_API_KEY
-  if (sarvamApiKey && import.meta.env.VITE_USE_SARVAM_TTS === 'true') {
-    try {
-      onLoadingChange?.(true)
-      const ttsResult = await textToSpeech(text, personaOrSpeaker)
-      onLoadingChange?.(false)
-      if (ttsResult.audio) {
-        onStart?.()
-        const audioSrc = ttsResult.audio.startsWith('data:')
-          ? ttsResult.audio
-          : `data:audio/mp3;base64,${ttsResult.audio}`
-        
-        currentAudioElement = new Audio(audioSrc)
-        currentAudioElement.onended = () => {
-          currentAudioElement = null
-          onEnd?.()
-        }
-        currentAudioElement.onerror = () => {
-          currentAudioElement = null
-          fallbackWebSpeech(text, profile, onStart, onEnd)
-        }
-        await currentAudioElement.play()
-        return
-      }
-    } catch (err) {
-      onLoadingChange?.(false)
-      console.warn('Sarvam AI bulbul:v3 TTS API call failed, using tuned Web Speech fallback:', err)
-    }
-  }
-
-  // Fallback to tuned Web Speech API
-  onLoadingChange?.(false)
-  fallbackWebSpeech(text, profile, onStart, onEnd)
-}
-
-function fallbackWebSpeech(
-  text: string,
-  profile: SpeakerProfile,
-  onStart?: () => void,
-  onEnd?: () => void
-) {
-  if (!('speechSynthesis' in window)) {
-    onEnd?.()
-    return
-  }
-
-  window.speechSynthesis.cancel()
-
-  const utterance = new SpeechSynthesisUtterance(text.substring(0, 350))
-  utterance.pitch = profile.webPitch
-  utterance.rate = profile.webRate
-  utterance.lang = 'en-IN'
-
-  const voices = window.speechSynthesis.getVoices()
-  if (voices && voices.length > 0) {
-    const matchingVoice = voices.find((v) => {
-      const name = v.name.toLowerCase()
-      if (profile.gender === 'female') {
-        return name.includes('female') || name.includes('zira') || name.includes('samantha') || name.includes('veena') || name.includes('karen')
-      } else {
-        return name.includes('male') || name.includes('david') || name.includes('daniel') || name.includes('alex') || name.includes('rishi')
-      }
-    })
-    if (matchingVoice) {
-      utterance.voice = matchingVoice
-    }
-  }
-
-  utterance.onstart = () => onStart?.()
-  utterance.onend = () => onEnd?.()
-  utterance.onerror = () => onEnd?.()
-
-  window.speechSynthesis.speak(utterance)
-}
-
+let audio: HTMLAudioElement | null = null
+let pending: AbortController | null = null
+let generation = 0
 export function stopSpeaking() {
-  if (currentAudioElement) {
-    try {
-      currentAudioElement.pause()
-      currentAudioElement.currentTime = 0
-    } catch (e) {
-      // ignore
-    }
-    currentAudioElement = null
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel()
-  }
+  generation++; pending?.abort(); pending = null
+  audio?.pause(); audio = null
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
 }
-
+export async function speakText(text: string, identity: Identity, voice: string, callbacks: {
+  onStart: () => void; onEnd: () => void; onNotice: (text: string) => void
+}) {
+  stopSpeaking()
+  const attempt = generation
+  pending = new AbortController()
+  try {
+    const response = await fetch('/api/v1/speech', { method: 'POST', signal: pending.signal,
+      headers: { 'Content-Type': 'application/json', ...identityHeaders(identity) }, body: JSON.stringify({ text, voice }) })
+    if (!response.ok) throw new Error('Audio unavailable')
+    const value: { audio: string; contentType: string } = await response.json()
+    if (attempt !== generation) return
+    const player = new Audio('data:' + value.contentType + ';base64,' + value.audio)
+    audio = player
+    player.onended = () => { if (attempt === generation) { audio = null; callbacks.onEnd() } }
+    player.onerror = () => { if (attempt === generation) { callbacks.onNotice('Audio playback failed. Your answer is still available as text.'); callbacks.onEnd() } }
+    await player.play()
+    if (attempt === generation) callbacks.onStart()
+  } catch {
+    if (attempt !== generation) return
+    if (!('speechSynthesis' in window)) { callbacks.onNotice('Audio is unavailable in this browser. Your answer is available as text.'); callbacks.onEnd(); return }
+    callbacks.onNotice('Using your browser voice because online audio is unavailable.')
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'en-IN'; utterance.rate = 1
+    utterance.onstart = () => { if (attempt === generation) callbacks.onStart() }
+    utterance.onend = () => { if (attempt === generation) callbacks.onEnd() }
+    utterance.onerror = () => { if (attempt === generation) { callbacks.onNotice('Audio playback is unavailable. Your answer is available as text.'); callbacks.onEnd() } }
+    window.speechSynthesis.speak(utterance)
+  } finally { if (attempt === generation) pending = null }
+}
 

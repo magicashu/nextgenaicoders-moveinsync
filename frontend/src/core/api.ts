@@ -1,402 +1,71 @@
-/**
- * API layer — all calls hit the real backend at /api (proxied to port 8081).
- * Set VITE_USE_MOCKS=true in .env.local to bypass the backend entirely.
- */
+import type {
+  ApiError,
+  ApprovalDecisionRequest,
+  ApprovalDecisionResponse,
+  ApprovalView,
+  AuditResponse,
+  Identity,
+  MorningBriefResponse,
+  QuestionRequest,
+  QuestionResponse,
+} from './contracts'
+import { identityHeaders } from './identity'
+import { mockApi } from '../mocks/mockApi'
 
-import { scorecardData } from './mockData'
-import type { DecisionBrief } from './contracts'
+export class ApiRequestError extends Error {
+  readonly status: number
+  readonly error: ApiError | null
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
-
-// ── Types mirroring InvestigationController ───────────────────────────────
-
-export interface EvidencePayload {
-  evidenceId: string
-  status: 'AVAILABLE' | 'UNAVAILABLE' | 'DEGRADED' | string
-  value: number | null
-  numerator: number | null
-  denominator: number | null
-  population: number
-  unit: string
-  metricVersion: string
-  sourceReference: string
-  warnings: string[]
-}
-
-export interface ActionPayload {
-  actionId: string
-  type: string
-  title: string
-  rationale: string
-  status: string
-}
-
-export interface InvestigateResponse {
-  metricId: string
-  dateFrom: string
-  dateTo: string
-  dataVersion: string
-  primaryEvidence: EvidencePayload | null
-  allEvidence: EvidencePayload[]
-  operationalSummary: string
-  leadershipSummary: string
-  verificationStatus: 'VERIFIED' | 'QUALIFIED' | 'REJECTED' | string
-  findings: string[]
-  proposedActions: ActionPayload[]
-  caveats: string[]
-  warnings: string[]
-}
-
-export interface MetricMeta {
-  id: string
-  contractId: string
-  unit: string
-}
-
-export interface GroupRow {
-  groupKey: string
-  value: number
-  overallValue: number
-  numerator: number | null
-  denominator: number | null
-  population: number
-}
-
-export interface BreakdownResponse {
-  metricId: string
-  dimension: string
-  dateFrom: string
-  dateTo: string
-  dataVersion: string
-  overallValue: number
-  rows: GroupRow[]
-}
-
-// Dashboard model consumed by DashboardPage
-export interface DashboardData {
-  runId: string
-  businessUnit: string
-  headline: string
-  metric: {
-    metricId: string
-    value: number
-    baseline: number
-    delta: number
-    numerator: number
-    denominator: number
-    periodStart: string
-    periodEnd: string
-    contractVersion: string
-    dataVersion: string
-  }
-  findings: string[]
-  recommendedAction: ActionPayload | null
-  evidence: { confidence: number; coverage: number; caveats: string[] }
-  operationalSummary: string
-  leadershipSummary: string
-  verificationStatus: string
-  status: string
-  toolCalls: number
-  maxToolCalls: number
-}
-
-// Vendor / site row shapes used by charts
-export interface VendorRow {
-  vendor: string
-  value: number
-  baseline: number
-  delta: number
-  trips: number
-  share: number
-}
-
-export interface SiteRow {
-  site: string
-  value: number
-  baseline: number
-  delta: number
-  trips: number
-  share: number
-}
-
-export interface TrendPoint {
-  week: string
-  delayed: number
-  baseline: number
-}
-
-// ── Core fetch helpers ────────────────────────────────────────────────────
-
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error?: string }).error ?? `Request failed: ${res.status}`)
-  }
-  return res.json() as Promise<T>
-}
-
-// ── Public API functions ──────────────────────────────────────────────────
-
-const NOISE_PATTERNS = [
-  'comparison-ev-', 'claim-ev-', 'has an invalid, unavailable, or scope-mismatched',
-  'Office comparison scope', 'Below the governed comparison volume',
-  'Claim comparison-', 'Claim claim-', 'Verified evidence was rejected',
-  'Denominator is delayed trips', 'Rated participants only', 'Feedback trip participation',
-]
-const isNoise = (s: string) => NOISE_PATTERNS.some(p => s.includes(p))
-
-export async function fetchInvestigation(
-  businessUnit: string,
-  metricId: string,
-  dateFrom: string,
-  dateTo: string,
-): Promise<InvestigateResponse> {
-  const r = await post<InvestigateResponse>('/api/v1/investigate', { businessUnit, metricId, dateFrom, dateTo })
-  return {
-    ...r,
-    caveats: r.caveats.filter(c => !isNoise(c)),
-    warnings: r.warnings.filter(w => !isNoise(w)),
+  constructor(status: number, error: ApiError | null, fallbackMessage: string) {
+    super(error?.message ?? fallbackMessage)
+    this.status = status
+    this.error = error
   }
 }
-
-export async function fetchBreakdown(
-  businessUnit: string,
-  metricId: string,
-  dimension: 'vendor_id' | 'site_id',
-  dateFrom: string,
-  dateTo: string,
-): Promise<BreakdownResponse> {
-  return post('/api/v1/investigate/breakdown', { businessUnit, metricId, dimension, dateFrom, dateTo })
-}
-
-export async function fetchAvailableMetrics(): Promise<MetricMeta[]> {
-  const res = await fetch('/api/v1/investigate/metrics')
-  if (!res.ok) throw new Error(`Metrics list failed: ${res.status}`)
-  return res.json() as Promise<MetricMeta[]>
-}
-
-// ── Dashboard ─────────────────────────────────────────────────────────────
-
-function apiToDashboard(r: InvestigateResponse, businessUnit: string): DashboardData {
-  const ev = r.primaryEvidence
-  const value = ev?.value ?? 0
-  const denom = ev?.denominator ?? 0
-  const numer = ev?.numerator ?? 0
-
-  const headlineVal = value.toFixed(1)
-  const headline = r.leadershipSummary ||
-    `${businessUnit}: delayed-trip rate is ${headlineVal}% for selected period`
-
-  return {
-    runId: crypto.randomUUID(),
-    businessUnit,
-    headline,
-    metric: {
-      metricId: r.metricId,
-      value,
-      baseline: 0,
-      delta: 0,
-      numerator: numer,
-      denominator: denom,
-      periodStart: r.dateFrom,
-      periodEnd: r.dateTo,
-      contractVersion: ev?.metricVersion ?? 'M01-v1.1',
-      dataVersion: r.dataVersion,
-    },
-    findings: r.findings,
-    recommendedAction: r.proposedActions[0] ?? null,
-    evidence: {
-      confidence: r.verificationStatus === 'VERIFIED' ? 0.94
-                : r.verificationStatus === 'QUALIFIED' ? 0.72 : 0.5,
-      coverage: denom,
-      caveats: [],
-    },
-    operationalSummary: r.operationalSummary,
-    leadershipSummary: r.leadershipSummary,
-    verificationStatus: r.verificationStatus,
-    status: r.proposedActions.length > 0 ? 'AWAITING_APPROVAL' : 'COMPLETED',
-    toolCalls: r.allEvidence.length,
-    maxToolCalls: 40,
-  }
-}
-
-export async function fetchDashboard(
-  businessUnit: string,
-  dateFrom: string,
-  dateTo: string,
-): Promise<DashboardData> {
-  const raw = await fetchInvestigation(businessUnit, 'M01_DELAYED_TRIP_RATE', dateFrom, dateTo)
-  return apiToDashboard(raw, businessUnit)
-}
-
-// ── Vendor breakdown → VendorRow[] ────────────────────────────────────────
-
-export async function fetchVendorBreakdown(
-  businessUnit: string,
-  dateFrom: string,
-  dateTo: string,
-): Promise<VendorRow[]> {
-  const data = await fetchBreakdown(businessUnit, 'M01_DELAYED_TRIP_RATE', 'vendor_id', dateFrom, dateTo)
-  const overall = data.overallValue
-  const totalTrips = data.rows.reduce((s, r) => s + (r.denominator ?? 0), 0)
-
-  return data.rows.map(r => ({
-    vendor: r.groupKey,
-    value: r.value,
-    baseline: overall,
-    delta: parseFloat((r.value - overall).toFixed(2)),
-    trips: r.denominator ?? r.population,
-    share: totalTrips > 0 ? parseFloat(((r.denominator ?? 0) / totalTrips * 100).toFixed(1)) : 0,
-  }))
-}
-
-// ── Site breakdown → SiteRow[] ────────────────────────────────────────────
-
-export async function fetchSiteBreakdown(
-  businessUnit: string,
-  dateFrom: string,
-  dateTo: string,
-): Promise<SiteRow[]> {
-  const data = await fetchBreakdown(businessUnit, 'M01_DELAYED_TRIP_RATE', 'site_id', dateFrom, dateTo)
-  const overall = data.overallValue
-  const totalTrips = data.rows.reduce((s, r) => s + (r.denominator ?? 0), 0)
-
-  return data.rows.map(r => ({
-    site: r.groupKey,
-    value: r.value,
-    baseline: overall,
-    delta: parseFloat((r.value - overall).toFixed(2)),
-    trips: r.denominator ?? r.population,
-    share: totalTrips > 0 ? parseFloat(((r.denominator ?? 0) / totalTrips * 100).toFixed(1)) : 0,
-  }))
-}
-
-// ── Trend — 7 weekly windows ending at dateTo ─────────────────────────────
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
-function weekLabel(dateStr: string): string {
-  const d = new Date(dateStr)
-  const month = d.toLocaleString('en', { month: 'short' })
-  // approximate week number within month
-  const week = Math.ceil(d.getDate() / 7)
-  return `W${week} ${month}`
-}
-
-export async function fetchTrend(
-  businessUnit: string,
-  _dateFrom: string,
-  dateTo: string,
-): Promise<TrendPoint[]> {
-  // Build 7 weekly windows (each 7 days wide) ending at dateTo
-  const weeks: Array<{ from: string; to: string }> = []
-  for (let i = 6; i >= 0; i--) {
-    const wEnd = addDays(dateTo, -i * 7)
-    const wStart = addDays(wEnd, -6)
-    weeks.push({ from: wStart, to: wEnd })
-  }
-
-  const results = await Promise.allSettled(
-    weeks.map(w =>
-      fetchInvestigation(businessUnit, 'M01_DELAYED_TRIP_RATE', w.from, w.to)
-        .then(r => ({
-          week: weekLabel(w.to),
-          delayed: r.primaryEvidence?.value ?? 0,
-        }))
-    )
-  )
-
-  const points: TrendPoint[] = results.map((r, i) => ({
-    week: weekLabel(weeks[i].to),
-    delayed: r.status === 'fulfilled' ? r.value.delayed : 0,
-    baseline: 0,
-  }))
-
-  // Use the mean of all weeks as the baseline reference line
-  const validValues = points.map(p => p.delayed).filter(v => v > 0)
-  const baseline = validValues.length > 0
-    ? parseFloat((validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(2))
-    : 0
-
-  return points.map(p => ({ ...p, baseline }))
-}
-
-// ── Scorecard (static implementation metadata) ────────────────────────────
-
-export async function fetchScorecard(): Promise<typeof scorecardData> {
-  return scorecardData
-}
-
-// ── Legacy compat (MorningBriefPage + its test) ───────────────────────────
-
-export const fixtureBrief: DecisionBrief = {
-  runId: '00000000-0000-0000-0000-000000000001',
-  businessUnit: 'pinnacle-Slc',
-  asOfDate: '2026-06-08',
-  headline: 'pinnacle-Slc: delayed-trip rate increased to 30.00%',
-  metric: {
-    metricId: 'M01_DELAYED_TRIP_RATE', metricName: 'Delayed-trip rate',
-    valuePercent: 30, baselinePercent: 10, deltaPercentagePoints: 20,
-    numerator: 3, denominator: 10,
-    periodStart: '2026-06-01', periodEnd: '2026-06-07',
-    contractVersion: 'M01-v1', dataVersion: 'fixture-v1',
-  },
-  findings: [
-    'Delayed-trip rate rose materially against the prior four complete weeks.',
-    'Current: 30.00%; prior four weeks: 10.00%; change: 20.00 percentage points.',
-    'Worker-specific attribution is the next implementation slice.',
-  ],
-  recommendedAction: {
-    actionId: '00000000-0000-0000-0000-000000000002',
-    type: 'CREATE_WATCHLIST',
-    title: 'Create a site-shift watchlist',
-    rationale: 'Investigate the deterioration before assigning vendor blame.',
-    status: 'DRAFT_REQUIRES_APPROVAL',
-  },
-  evidence: {
-    items: [{
-      evidenceId: 'pinnacle-Slc:m01:2026-06-07', metricId: 'M01_DELAYED_TRIP_RATE',
-      valuePercent: 30, baselinePercent: 10, numerator: 3, denominator: 10,
-      source: 'sql/metrics/m01_delayed_trip_rate.sql',
-      contractVersion: 'M01-v1', dataVersion: 'fixture-v1',
-    }],
-    confidence: 1, coverage: 10,
-    caveats: ['Tiny fixture for scaffold verification; not a production claim.'],
-  },
-  status: 'AWAITING_APPROVAL',
-}
-
-export async function fetchDemoBrief(): Promise<DecisionBrief> {
-  if (USE_MOCKS) return fixtureBrief
-  const response = await fetch('/api/v1/demo/brief?asOf=2026-06-08', {
-    headers: { 'X-Business-Unit': 'pinnacle-Slc' },
-  })
-  if (!response.ok) throw new Error(`Brief request failed: ${response.status}`)
-  return response.json() as Promise<DecisionBrief>
-}
-
-// ── Compat stubs for main-branch files (ApiContext, AppShell, store) ──────────
 
 export type CopilotApi = {
-  getWorkflow: (identity: unknown, runId: string) => Promise<unknown>
-  [key: string]: unknown
+  morningBrief(identity: Identity, asOf: string, persona?: string): Promise<MorningBriefResponse>
+  startWorkflow(identity: Identity, asOf: string, persona?: string, refresh?: boolean): Promise<MorningBriefResponse>
+  getWorkflow(identity: Identity, workflowId: string): Promise<MorningBriefResponse>
+  ask(identity: Identity, request: QuestionRequest): Promise<QuestionResponse>
+  approvalPreview(identity: Identity, approvalId: string): Promise<ApprovalView>
+  decide(identity: Identity, approvalId: string, request: ApprovalDecisionRequest): Promise<ApprovalDecisionResponse>
+  audit(identity: Identity, workflowId: string): Promise<AuditResponse>
 }
 
+async function call<T>(identity: Identity, path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...identityHeaders(identity), ...(init.headers ?? {}) },
+  })
+  if (!response.ok) {
+    let parsed: ApiError | null = null
+    try {
+      parsed = (await response.json()) as ApiError
+    } catch {
+      parsed = null
+    }
+    throw new ApiRequestError(response.status, parsed, `Request failed with status ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+/** Real HTTP client. Same business semantics as the mock; only transport differs. */
 export const httpApi: CopilotApi = {
-  getWorkflow: async () => { throw new Error('getWorkflow not implemented') },
+  morningBrief: (identity, asOf, persona) =>
+    call(identity, `/api/v1/briefs/morning?asOf=${encodeURIComponent(asOf)}${persona ? `&persona=${encodeURIComponent(persona)}` : ''}`),
+  startWorkflow: (identity, asOf, persona, refresh = false) =>
+    call(identity, `/api/v1/workflows?refresh=${refresh}`, { method: 'POST', body: JSON.stringify({ asOfDate: asOf, persona: persona ?? null }) }),
+  getWorkflow: (identity, workflowId) => call(identity, `/api/v1/workflows/${encodeURIComponent(workflowId)}`),
+  ask: (identity, request) => call(identity, '/api/v1/questions', { method: 'POST', body: JSON.stringify(request) }),
+  approvalPreview: (identity, approvalId) => call(identity, `/api/v1/approvals/${encodeURIComponent(approvalId)}`),
+  decide: (identity, approvalId, request) =>
+    call(identity, `/api/v1/approvals/${encodeURIComponent(approvalId)}/decision`, { method: 'POST', body: JSON.stringify(request) }),
+  audit: (identity, workflowId) => call(identity, `/api/v1/audit/${encodeURIComponent(workflowId)}`),
 }
-
-export const api = httpApi
 
 export function useMocks(): boolean {
-  return USE_MOCKS
+  return import.meta.env.VITE_USE_MOCKS === 'true'
 }
+
+export const api: CopilotApi = useMocks() ? mockApi : httpApi

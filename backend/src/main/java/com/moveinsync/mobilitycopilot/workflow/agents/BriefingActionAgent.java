@@ -107,19 +107,25 @@ public final class BriefingActionAgent {
 
     /** Healthy or report-only brief: same shape, no action pending. */
     public BriefingOutput composeHealthy(WorkflowRun run, MetricResult headlineMetric, EvidenceBundle bundle, String status, List<String> notes) {
+        boolean readOnly = "REPORT_ONLY".equals(status);
         String headline = "%s: no material operational anomaly as of %s; %s is %s%s versus %s%s in the prior four weeks".formatted(
                 run.state().tenant().businessUnit(), run.state().asOfDate(), headlineMetric.metricName().toLowerCase(Locale.ROOT),
                 fmt(headlineMetric.value()), unit(headlineMetric), fmt(headlineMetric.baselineValue()), unit(headlineMetric));
+        if (readOnly) {
+            headline = "%s: %s is %s%s, compared with %s%s in the previous four weeks".formatted(
+                    run.state().tenant().businessUnit(), headlineMetric.metricName().toLowerCase(Locale.ROOT),
+                    fmt(headlineMetric.value()), unit(headlineMetric), fmt(headlineMetric.baselineValue()), unit(headlineMetric));
+        }
         Instant now = Instant.now();
         ActionProposal none = new ActionProposal(UUID.randomUUID(), run.state().runId(), ActionType.DRAFT_COMMUNICATION,
-                "No action recommended", "All sensed metrics are within the materiality rule; no approval request is raised.",
+                "No action recommended", readOnly ? "This view is read-only. Ask your transport manager to review issues requiring a response." : "All sensed metrics are within the materiality rule; no approval request is raised.",
                 Map.of("businessUnit", run.state().tenant().businessUnit(), "recommendation", "none"),
                 bundle.items().isEmpty() ? run.context().dataVersion() : bundle.items().getFirst().dataVersion(), now, now.plus(properties.approvalTtl()),
                 ActionStatus.DRAFT_REQUIRES_APPROVAL);
         List<String> findings = new ArrayList<>(notes);
         DecisionBrief brief = new DecisionBrief(run.state().runId(), run.state().tenant().businessUnit(), run.state().asOfDate(), headline,
                 headlineMetric, findings, none, bundle, status);
-        return new BriefingOutput(brief, findings, List.of(headline + ".", "No intervention is proposed."), none, "healthy", false);
+        return new BriefingOutput(brief, findings, List.of(headline + ".", readOnly ? "Review the arrival and shift information with your transport manager. Team assignments are not present in this dataset." : "No intervention is proposed."), none, readOnly ? "read-only" : "healthy", false);
     }
 
     ActionProposal proposeAction(WorkflowRun run, DetectionSnapshot.IssueCandidate issue, List<WorkerEvidenceDto.Ranking> vendorRankings, EvidencePackage evidence) {
@@ -166,7 +172,7 @@ public final class BriefingActionAgent {
     /** Top deteriorating qualified members by share of the numerator, returned in natural order (e.g. shift times). */
     private static List<String> topQualifiedBand(WorkflowRun run, String dimension, int limit) {
         return run.investigations().stream().flatMap(i -> i.evidence().stream()).flatMap(e -> e.rankings().stream())
-                .filter(r -> r.dimension().equals(dimension)).flatMap(r -> r.qualifiedRows().stream())
+                .filter(r -> r.dimension().equalsIgnoreCase(dimension)).flatMap(r -> r.qualifiedRows().stream())
                 .filter(r -> r.delta() != null && r.delta().signum() > 0)
                 .sorted(java.util.Comparator.comparing((WorkerEvidenceDto.Ranking.Row r) -> r.shareOfCurrentNumerator() == null ? BigDecimal.ZERO : r.shareOfCurrentNumerator()).reversed())
                 .map(WorkerEvidenceDto.Ranking.Row::member).distinct().limit(limit).sorted().toList();
@@ -181,7 +187,7 @@ public final class BriefingActionAgent {
 
     private static Optional<WorkerEvidenceDto.Ranking.Row> topQualified(WorkflowRun run, String dimension) {
         return run.investigations().stream().flatMap(i -> i.evidence().stream()).flatMap(e -> e.rankings().stream())
-                .filter(r -> r.dimension().equals(dimension)).flatMap(r -> r.qualifiedRows().stream())
+                .filter(r -> r.dimension().equalsIgnoreCase(dimension)).flatMap(r -> r.qualifiedRows().stream())
                 .filter(r -> r.delta() != null && r.delta().signum() > 0)
                 .max(java.util.Comparator.comparing(r -> r.shareOfCurrentNumerator() == null ? BigDecimal.ZERO : r.shareOfCurrentNumerator()));
     }

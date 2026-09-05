@@ -1,6 +1,6 @@
-# Run try1 locally
+# Run the integrated application locally
 
-`try1` builds on Java-branch-2 and now uses LangGraph4j 1.8.25, replacing the
+The current implementation builds on Java-branch-2 and now uses LangGraph4j 1.8.25, replacing the
 custom Java state-machine engine. The four agent roles use Sarvam for bounded
 planning, investigation choices, critique and selection of verified briefing
 claims. DuckDB computes the facts. The main graph has 18 business nodes; each
@@ -57,7 +57,6 @@ These commands use the JDK and official dataset already present on your Mac:
 
 ```bash
 cd /Users/miniorange/Desktop/miniOrange-IAM/try/hackathon
-git switch try1
 export JAVA_HOME="/Users/miniorange/Library/Java/JavaVirtualMachines/jbr-21.0.10/Contents/Home"
 export PATH="$JAVA_HOME/bin:$PATH"
 export MOBILITY_DATA_DIR="$PWD/outputs/MoveInSync - Anonymised Trip-Log Dataset"
@@ -102,8 +101,10 @@ lockfile. Subsequent starts only need the PATH export and `npm run dev`.
 
 Open <http://localhost:5173>. Use business unit `pinnacle-Slc` and date
 `2026-06-08`, which matches the supplied dataset's verified scenario.
-Explore the morning brief, investigation, approval and audit views. Use the
-Ask interface or a suggested question to ask about the current brief.
+Choose your persona first, then open Dashboard, Incidents or Reports. Use the
+bottom-right chat icon for questions, microphone input and read-aloud answers.
+Evidence starts collapsed. Unchanged selections reuse the displayed capture;
+Refresh explicitly requests a new investigation. See the [text and voice guide](supervisor-voice-chat-copilot.md).
 
 This local configuration requires neither an operator token nor PostgreSQL.
 Approvals, checkpoints and audit state are held in memory and reset when the
@@ -124,7 +125,9 @@ frontend proxy is configured to use that port.
 
 ## 6. Inspect the LLM calls and graph nodes
 
-After running a brief or a question, open **Trust**. Expand **LLM execution** to
+Developer diagnostics are hidden from manager screens by default. To inspect
+execution locally, set `VITE_SHOW_DIAGNOSTICS=true` in frontend terminal 2 and
+restart Vite. After running a brief or a question, open **Trust**. Expand **LLM execution** to
 see each role's attempt, model, duration, input/output tokens, fallback reason and
 structured proposal. Expand **Decision details** on each workflow node to see
 the next node, selected issue, workers, validation results, critic verdict and
@@ -262,17 +265,22 @@ npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
 npm run dev
 ```
 
-Open http://localhost:5173 and select `pinnacle-Slc`, `2026-06-01 → 2026-06-07`, then **Analyse**.
+Open http://localhost:5173. First choose a persona and business unit, then **Open my dashboard**. No dashboard request starts before this choice. The initial date window is `2026-06-01 → 2026-06-07`.
 The picker retains the incoming design; the current backend requires seven consecutive days and compares against the preceding four weeks.
 
-- **Dashboard:** governed M01/M04 metrics, daily trend, vendor/site comparisons, actual findings and evidence confidence.
-- **Decision Brief:** the same run, evidence provenance, approval scope/expiry and the actual execution receipt. Effects are explicitly mock watchlists/tickets.
-- **3D Workflow:** all 18 main nodes; replay recorded transitions and select nodes for actual timings and decisions. This is recorded replay, not a live stream.
-- **LLM & Trust:** provider/model, calls, tokens, fallback results, worker spans, structured outputs and Langfuse link.
-- **Ask Copilot:** contextual questions with cited findings and a question-specific trace; open a resulting investigation to inspect its brief, graph and audit.
-- **Audit Trail:** real tenant-scoped events, with payload inspection and filtering.
-- **Scorecard:** actual run performance; acceptance gates remain **Not evaluated** until a versioned evaluation is run.
+- **Transport Manager:** operational findings, arrival reliability, vendor/site comparisons and incident responses.
+- **Transport & Facilities Head:** performance and cost overview, leadership report and incident responses.
+- **Team / Line Manager:** read-only arrival, no-show and shift information. No investigation or approval permissions. Business-unit data is not an authenticated manager-to-team mapping.
+- **Ask Copilot:** simple-English explanations; covered questions reuse current findings. Supporting evidence is grouped and collapsed initially.
+- **Reports:** readable narratives and supporting figures.
+- **Incidents:** actual proposals from retained captures, with current approval state, affected scope, review expiry and a confirmation step. Approve, narrow existing multi-site/shift scope where available, or dismiss with a reason. Actions remain simulated; recording a response does not resolve the underlying real-world issue.
 
-Refresh reloads the active run without launching a fresh investigation. Switching tenants clears its results.
+**Analyse** reuses the same role/business-unit/date capture. **Refresh** explicitly captures a replacement and keeps the previous data visible while it loads. Changing dates or business unit loads the matching capture or creates one if absent. **Switch persona** returns to the selection screen. Reload returns to selection but retains up to eight tab-local captures.
+
+Developer diagnostics are hidden by default. To inspect recorded node decisions, Sarvam calls and Langfuse links, set `VITE_SHOW_DIAGNOSTICS=true` in `frontend/.env.local` and restart Vite; this enables **3D Workflow**, **LLM & Trust**, **Audit Trail** and **Scorecard**. These views replay records; they are not a live event stream. Provider credentials stay on the backend.
+
+The CSV source is not a live ingestion feed. Backend caches are bounded and process-local; production with multiple replicas needs a shared capture/job store and durable coordination. The incident queue currently covers retained reports rather than complete server-side history.
 The browser calls the local backend; Sarvam and Langfuse secret keys remain backend-only.
 For a non-default backend port, launch Vite with `VITE_API_TARGET=http://127.0.0.1:18080 npm run dev`.
+
+If the backend was restarted and a retained report's response details are unavailable, use **Refresh** to capture a new report. Session storage preserves the display, but the default local backend does not preserve all run objects across restarts.

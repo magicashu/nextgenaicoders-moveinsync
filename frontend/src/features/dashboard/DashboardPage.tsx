@@ -1,65 +1,40 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
   PieChart, Pie, Cell, Legend, CartesianGrid, LabelList, Area, AreaChart
 } from 'recharts'
 import {
-  fetchDashboard, fetchVendorBreakdown, fetchSiteBreakdown, fetchTrend,
+  startInvestigation, fetchCharts, cachedCharts, dashboardView, rangeFor,
   type DashboardData, type VendorRow, type SiteRow, type TrendPoint,
-} from '../../core/api'
+} from '../../core/dashboardApi'
 import { useAppStore } from '../../core/store'
+import { plain, MANAGER_ROLES } from '../../core/presentation'
+import type { Ranking } from '../../core/dashboardTypes'
+import type { MetricResult } from '../../core/contracts'
+import { formatValue } from '../../shared/format'
 import { DateRangePicker } from '../../shared/DateRangePicker'
 
 const SITE_COLORS = ['#3C68D0','#3FA535','#10ADAE','#FF9D00','#C13D6D','#638FE7','#815FD5','#2E7D3E','#FF6B35','#1E5F8E']
 
-// ── Fleet Health Score ─────────────────────────────────────────────────────
+// ── Evidence Confidence Score ─────────────────────────────────────────────────────
 
-function fleetHealthScore(delayRate: number, verificationStatus: string): { score: number; label: string; color: string } {
-  // 100 = perfect, 0 = crisis. Weighted: rate is primary, verification is secondary.
-  const rateScore = Math.max(0, 100 - delayRate * 3.5)
-  const verBonus = verificationStatus === 'VERIFIED' ? 5 : verificationStatus === 'QUALIFIED' ? 0 : -5
-  const score = Math.round(Math.min(100, Math.max(0, rateScore + verBonus)))
-  if (score >= 80) return { score, label: 'Healthy', color: '#2E7D3E' }
-  if (score >= 60) return { score, label: 'At Risk', color: '#D4900C' }
-  return { score, label: 'Critical', color: '#B00020' }
+function evidenceConfidence(confidence: number) {
+  return { score: Math.round(confidence * 100), label: 'Evidence confidence', color: '#3FA535' }
 }
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-function AnomalyAlerts({ vendors, fleetAvg }: { vendors: VendorRow[]; fleetAvg: number }) {
-  const critical = vendors.filter(v => v.delta > 20).slice(0, 3)
-  if (critical.length === 0) return null
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {critical.map(v => (
-          <div key={v.vendor} style={{
-            flex: 1, minWidth: 220, background: 'linear-gradient(135deg, #FFF0F0 0%, #FFF8F0 100%)',
-            border: '1px solid rgba(176,0,32,0.25)', borderLeft: '3px solid #B00020',
-            borderRadius: 10, padding: '12px 16px',
-            display: 'flex', alignItems: 'center', gap: 14,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(176,0,32,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: '1.1rem' }}>⚠</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#B00020', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {v.vendor}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>
-                <span style={{ fontWeight: 700, color: '#B00020', fontSize: '0.85rem', fontFamily: 'IBM Plex Mono, monospace' }}>{v.value.toFixed(1)}%</span>
-                {' '}delayed · fleet avg {fleetAvg.toFixed(1)}%
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#B00020' }}>+{v.delta.toFixed(0)}pp</div>
-              <div style={{ fontSize: '0.65rem', color: '#6B7A70' }}>vs fleet</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+function AnomalyAlerts({ data }: { data: DashboardData }) {
+  if (data.status === 'REPORT_ONLY') return null
+  if (data.status === 'HEALTHY') return <div className="caveat-ribbon">No material issue was detected for this window.</div>
+  return <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+    {data.findings.slice(0, 3).map((finding, index) => <div key={index} style={{
+      flex: 1, minWidth: 220, background: 'linear-gradient(135deg, #FFF0F0 0%, #FFF8F0 100%)',
+      border: '1px solid rgba(176,0,32,0.25)', borderLeft: '3px solid #B00020', borderRadius: 10,
+      padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14,
+    }}><span style={{ color: '#B00020', fontSize: '1.1rem' }}>⚠</span>
+      <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>{plain(finding)}</div></div>)}
+  </div>
 }
 
 function FleetHealthGauge({ score, label, color, delayRate, totalTrips }: { score: number; label: string; color: string; delayRate: number; totalTrips: number }) {
@@ -76,7 +51,7 @@ function FleetHealthGauge({ score, label, color, delayRate, totalTrips }: { scor
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color, lineHeight: 1 }}>{score}</div>
-          <div style={{ fontSize: '0.58rem', color: '#6B7A70', textTransform: 'uppercase', letterSpacing: 1 }}>score</div>
+          <div style={{ fontSize: '0.58rem', color: '#6B7A70', textTransform: 'uppercase', letterSpacing: 1 }}>confidence %</div>
         </div>
       </div>
       <div>
@@ -92,15 +67,13 @@ function FleetHealthGauge({ score, label, color, delayRate, totalTrips }: { scor
 
 function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] }) {
   const m = data.metric
-  const trendDir = trend.length >= 2
-    ? trend[trend.length - 1].delayed - trend[trend.length - 2].delayed
-    : 0
-  const trendUp = trendDir > 0.5
-  const trendDown = trendDir < -0.5
+  const trendDir = m.delta
+  const trendUp = trendDir != null && trendDir > 0
+  const trendDown = trendDir != null && trendDir < 0
 
   const miniTrendData = trend.slice(-5).map((p, i) => ({ i, v: p.delayed }))
 
-  const health = fleetHealthScore(m.value, data.verificationStatus)
+  const health = evidenceConfidence(data.evidence.confidence)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
@@ -111,7 +84,7 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#B00020', lineHeight: 1 }}>{m.value.toFixed(1)}%</div>
           {(trendUp || trendDown) && (
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: trendUp ? '#B00020' : '#3FA535', marginBottom: 4 }}>
-              {trendUp ? '▲' : '▼'} {Math.abs(trendDir).toFixed(1)}pp
+              {trendUp ? '▲' : '▼'} {Math.abs(trendDir!).toFixed(1)}pp vs prior 4 weeks
             </div>
           )}
         </div>
@@ -135,30 +108,16 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
 
       {/* On-time rate */}
       <div style={{ background: '#fff', border: '1px solid #E0E0E0', borderTop: '3px solid #3FA535', borderRadius: 10, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>On-Time Rate</div>
-        <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#2E7D3E', lineHeight: 1, marginBottom: 4 }}>{(100 - m.value).toFixed(1)}%</div>
-        <div style={{ fontSize: '0.71rem', color: '#A8B2AB' }}>{(m.denominator - m.numerator).toLocaleString()} on-time trips</div>
-        {miniTrendData.length > 1 && (
-          <div style={{ marginTop: 10 }}>
-            <ResponsiveContainer width="100%" height={32}>
-              <AreaChart data={miniTrendData.map(p => ({ ...p, v: 100 - p.v }))} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3FA535" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#3FA535" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="v" stroke="#3FA535" strokeWidth={1.5} fill="url(#greenGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>On-Time Pickup Rate</div>
+        <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#2E7D3E', lineHeight: 1, marginBottom: 4 }}>{data.onTime.value == null ? '—' : `${data.onTime.value.toFixed(1)}%`}</div>
+        <div style={{ fontSize: '0.71rem', color: '#A8B2AB' }}>{data.onTime.numerator?.toLocaleString() ?? '—'} / {data.onTime.denominator?.toLocaleString() ?? '—'} eligible pickups</div>
+        <div style={{ marginTop: 10, fontSize: '0.71rem', color: '#6B7A70' }}>Only valid, boarded passenger trips with recorded pickup times are included.</div>
       </div>
 
       {/* Fleet health score */}
       <div style={{ background: '#fff', border: '1px solid #E0E0E0', borderTop: `3px solid ${health.color}`, borderRadius: 10, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>Fleet Health</div>
-        <FleetHealthGauge score={health.score} label={health.label} color={health.color} delayRate={m.value} totalTrips={m.denominator} />
+        <div style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7A70', marginBottom: 8 }}>Evidence Confidence</div>
+        {data.status === 'REPORT_ONLY' ? <p>Read-only metric report. Explanations of causes have not been assessed.</p> : <FleetHealthGauge score={health.score} label={health.label} color={health.color} delayRate={m.value} totalTrips={m.denominator} />}
       </div>
 
       {/* Period + evidence */}
@@ -168,15 +127,15 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
             <span style={{ color: '#6B7A70' }}>Evidence items</span>
-            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace' }}>{data.toolCalls}</span>
+            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace' }}>{data.evidenceCount}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
             <span style={{ color: '#6B7A70' }}>Confidence</span>
-            <span style={{ fontWeight: 700, color: '#3C68D0' }}>{Math.round(data.evidence.confidence * 100)}%</span>
+            <span style={{ fontWeight: 700, color: '#3C68D0' }}>{data.status === 'REPORT_ONLY' ? 'Not assessed' : `${Math.round(data.evidence.confidence * 100)}%`}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-            <span style={{ color: '#6B7A70' }}>Contract</span>
-            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.7rem' }}>{m.contractVersion}</span>
+            <span style={{ color: '#6B7A70' }}>Comparison</span>
+            <span style={{ fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.7rem' }}>Previous four weeks</span>
           </div>
         </div>
       </div>
@@ -185,20 +144,23 @@ function KpiStrip({ data, trend }: { data: DashboardData; trend: TrendPoint[] })
 }
 
 function TrendChart({ data }: { data: TrendPoint[] }) {
-  const baseline = data.find(p => p.baseline > 0)?.baseline ?? 0
-  const max = Math.max(...data.map(p => p.delayed), baseline)
-  const isWorsening = data.length >= 2 && data[data.length - 1].delayed > data[0].delayed
+  const baseline = data.find(p => p.baseline != null)?.baseline ?? null
+  const max = Math.max(...data.map(p => p.delayed ?? 0), baseline ?? 0)
+  const first = data.find(p => p.delayed != null)?.delayed
+  const last = [...data].reverse().find(p => p.delayed != null)?.delayed
+  const isWorsening = first != null && last != null && last > first
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="card-title">Delayed-Trip Rate — 7-Week Trend</div>
-          {isWorsening
-            ? <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(176,0,32,0.1)', color: '#B00020', fontWeight: 700 }}>▲ Worsening</span>
-            : <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700 }}>▼ Improving</span>
+          <div className="card-title">Delayed-Trip Rate — Daily Trend</div>
+          {first != null && last != null && first !== last ? isWorsening
+            ? <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(176,0,32,0.1)', color: '#B00020', fontWeight: 700 }}>▲ Higher than first day</span>
+            : <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700 }}>▼ Lower than first day</span>
+            : <span style={{ fontSize: '0.7rem', color: '#6B7A70' }}>Recorded daily values</span>
           }
         </div>
-        {baseline > 0 && <div style={{ fontSize: '0.75rem', color: '#6B7A70' }}>7-week avg: <strong>{baseline.toFixed(1)}%</strong></div>}
+        {baseline != null && <div style={{ fontSize: '0.75rem', color: '#6B7A70' }}>Prior four weeks: <strong>{baseline.toFixed(1)}%</strong></div>}
       </div>
       <div className="card-body" style={{ paddingTop: 12 }}>
         <ResponsiveContainer width="100%" height={200}>
@@ -218,12 +180,10 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
               contentStyle={{ background: '#fff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
               labelStyle={{ color: '#16211B', fontWeight: 700 }}
               formatter={(v) => [`${Number(v).toFixed(1)}%`, 'Delayed rate']} />
-            {baseline > 0 && (
+            {baseline != null && (
               <ReferenceLine y={baseline} stroke="#D4900C" strokeDasharray="5 3"
-                label={{ value: `7-wk avg ${baseline.toFixed(1)}%`, fill: '#D4900C', fontSize: 11, position: 'insideTopRight' }} />
+                label={{ value: `Baseline ${baseline.toFixed(1)}%`, fill: '#D4900C', fontSize: 11, position: 'insideTopRight' }} />
             )}
-            <ReferenceLine y={9.0} stroke="#3C68D0" strokeDasharray="4 4"
-              label={{ value: 'IT/ITeS sector 9%', fill: '#3C68D0', fontSize: 10, position: 'insideBottomRight' }} />
             <Area type="monotone" dataKey="delayed" stroke="#B00020" strokeWidth={2.5}
               fill="url(#trendGrad)" dot={{ fill: '#B00020', r: 4, strokeWidth: 2, stroke: '#fff' }}
               activeDot={{ r: 6, stroke: '#B00020', strokeWidth: 2 }} />
@@ -238,16 +198,16 @@ function VendorChart({ data }: { data: VendorRow[] }) {
   const chartData = data.slice(0, 12).map(v => ({
     name: v.vendor.replace(' Travel', '').slice(0, 20),
     current: parseFloat(v.value.toFixed(1)),
-    baseline: parseFloat(v.baseline.toFixed(1)),
-    isHigh: v.delta > 10,
+    baseline: v.baseline == null ? null : parseFloat(v.baseline.toFixed(1)),
+    isHigh: (v.delta ?? 0) > 0,
   }))
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Vendor Delay Rates vs Fleet Average</div>
+        <div className="card-title">Vendor Delay Rates vs Previous Four Weeks</div>
         <div style={{ display: 'flex', gap: 14, fontSize: '0.72rem', color: '#6B7A70' }}>
           <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#B00020', marginRight: 4 }} />Current</span>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3FA535', marginRight: 4 }} />Fleet avg</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3FA535', marginRight: 4 }} />Previous four weeks</span>
         </div>
       </div>
       <div className="card-body" style={{ paddingRight: 4 }}>
@@ -263,7 +223,7 @@ function VendorChart({ data }: { data: VendorRow[] }) {
               ))}
               <LabelList dataKey="current" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 9, fontWeight: 700 }} />
             </Bar>
-            <Bar dataKey="baseline" fill="#3FA535" name="Fleet avg" radius={[0, 3, 3, 0]} maxBarSize={9}>
+            <Bar dataKey="baseline" fill="#3FA535" name="Previous four weeks" radius={[0, 3, 3, 0]} maxBarSize={9}>
               <LabelList dataKey="baseline" position="right" formatter={(v: unknown) => `${Number(v).toFixed(1)}%`} style={{ fontSize: 9, fill: '#3FA535', fontWeight: 600 }} />
             </Bar>
           </BarChart>
@@ -284,7 +244,7 @@ function SiteDonut({ data }: { data: SiteRow[] }) {
   }))
   return (
     <div className="card">
-      <div className="card-header"><div className="card-title">Trip Volume by Site</div></div>
+      <div className="card-header"><div className="card-title">Trip Volume — Top 8 Sites</div></div>
       <div className="card-body">
         <ResponsiveContainer width="100%" height={260}>
           <PieChart>
@@ -293,7 +253,7 @@ function SiteDonut({ data }: { data: SiteRow[] }) {
             </Pie>
             <Tooltip
               contentStyle={{ background: '#fff', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-              formatter={(v, _n, props) => [`${Number(v).toFixed(1)}% of trips · ${props.payload?.delayRate?.toFixed(1)}% delayed`]}
+              formatter={(v, _n, props) => [`${Number(v).toFixed(1)}% of displayed trips · ${props.payload?.delayRate?.toFixed(1)}% delayed`]}
             />
             <Legend iconSize={9} wrapperStyle={{ fontSize: 10, color: '#6B7A70', lineHeight: 1.8 }} />
           </PieChart>
@@ -304,14 +264,14 @@ function SiteDonut({ data }: { data: SiteRow[] }) {
 }
 
 function VendorDeltaBars({ data }: { data: VendorRow[] }) {
-  const top = data.slice(0, 10)
+  const top = data.filter((v): v is VendorRow & { delta: number } => v.delta != null).slice(0, 10)
   const max = Math.max(...top.map(v => Math.abs(v.delta)), 1)
-  const getColor = (delta: number) => delta > 20 ? '#B00020' : delta > 10 ? '#D4900C' : delta > 3 ? '#6B7A70' : '#3FA535'
+  const getColor = (delta: number) => delta > 0 ? '#B00020' : '#3FA535'
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Vendor Performance Delta vs Fleet (pp)</div>
-        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>+ = worse than fleet</div>
+        <div className="card-title">Change in Vendor Delay Rate (pp)</div>
+        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>+ = increase from previous four weeks</div>
       </div>
       <div className="card-body">
         {top.map((v) => {
@@ -353,12 +313,12 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
               <th>Site</th>
               <th style={{ textAlign: 'right' }}>Rate</th>
               <th style={{ textAlign: 'right' }}>Trips</th>
-              <th style={{ textAlign: 'right' }}>vs Fleet</th>
+              <th style={{ textAlign: 'right' }}>vs prior 4 weeks</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((s) => {
-              const sevColor = s.value > s.baseline * 2 ? '#B00020' : s.value > s.baseline * 1.2 ? '#D4900C' : '#2E7D3E'
+              const sevColor = s.delta == null ? '#6B7A70' : s.delta > 0 ? '#B00020' : '#2E7D3E'
               return (
                 <tr key={s.site}>
                   <td style={{ fontWeight: 500 }}>{s.site}</td>
@@ -368,8 +328,8 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
                   <td style={{ textAlign: 'right', color: '#6B7A70', fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.78rem' }}>
                     {s.trips.toLocaleString()}
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem', color: s.delta > 0 ? '#B00020' : '#2E7D3E' }}>
-                    {s.delta >= 0 ? '+' : ''}{s.delta.toFixed(1)}
+                  <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.8rem', color: sevColor }}>
+                    {s.delta == null ? '—' : `${s.delta >= 0 ? '+' : ''}${s.delta.toFixed(1)}`}
                   </td>
                 </tr>
               )
@@ -381,191 +341,45 @@ function SiteDelayTable({ data }: { data: SiteRow[] }) {
   )
 }
 
-// ── Industry Benchmarks (from MoveInSync IT/ITeS & Financial Services Sector Reports 2026) ──
-
-const INDUSTRY_BENCHMARKS = [
-  {
-    label: 'Delayed Trip Rate',
-    sector: 'IT/ITeS sector avg',
-    benchmark: 9.0,
-    unit: '%',
-    description: 'On-time arrival 89–93% across Bengaluru, Hyderabad, Delhi NCR, Chennai',
-    good: (v: number) => v <= 9,
-    format: (v: number) => `${v.toFixed(1)}%`,
-  },
-  {
-    label: 'No-Show Rate',
-    sector: 'IT/ITeS sector avg',
-    benchmark: 4.2,
-    unit: '%',
-    description: 'Ghost trips (seats booked, no passenger) — sector range 2.3–6.8%',
-    good: (_: number) => true,
-    format: (v: number) => `${v.toFixed(1)}%`,
-  },
-  {
-    label: 'Seat Utilisation',
-    sector: 'IT/ITeS sector avg',
-    benchmark: 68,
-    unit: '%',
-    description: 'Occupied seats / available seats — Bengaluru leads at 72%, Delhi NCR at 63%',
-    good: (v: number) => v >= 68,
-    format: (v: number) => `${v.toFixed(0)}%`,
-  },
-  {
-    label: 'Safe Reach Verification',
-    sector: 'Financial Services avg',
-    benchmark: 97.5,
-    unit: '%',
-    description: 'Employee safe-reach confirmation rate — sector range 96–99%',
-    good: (v: number) => v >= 96,
-    format: (v: number) => `${v.toFixed(1)}%`,
-  },
-]
-
-function IndustryBenchmarkPanel({ delayRate }: { delayRate: number }) {
-  const industryDelayBenchmark = 9.0
-  const deltaVsIndustry = delayRate - industryDelayBenchmark
-  const isAboveBenchmark = deltaVsIndustry > 0
-
-  return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="card-title">Industry Benchmark Context</div>
-          <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(60,104,208,0.08)', color: '#3C68D0', fontWeight: 700 }}>
-            MoveInSync IT/ITeS Report 2026
-          </span>
-        </div>
-        <div style={{ fontSize: '0.72rem', color: '#6B7A70' }}>
-          Source: Commute Trends Across IT/ITeS Sector · Financial Services Sector 2026
-        </div>
-      </div>
-      <div className="card-body">
-        {/* Headline comparison */}
-        <div style={{
-          padding: '16px 20px', borderRadius: 12, marginBottom: 16,
-          background: isAboveBenchmark ? 'linear-gradient(135deg, #FFF0F0, #FFF8F0)' : 'linear-gradient(135deg, #F0FFF4, #F0FFF8)',
-          border: `1px solid ${isAboveBenchmark ? 'rgba(176,0,32,0.2)' : 'rgba(46,125,62,0.2)'}`,
-          display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
-        }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: '0.75rem', color: '#6B7A70', marginBottom: 4 }}>
-              Your delayed trip rate vs IT/ITeS industry average
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: '0.65rem', color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: 1 }}>Your Fleet</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: isAboveBenchmark ? '#B00020' : '#2E7D3E', lineHeight: 1 }}>
-                  {delayRate.toFixed(1)}%
-                </div>
-              </div>
-              <div style={{ fontSize: '1.4rem', color: '#C8CDD3' }}>vs</div>
-              <div>
-                <div style={{ fontSize: '0.65rem', color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: 1 }}>Sector avg</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: '#3C68D0', lineHeight: 1 }}>
-                  {industryDelayBenchmark.toFixed(1)}%
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '12px 20px', borderRadius: 10, background: isAboveBenchmark ? 'rgba(176,0,32,0.08)' : 'rgba(46,125,62,0.08)', border: `1px solid ${isAboveBenchmark ? 'rgba(176,0,32,0.2)' : 'rgba(46,125,62,0.2)'}` }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: isAboveBenchmark ? '#B00020' : '#2E7D3E', lineHeight: 1 }}>
-              {isAboveBenchmark ? '+' : ''}{deltaVsIndustry.toFixed(1)}pp
-            </div>
-            <div style={{ fontSize: '0.68rem', color: '#6B7A70', marginTop: 4 }}>
-              {isAboveBenchmark ? '▲ above industry' : '▼ below industry'}
-            </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 180, fontSize: '0.8rem', color: '#6B7A70', lineHeight: 1.65 }}>
-            {isAboveBenchmark
-              ? `At ${delayRate.toFixed(1)}%, this fleet is running ${deltaVsIndustry.toFixed(1)}pp above the IT/ITeS sector average. Driver-related delays are the leading cause across the sector (5–8% of trips).`
-              : `This fleet is performing ${Math.abs(deltaVsIndustry).toFixed(1)}pp better than the IT/ITeS sector average of 9%. On-time arrivals across Bengaluru, Hyderabad, Delhi NCR and Chennai average 89–93%.`
-            }
-          </div>
-        </div>
-
-        {/* Benchmark grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {INDUSTRY_BENCHMARKS.map(b => (
-            <div key={b.label} style={{ padding: '12px 14px', background: '#FAFAFA', border: '1px solid #E8ECEE', borderRadius: 10 }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#A8B2AB', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-                {b.label}
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: 'IBM Plex Mono, monospace', color: '#3C68D0', lineHeight: 1, marginBottom: 4 }}>
-                {b.format(b.benchmark)}
-              </div>
-              <div style={{ fontSize: '0.68rem', color: '#A8B2AB', marginBottom: 6, fontStyle: 'italic' }}>{b.sector}</div>
-              <div style={{ fontSize: '0.7rem', color: '#6B7A70', lineHeight: 1.4 }}>{b.description}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Cost context */}
-        <div style={{ marginTop: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(60,104,208,0.04)', border: '1px solid rgba(60,104,208,0.12)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3C68D0' }}>Cost Context:</span>
-          <span style={{ fontSize: '0.75rem', color: '#6B7A70' }}>
-            Enterprise commute cost averages <strong style={{ color: '#16211B' }}>₹7.7k–₹15.8k/employee/month</strong> in the IT/ITeS sector.
-            Each percentage point reduction in delayed trips translates directly to productivity gains and SLA compliance.
-            Hyderabad leads EV adoption at <strong style={{ color: '#2E7D3E' }}>11%</strong> — saving 89.4 tonnes of CO₂ monthly.
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function AgentInsightPanel({ data }: { data: DashboardData }) {
-  const health = fleetHealthScore(data.metric.value, data.verificationStatus)
+  const health = evidenceConfidence(data.evidence.confidence)
   return (
     <div className="card" style={{ gridColumn: 'span 2' }}>
-      <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="card-title">AI Agent Analysis</div>
-          <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700, marginLeft: 8 }}>
-            4-agent pipeline
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: '0.72rem' }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(60,104,208,0.1)', color: '#3C68D0', fontWeight: 700 }}>supervisor</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(16,173,174,0.1)', color: '#10ADAE', fontWeight: 700 }}>investigator</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(212,144,12,0.1)', color: '#D4900C', fontWeight: 700 }}>critic</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(63,165,53,0.1)', color: '#2E7D3E', fontWeight: 700 }}>briefing</span>
-        </div>
-      </div>
+      <div className="card-header"><div className="card-title">What changed and why it matters</div></div>
       <div className="card-body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div>
             {data.findings.length > 0 ? (
               <>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Verified Findings</div>
-                {data.findings.map((f, i) => (
+                {data.findings.slice(0, 4).map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                     <div style={{ minWidth: 20, height: 20, borderRadius: '50%', background: 'rgba(63,165,53,0.12)', border: '1px solid rgba(63,165,53,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3FA535', fontWeight: 800, flexShrink: 0 }}>{i + 1}</div>
-                    <div style={{ fontSize: '0.84rem', color: '#16211B', lineHeight: 1.6 }}>{f}</div>
+                    <div style={{ fontSize: '0.84rem', color: '#16211B', lineHeight: 1.6 }}>{plain(f)}</div>
                   </div>
                 ))}
               </>
             ) : (
               <>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Agent Summary</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Summary</div>
                 <p style={{ fontSize: '0.85rem', color: '#6B7A70', lineHeight: 1.7, marginBottom: 10 }}>
-                  {data.operationalSummary || 'Investigation pipeline completed.'}
+                  {data.operationalSummary || 'Your report is ready.'}
                 </p>
                 <p style={{ fontSize: '0.78rem', color: '#A8B2AB', lineHeight: 1.6 }}>
-                  The critic agent validates claims against primary evidence. For wider date ranges, individual weekly claims may not meet the verification threshold — this is expected conservative behaviour, not a data error.
+                  Open the report to review the supporting facts and recommended next steps.
                 </p>
               </>
             )}
           </div>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>Pipeline Summary</div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7A70', marginBottom: 10 }}>At a glance</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
-                { label: 'Fleet Health', value: `${health.score}/100`, color: health.color },
-                { label: 'Evidence items', value: String(data.toolCalls), color: '#16211B' },
+                { label: 'Evidence Confidence', value: `${health.score}/100`, color: health.color },
+                { label: 'Evidence items', value: String(data.evidenceCount), color: '#16211B' },
                 { label: 'Coverage', value: data.metric.denominator.toLocaleString(), color: '#16211B' },
-                { label: 'Contract', value: data.metric.contractVersion, color: '#3C68D0' },
-                { label: 'Status', value: data.status.replace(/_/g, ' '), color: '#16211B' },
+                { label: 'Comparison', value: 'Previous four weeks', color: '#3C68D0' },
+                { label: 'Status', value: data.status === 'AWAITING_APPROVAL' ? 'Needs review' : data.status === 'EXECUTED' ? 'Response recorded' : data.status.toLowerCase().replaceAll('_', ' '), color: '#16211B' },
                 { label: 'Confidence', value: `${Math.round(data.evidence.confidence * 100)}%`, color: '#3FA535' },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ padding: '8px 10px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #E0E0E0' }}>
@@ -592,63 +406,76 @@ function LoadingOverlay() {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(245,245,245,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100, gap: 16 }}>
       <div style={{ width: 44, height: 44, border: '3px solid #E0E0E0', borderTopColor: '#3FA535', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#16211B' }}>Running 4-agent pipeline…</div>
+      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#16211B' }}>Preparing your report…</div>
       <div style={{ fontSize: '0.78rem', color: '#6B7A70', textAlign: 'center', maxWidth: 320 }}>
-        Supervisor → Investigator → Critic → Briefing<br />
-        First run ingests CSV data — may take 15–30 s
+
+        Reviewing the available records for your selected period.
       </div>
     </div>
   )
 }
 
-interface AllData { dashboard: DashboardData; vendors: VendorRow[]; sites: SiteRow[]; trend: TrendPoint[] }
+interface AllData { dashboard: DashboardData; vendors: VendorRow[]; sites: SiteRow[]; trend: TrendPoint[]; shifts: Ranking; noShow: MetricResult; cost: MetricResult }
 
 export function DashboardPage() {
-  const { tenant, lastRefresh } = useAppStore()
-  const [dateRange, setDateRange] = useState({ from: '2026-06-01', to: '2026-06-30' })
-  const [allData, setAllData] = useState<AllData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { tenant, role, run, busy, asOf, lastRefresh } = useAppStore()
+  const [dateRange, setDateRange] = useState(rangeFor(asOf))
+  const [allData, setAllData] = useState<AllData | null>(() => {
+    if (!run) return null
+    const charts = cachedCharts(tenant, run.asOfDate, run.trust.dataVersion)
+    try { return charts ? dashboardView(run, charts) : null } catch { return null }
+  })
+  const [chartLoading, setChartLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loading = busy || chartLoading
 
-  const loadAll = useCallback(async () => {
-    setLoading(true)
+  const loadAll = async () => {
     setError(null)
-    try {
-      const dashboard = await fetchDashboard(tenant, dateRange.from, dateRange.to)
-      const [vendorsResult, sitesResult, trendResult] = await Promise.allSettled([
-        fetchVendorBreakdown(tenant, dateRange.from, dateRange.to),
-        fetchSiteBreakdown(tenant, dateRange.from, dateRange.to),
-        fetchTrend(tenant, dateRange.from, dateRange.to),
-      ])
-      setAllData({
-        dashboard,
-        vendors: vendorsResult.status === 'fulfilled' ? vendorsResult.value : [],
-        sites:   sitesResult.status   === 'fulfilled' ? sitesResult.value   : [],
-        trend:   trendResult.status   === 'fulfilled' ? trendResult.value   : [],
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [tenant, dateRange])
+    try { await startInvestigation(tenant, dateRange.from, dateRange.to) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Investigation failed') }
+  }
+  useEffect(() => {
+    if (run) return
+    let active = true
+    const range = rangeFor(asOf)
+    startInvestigation(tenant, range.from, range.to)
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Unable to load dashboard') })
+    return () => { active = false }
+  }, [tenant, asOf, run])
 
   useEffect(() => {
-    if (allData) loadAll()
-  }, [lastRefresh]) // eslint-disable-line react-hooks/exhaustive-deps
+    let active = true
+    if (!run) return
+    setDateRange(rangeFor(run.asOfDate))
+    const cached = cachedCharts(tenant, run.asOfDate, run.trust.dataVersion)
+    if (cached) {
+      try { setAllData(dashboardView(run, cached)); setError(null) }
+      catch (e) { setError(e instanceof Error ? e.message : 'No data for this window'); setAllData(null) }
+      return
+    }
+    setChartLoading(true)
+    fetchCharts(tenant, run.asOfDate, run.trust.dataVersion).then(charts => {
+      if (active) { setAllData(dashboardView(run, charts)); setError(null) }
+    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Charts unavailable') })
+      .finally(() => { if (active) setChartLoading(false) })
+    return () => { active = false }
+  }, [tenant, run])
 
   const d = allData?.dashboard
 
   return (
     <div>
-      {loading && <LoadingOverlay />}
+      {loading && !allData && <LoadingOverlay />}
+      {loading && allData && <div className="caveat-ribbon" role="status">Updating capture… The previous result remains visible.</div>}
 
+      <h1 className="page-title">{role === 'LINE_MANAGER' ? 'Arrival and shift overview' : role === 'FACILITIES_HEAD' ? 'Performance and cost overview' : 'Your transport overview'}</h1>
+      <p className="page-subtitle">{MANAGER_ROLES[role]} · {tenant} · Review what changed and the next steps for your business unit.</p>
       <div className="filter-bar">
         <div className="filter-group">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: '#3FA535' }}>
             <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          <span className="filter-label">Tenant</span>
+          <span className="filter-label">Business unit</span>
           <span className="filter-value">{tenant}</span>
         </div>
         <div className="filter-divider" />
@@ -656,9 +483,10 @@ export function DashboardPage() {
         <button className="filter-apply-btn" type="button" onClick={loadAll} disabled={loading}>
           {loading ? 'Running…' : 'Analyse'}
         </button>
-        {d && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#3FA535', fontWeight: 700 }}>● LIVE DATA</span>}
+        {d && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#3FA535', fontWeight: 700 }}>● CAPTURED DATA</span>}
       </div>
 
+      <p className="page-subtitle">{lastRefresh ? `Captured ${new Date(lastRefresh).toLocaleString()}. ` : ''}Unchanged selections reuse this capture. Refresh requests a new investigation; date windows compare seven days with the prior four weeks.</p>
       {error && (
         <div className="caveat-ribbon" style={{ background: '#FFF0F0', borderColor: '#FFCCCC', color: '#B00020', marginBottom: 12 }}>⚠ {error}</div>
       )}
@@ -674,11 +502,10 @@ export function DashboardPage() {
           </div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: '#16211B' }}>Ready to analyse</div>
           <div style={{ fontSize: '0.85rem', textAlign: 'center', maxWidth: 380, color: '#6B7A70', lineHeight: 1.7 }}>
-            Select a tenant and date range, then click <strong style={{ color: '#16211B' }}>Analyse</strong> to run the 4-agent pipeline.<br />
-            Supervisor · Investigator · Critic · Briefing
+            Select a business unit and seven-day window, then click <strong style={{ color: '#16211B' }}>Analyse</strong> to review your transport performance.
           </div>
           <div style={{ fontSize: '0.78rem', color: '#A8B2AB', textAlign: 'center', maxWidth: 400 }}>
-            Dataset: May–July 2026 · Tenants: pinnacle-Slc · vanta-Sea · vanta-Aus · catalyst-Sac · orbit-Slc
+            Dataset: May–July 2026 · Business units: pinnacle-Slc · vanta-Sea · vanta-Aus · catalyst-Sac · orbit-Slc
           </div>
         </div>
       )}
@@ -696,21 +523,21 @@ export function DashboardPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: '#FEF3C7', border: '1px solid #F59E0B', color: '#92400E', fontSize: '0.71rem', fontWeight: 700 }}>
-                    M01 · Delayed Trip Rate
+                    Delayed Trip Rate
                   </span>
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(60,104,208,0.1)', border: '1px solid rgba(60,104,208,0.3)', color: '#3C68D0', fontSize: '0.71rem', fontWeight: 700 }}>
-                    4-Agent Pipeline
+                    Transport overview
                   </span>
                 </div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16211B', marginBottom: 6, lineHeight: 1.3 }}>
-                  {d.headline}
+                  {plain(d.headline)}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#6B7A70' }}>
                   {tenant} · {d.metric.periodStart} → {d.metric.periodEnd} · {d.metric.denominator.toLocaleString()} eligible trips
                 </div>
               </div>
-              <div style={{ textAlign: 'center', background: d.metric.value > 20 ? 'rgba(176,0,32,0.08)' : d.metric.value > 10 ? 'rgba(212,144,12,0.08)' : 'rgba(63,165,53,0.08)', border: `1px solid ${d.metric.value > 20 ? 'rgba(176,0,32,0.25)' : d.metric.value > 10 ? 'rgba(212,144,12,0.25)' : 'rgba(63,165,53,0.25)'}`, borderRadius: 12, padding: '16px 24px', minWidth: 120, flexShrink: 0, marginLeft: 20 }}>
-                <div style={{ fontSize: '2.2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: d.metric.value > 20 ? '#B00020' : d.metric.value > 10 ? '#D4900C' : '#2E7D3E', lineHeight: 1 }}>
+              <div style={{ textAlign: 'center', background: 'rgba(176,0,32,0.08)', border: `1px solid ${'rgba(176,0,32,0.25)'}`, borderRadius: 12, padding: '16px 24px', minWidth: 120, flexShrink: 0, marginLeft: 20 }}>
+                <div style={{ fontSize: '2.2rem', fontWeight: 800, fontFamily: 'IBM Plex Mono, monospace', color: '#B00020', lineHeight: 1 }}>
                   {d.metric.value.toFixed(1)}%
                 </div>
                 <div style={{ fontSize: '0.65rem', color: '#6B7A70', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 }}>delayed</div>
@@ -718,10 +545,18 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Anomaly alerts */}
-          {allData!.vendors.length > 0 && (
-            <AnomalyAlerts vendors={allData!.vendors} fleetAvg={d.metric.value} />
-          )}
+          {role === 'FACILITIES_HEAD' && <div className="card card-body" style={{ marginBottom: 16 }}><h3>Leadership summary</h3><p>{plain(d.leadershipSummary)}</p><h4>Median billed cost per trip</h4><p>{formatValue(allData!.cost.value, allData!.cost.unit)} · previous four weeks: {formatValue(allData!.cost.baselineValue, allData!.cost.unit)}</p><p>{allData!.cost.caveats.map(plain).join(' ')}</p></div>}
+          {role === 'LINE_MANAGER' && <div className="card card-body" style={{ marginBottom: 16 }}>
+            <h3>Arrival readiness</h3><p>Review recorded no-shows and delays by shift. These are business-unit totals, not a count of your team members.</p>
+            <p>No-show rate: <strong>{formatValue(allData!.noShow.value, allData!.noShow.unit)}</strong> · {allData!.noShow.numerator?.toLocaleString() ?? '—'} of {allData!.noShow.denominator?.toLocaleString() ?? '—'} eligible passenger trip legs.</p>
+            <details><summary>No-show data coverage</summary>{allData!.noShow.caveats.map(c => <p key={c}>{plain(c)}</p>)}</details>
+            <table className="data-table"><thead><tr><th>Shift</th><th>Late trips</th><th>Eligible trips</th><th>Delay rate</th></tr></thead>
+              <tbody>{allData!.shifts.rows.filter(row => row.currentValue != null).slice(0, 12).map(row => <tr key={row.member}><td>{row.member}</td><td>{row.currentNumerator.toLocaleString()}</td><td>{row.currentDenominator.toLocaleString()}</td><td>{formatValue(row.currentValue, 'PERCENT')}</td></tr>)}</tbody>
+            </table>
+            <details><summary>Shift data coverage</summary>{allData!.shifts.caveats.map(c => <p key={c}>{plain(c)}</p>)}</details>
+          </div>}
+          {/* Findings from the actual workflow */}
+          <AnomalyAlerts data={d} />
 
           {/* KPI strip */}
           <KpiStrip data={d} trend={allData!.trend} />
@@ -730,7 +565,7 @@ export function DashboardPage() {
           {allData!.trend.length > 0 && <TrendChart data={allData!.trend} />}
 
           {/* Vendor + Site side by side */}
-          {(allData!.vendors.length > 0 || allData!.sites.length > 0) && (
+          {role !== 'LINE_MANAGER' && (allData!.vendors.length > 0 || allData!.sites.length > 0) && (
             <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
               {allData!.vendors.length > 0 && <VendorChart data={allData!.vendors} />}
               {allData!.sites.length > 0 && <SiteDonut data={allData!.sites} />}
@@ -738,7 +573,7 @@ export function DashboardPage() {
           )}
 
           {/* Delta bars + Site table */}
-          {(allData!.vendors.length > 0 || allData!.sites.length > 0) && (
+          {role !== 'LINE_MANAGER' && (allData!.vendors.length > 0 || allData!.sites.length > 0) && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               {allData!.vendors.length > 0 && <VendorDeltaBars data={allData!.vendors} />}
               {allData!.sites.length > 0 && <SiteDelayTable data={allData!.sites} />}
@@ -747,15 +582,13 @@ export function DashboardPage() {
 
           {/* Agent analysis full-width */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 8 }}>
-            <AgentInsightPanel data={d} />
+            {role !== 'LINE_MANAGER' && <AgentInsightPanel data={d} />}
           </div>
 
-          {/* Industry benchmark context */}
-          <IndustryBenchmarkPanel delayRate={d.metric.value} />
-
+          <details className="card card-body"><summary>Data coverage and limitations</summary>
           {d.evidence.caveats.map((c, i) => (
-            <div key={i} className="caveat-ribbon" style={{ marginTop: 8 }}>⚠ {c}</div>
-          ))}
+            <div key={i} className="caveat-ribbon" style={{ marginTop: 8 }}>⚠ {plain(c)}</div>
+          ))}</details>
         </>
       )}
     </div>

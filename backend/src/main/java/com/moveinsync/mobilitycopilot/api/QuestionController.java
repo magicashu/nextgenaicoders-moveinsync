@@ -5,6 +5,7 @@ import com.moveinsync.mobilitycopilot.api.dto.ApiDtos;
 import com.moveinsync.mobilitycopilot.api.security.TrustedHeaders;
 import com.moveinsync.mobilitycopilot.conversation.application.ContextualQuestionService;
 import com.moveinsync.mobilitycopilot.conversation.domain.QuestionScope;
+import com.moveinsync.mobilitycopilot.conversation.application.QuestionExplanation;
 import com.moveinsync.mobilitycopilot.evidence.domain.EvidenceBundle;
 import com.moveinsync.mobilitycopilot.reporting.application.BriefRenderer;
 import com.moveinsync.mobilitycopilot.reporting.application.RunView;
@@ -45,17 +46,27 @@ public class QuestionController {
         QuestionScope scope = questions.classify(actor, request.question());
         if (scope.refused()) {
             return new ApiDtos.QuestionResponse(null, actor.businessUnit(), scope.intent(), List.of(), true, scope.refusalReason(),
-                    "I can only answer governed analytical questions about " + actor.businessUnit() + ". " + scope.refusalReason() + ".",
+                    scope.refusalReason(),
                     List.of(), List.of(), null, null, null, questions.suggestedQuestions());
         }
         LocalDate asOf = request.asOfDate() == null ? LocalDate.parse("2026-06-08") : request.asOfDate();
         Optional<RunView> answer = questions.answer(actor, context.tenant(actor), asOf, RequestContext.persona(actor, request.persona()), scope, request.relatedRunId());
         RunView run = answer.orElseThrow();
         List<ApiDtos.Finding> findings = run.claims().stream().filter(c -> !"CAVEAT".equals(c.kind()))
-                .map(c -> new ApiDtos.Finding(c.claimId(), c.text(), c.kind(), c.evidenceIds(), c.worker())).toList();
+                .filter(c -> scope.workers().isEmpty() || scope.workers().contains(c.worker()) || "detector".equals(c.worker()))
+                .sorted(java.util.Comparator.comparing(c -> "detector".equals(c.worker()) ? 1 : 0)).limit(6)
+                .map(c -> new ApiDtos.Finding(c.claimId(), QuestionExplanation.plain(c.text()), c.kind(), c.evidenceIds(), c.worker())).toList();
         List<ApiDtos.Finding> caveats = run.claims().stream().filter(c -> "CAVEAT".equals(c.kind()))
                 .map(c -> new ApiDtos.Finding(c.claimId(), c.text(), c.kind(), c.evidenceIds(), c.worker())).toList();
-        String direct = findings.isEmpty() ? run.brief().headline() : findings.stream().filter(f -> !f.worker().equals("detector")).findFirst().map(ApiDtos.Finding::text).orElse(findings.getFirst().text());
+        if (findings.isEmpty()) {
+            findings = run.brief().findings().stream().limit(6).map(text -> new ApiDtos.Finding(
+                    UUID.nameUUIDFromBytes(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(),
+                    QuestionExplanation.plain(text), "DIRECT", List.of(), "overview")).toList();
+        }
+        String direct = QuestionExplanation.explain(run, findings, scope.intent().contains("DELAY_REASONS") || scope.intent().contains("CONCENTRATION"));
+        if ("LINE_MANAGER".equals(run.persona())) {
+            direct = "Here is the available business-unit overview. This read-only report does not establish the cause of an individual team's delays. Your transport manager can investigate further.\n\n" + direct;
+        }
         EvidenceBundle evidence = run.brief().evidence();
         return new ApiDtos.QuestionResponse(run.runId(), run.businessUnit(), scope.intent(), scope.workers(), false, null, direct, findings, caveats, evidence,
                 renderer.trust(run), run.recommendedAction(), questions.followUps(scope));
